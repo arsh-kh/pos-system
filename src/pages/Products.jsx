@@ -63,11 +63,7 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  
-  // Exchange Rate State (IQD per 1 USD)
-  const [exchangeRate, setExchangeRate] = useState(() => {
-    return Number(localStorage.getItem('pos_exchange_rate')) || 1500;
-  });
+
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -76,7 +72,7 @@ const Products = () => {
   // Form State
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL'); // 'ALL', 'LOW_STOCK', 'EXPIRING'
   const [formData, setFormData] = useState({
-    name: '', barcode: '', cost_price: '', selling_price: '', usd_price: '', stock: '', category_id: '',
+    name: '', barcode: '', cost_price: '', selling_price: '', stock: '', category_id: '',
     wholesale_price: '', expiry_date: '', low_stock_threshold: '5'
   });
 
@@ -121,7 +117,7 @@ const Products = () => {
   const openAddModal = () => {
     setEditId(null);
     setFormData({ 
-      name: '', barcode: '', cost_price: '', selling_price: '', usd_price: '', stock: '', category_id: '',
+      name: '', barcode: '', cost_price: '', selling_price: '', stock: '', category_id: '',
       wholesale_price: '', expiry_date: '', low_stock_threshold: '5' 
     });
     setIsModalOpen(true);
@@ -134,7 +130,6 @@ const Products = () => {
       barcode: p.barcode, 
       cost_price: p.cost_price || '', 
       selling_price: p.selling_price || '', 
-      usd_price: p.usd_price || '', 
       stock: p.stock !== undefined ? p.stock : '', 
       category_id: p.category_id || '',
       wholesale_price: p.wholesale_price || '',
@@ -150,30 +145,7 @@ const Products = () => {
     setFormData(prev => ({ ...prev, barcode: randomBarcode }));
   };
 
-  // Dual Currency Calculations
-  const handleUsdChange = (usdVal) => {
-    const numUsd = parseFloat(usdVal);
-    const updated = { ...formData, usd_price: usdVal };
-    if (!isNaN(numUsd) && numUsd > 0 && exchangeRate > 0) {
-      updated.selling_price = Math.round(numUsd * exchangeRate).toString();
-    }
-    setFormData(updated);
-  };
 
-  const handleIqdChange = (iqdVal) => {
-    const numIqd = parseFloat(iqdVal);
-    const updated = { ...formData, selling_price: iqdVal };
-    if (!isNaN(numIqd) && numIqd > 0 && exchangeRate > 0) {
-      updated.usd_price = (numIqd / exchangeRate).toFixed(2);
-    }
-    setFormData(updated);
-  };
-
-  const handleExchangeRateChange = (newRate) => {
-    const rate = Math.max(1, Number(newRate) || 1500);
-    setExchangeRate(rate);
-    localStorage.setItem('pos_exchange_rate', rate.toString());
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -318,7 +290,7 @@ const Products = () => {
             <Tag color="#8b5cf6" size={32} />
             بەشی کاڵاکان
           </h1>
-          <p className="text-secondary">بینین، گەڕان، بەڕێوەبردنی نرخ (دینار و دۆلار) و ئامادەکردنی بارکۆد بۆ چاپ</p>
+          <p className="text-secondary">بینین، گەڕان، بەڕێوەبردنی نرخ و ئامادەکردنی بارکۆد بۆ چاپ</p>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -339,18 +311,7 @@ const Products = () => {
             )}
           </div>
 
-          {/* Currency Rate Indicator */}
-          <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.6rem 1rem', borderRadius: '12px', fontSize: '0.9rem', color: '#94a3b8' }}>
-            <Coins size={16} color="#10b981" />
-            <span>١ دۆلار = </span>
-            <input 
-              type="number"
-              value={exchangeRate}
-              onChange={(e) => handleExchangeRateChange(e.target.value)}
-              style={{ width: '70px', padding: '2px 6px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#10b981', fontWeight: 'bold', textAlign: 'center' }}
-            />
-            <span>دینار</span>
-          </div>
+
           
           {/* Add New Product Button */}
           <button 
@@ -500,7 +461,6 @@ const Products = () => {
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <div style={{ color: '#10b981', fontWeight: 'bold' }}>{Number(p.selling_price).toLocaleString()} دینار</div>
-                    <small style={{ color: '#f59e0b', fontSize: '0.75rem' }}>{p.usd_price || (Number(p.selling_price) / exchangeRate).toFixed(2)} دۆلار</small>
                   </td>
                   <td style={{ padding: '16px 20px', color: p.wholesale_price > 0 ? '#c084fc' : '#64748b', fontWeight: p.wholesale_price > 0 ? 'bold' : 'normal' }}>
                     {p.wholesale_price > 0 ? `${Number(p.wholesale_price).toLocaleString()} دینار` : '-'}
@@ -662,18 +622,15 @@ const Products = () => {
                 </small>
               </div>
 
-              {/* Pricing Section with Dual Currency */}
+              {/* Pricing Section (Iraqi Dinar Only) */}
               <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
                   <span style={{ fontWeight: 'bold', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Coins size={18} color="#10b981" /> بەڕێوەبردنی نرخ و دۆلار
-                  </span>
-                  <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                    تێکڕای گۆڕینەوە: ١ دۆلار = {exchangeRate} دینار
+                    <Coins size={18} color="#10b981" /> دیاریکردنی نرخەکان (دیناری عێراقی)
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>نرخی کڕین (دینار)</label>
                     <input 
@@ -691,7 +648,7 @@ const Products = () => {
                       type="number" 
                       required 
                       value={formData.selling_price} 
-                      onChange={e => handleIqdChange(e.target.value)} 
+                      onChange={e => setFormData({ ...formData, selling_price: e.target.value })} 
                       style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 'bold' }} 
                     />
                   </div>
@@ -704,18 +661,6 @@ const Products = () => {
                       value={formData.wholesale_price} 
                       onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
                       style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.1)', border: '1px solid rgba(192, 132, 252, 0.3)', color: '#c084fc', fontWeight: 'bold' }} 
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#f59e0b', fontWeight: 'bold' }}>بەرامبەر بە دۆلار</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.usd_price} 
-                      onChange={e => handleUsdChange(e.target.value)} 
-                      placeholder="0.00"
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#f59e0b', fontWeight: 'bold' }} 
                     />
                   </div>
                 </div>

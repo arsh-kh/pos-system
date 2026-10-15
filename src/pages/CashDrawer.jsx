@@ -9,7 +9,7 @@ import {
   CheckCircle2, 
   TrendingUp, 
   Wallet, 
-  DollarSign, 
+  Coins, 
   CreditCard, 
   X,
   History,
@@ -198,7 +198,7 @@ const CashDrawer = () => {
             <div className="stat-card glass-panel" style={{ background: 'rgba(59, 130, 246, 0.08)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3>سەرمایەی سەرەتا (قاسە)</h3>
-                <DollarSign size={20} color="#60a5fa" />
+                <Coins size={20} color="#60a5fa" />
               </div>
               <div className="value" style={{ color: '#60a5fa' }}>
                 {Number(stats?.opening_cash || 0).toLocaleString()} دینار

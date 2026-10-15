@@ -7,7 +7,6 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Package, 
-  DollarSign, 
   Calendar, 
   User, 
   Receipt, 
