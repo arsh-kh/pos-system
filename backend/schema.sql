@@ -1,0 +1,140 @@
+DROP DATABASE IF EXISTS pos_db;
+CREATE DATABASE pos_db;
+USE pos_db;
+
+CREATE TABLE IF NOT EXISTS Users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('ADMIN', 'CASHIER') NOT NULL DEFAULT 'CASHIER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Customer_Debts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    amount BIGINT NOT NULL,
+    transaction_type ENUM('ADD', 'PAY') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Suppliers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),
+    total_paid BIGINT DEFAULT 0,
+    total_remaining BIGINT DEFAULT 0
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Purchase_Invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier_id INT NOT NULL,
+    total_amount BIGINT NOT NULL,
+    paid_amount BIGINT NOT NULL,
+    remaining_amount BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES Suppliers(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Discounts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    discount_type ENUM('PERCENTAGE', 'FIXED') NOT NULL,
+    discount_value DECIMAL(10,2) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    barcode VARCHAR(100) UNIQUE NOT NULL,
+    cost_price BIGINT NOT NULL,
+    selling_price BIGINT NOT NULL,
+    usd_price DECIMAL(10,2) DEFAULT 0.00,
+    stock INT NOT NULL DEFAULT 0,
+    category_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES Categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Purchase_Invoice_Items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    cost_price BIGINT NOT NULL,
+    selling_price BIGINT NOT NULL,
+    FOREIGN KEY (invoice_id) REFERENCES Purchase_Invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Sales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    total_amount BIGINT NOT NULL,
+    total_profit BIGINT NOT NULL DEFAULT 0,
+    customer_id INT,
+    discount_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customers(id) ON DELETE SET NULL,
+    FOREIGN KEY (discount_id) REFERENCES Discounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Sale_Items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sale_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price_at_sale BIGINT NOT NULL,
+    FOREIGN KEY (sale_id) REFERENCES Sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Returns (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sale_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    refunded_amount BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sale_id) REFERENCES Sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Expenses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    description VARCHAR(255) NOT NULL,
+    amount BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Needs_Categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Needs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    is_fulfilled BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (category_id) REFERENCES Needs_Categories(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Insert Mock Dummy Products for Testing (Only runs if DB is empty or ignoring duplicates)
+INSERT IGNORE INTO Categories (id, name) VALUES (1, 'خواردنەوەکان'), (2, 'شیرینی');
+INSERT IGNORE INTO Products (name, barcode, cost_price, selling_price, stock, category_id) VALUES 
+('ماء معدني كبير', '123456789012', 250, 500, 100, 1),
+('بسكويت الشوكولاتة', '098765432109', 500, 1000, 50, 2),
+('شاي عراقي ممتاز', '111122223333', 1500, 2500, 200, 1);
