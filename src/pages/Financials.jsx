@@ -12,12 +12,15 @@ import {
   CheckCircle2,
   CreditCard,
   Eye,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 const Financials = () => {
+  const { isAdmin } = useAuth();
   const [suppliers, setSuppliers] = useState([]);
   const [allInvoices, setAllInvoices] = useState([]);
   const [purchaseReturns, setPurchaseReturns] = useState([]);
@@ -241,6 +244,20 @@ const Financials = () => {
 
     return Object.values(dataMap);
   }, [selectedProfile]);
+
+  if (!isAdmin) {
+    return (
+      <div className="dashboard-page p-8" style={{ textAlign: 'center', paddingTop: '80px' }}>
+        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <AlertTriangle size={40} color="#f87171" />
+        </div>
+        <h2 style={{ fontSize: '1.6rem', color: '#f87171', marginBottom: '10px' }}>دەسەڵاتی بینینی ئەم بەشەت نییە</h2>
+        <p style={{ color: '#94a3b8', maxWidth: '500px', margin: '0 auto' }}>
+          بەشی دارایی و قازانجی کۆمپانیاکان تایبەتە بە بەڕێوەبەر (Admin). تکایە لە شریتی سەرەوە بە هەژماری ئەدمین بچۆ ژوورەوە.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-page p-8" style={{ position: 'relative' }}>

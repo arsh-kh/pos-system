@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Moon, Sun, Database, Shield, CheckCircle2 } from 'lucide-react';
+import { Moon, Sun, Database, Shield, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 const Settings = () => {
+  const { isAdmin } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [savedNotice, setSavedNotice] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
@@ -42,6 +44,20 @@ const Settings = () => {
       setBackupLoading(false);
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="dashboard-page p-8" style={{ textAlign: 'center', paddingTop: '80px' }}>
+        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <AlertTriangle size={40} color="#f87171" />
+        </div>
+        <h2 style={{ fontSize: '1.6rem', color: '#f87171', marginBottom: '10px' }}>دەسەڵاتی بینینی ئەم بەشەت نییە</h2>
+        <p style={{ color: '#94a3b8', maxWidth: '500px', margin: '0 auto' }}>
+          بەشی ڕێکخستنی سیستەم و باکئەپ تایبەتە بە بەڕێوەبەر (Admin). تکایە لە شریتی سەرەوە بە هەژماری ئەدمین بچۆ ژوورەوە.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-page p-8" style={{ position: 'relative' }}>

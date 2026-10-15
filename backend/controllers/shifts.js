@@ -1,4 +1,5 @@
 const db = require('../db');
+const { logAuditAction } = require('../middleware/auditLogger');
 
 exports.getCurrentShift = async (req, res) => {
     try {
@@ -74,6 +75,16 @@ exports.openShift = async (req, res) => {
             [name, openFloat]
         );
 
+        // Audit log shift opening
+        await logAuditAction({
+            req,
+            action_type: 'SHIFT_OPEN',
+            entity_name: 'Shifts',
+            entity_id: result.insertId,
+            new_value: { cashier_name: name, opening_cash: openFloat },
+            details: `کردنەوەی شیفتی نوێ بە ناوی "${name}"، سەرمایەی سەرەتای قاسە: ${openFloat.toLocaleString()} دینار`
+        });
+
         res.status(201).json({
             status: 'SUCCESS',
             message: 'شیفتی نوێ بە سەرکەوتوویی کرایەوە',
@@ -139,9 +150,19 @@ exports.closeShift = async (req, res) => {
 
         const [updatedRows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [id]);
 
+        // Audit log shift closing
+        await logAuditAction({
+            req,
+            action_type: 'SHIFT_CLOSE',
+            entity_name: 'Shifts',
+            entity_id: id,
+            new_value: { expected_cash: expectedCash, actual_cash: countedCash, difference: diff, notes },
+            details: `داخستنی شیفت #${id}: ژمێردراوی ڕاستەقینە ${countedCash.toLocaleString()} دینار، پێشبینیکراو ${expectedCash.toLocaleString()} دینار، جیاوازی: ${diff === 0 ? '٠ (تەواو)' : diff > 0 ? `+${diff.toLocaleString()} (زیادە)` : `${diff.toLocaleString()} (کورتهێنان)`}`
+        });
+
         res.json({
             status: 'SUCCESS',
-            message: 'شیفت بە سەرکەوتوویی داخرا و ڕاپۆرتی Z-Report ئامادەکرا',
+            message: 'شیفت بە سەرکەوتوویی داخرا و ڕاپۆرتی Z دەرچوو',
             data: updatedRows[0]
         });
     } catch (error) {
@@ -152,7 +173,7 @@ exports.closeShift = async (req, res) => {
 
 exports.getAllShifts = async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM Shifts ORDER BY id DESC");
+        const [rows] = await db.query("SELECT * FROM Shifts ORDER BY id DESC LIMIT 50");
         res.json({ status: 'SUCCESS', data: rows });
     } catch (error) {
         console.error('Get All Shifts Error:', error);

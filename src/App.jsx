@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import UserBar from './components/UserBar';
+
 import Home from './pages/Home';
 import Cashier from './pages/Cashier';
 import ThisMonth from './pages/ThisMonth';
@@ -16,33 +19,35 @@ import Promotions from './pages/Promotions';
 import SalesHistory from './pages/SalesHistory';
 import TotalSales from './pages/TotalSales';
 import Settings from './pages/Settings';
-import './Layout.css'; // Keep if you have global styles
+import AuditLogs from './pages/AuditLogs';
+import './Layout.css';
 
-// PageWrapper adds a back button to all pages except Home
+// PageWrapper adds back nav and top user status bar
 const PageWrapper = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  if (location.pathname === '/') {
-    return children;
-  }
-
   return (
-    <div className="page-wrapper">
-      <nav className="back-nav">
-        <button className="btn-back" onClick={() => navigate('/')}>
-          <ArrowRight size={20} />
-          گەڕانەوە بۆ سەرەکی
-        </button>
-      </nav>
-      <main className="page-content">
+    <div className="page-wrapper" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <UserBar />
+      
+      {location.pathname !== '/' && (
+        <nav className="back-nav" style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <button className="btn-back" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+            <ArrowRight size={20} />
+            گەڕانەوە بۆ سەرەکی
+          </button>
+        </nav>
+      )}
+
+      <main className="page-content" style={{ flex: 1 }}>
         {children}
       </main>
     </div>
   );
 };
 
-function App() {
+function AppContent() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('pos_theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -52,6 +57,7 @@ function App() {
       document.body.classList.remove('theme-light');
     }
   }, []);
+
   return (
     <PageWrapper>
       <Routes>
@@ -70,8 +76,17 @@ function App() {
         <Route path="/history" element={<SalesHistory />} />
         <Route path="/total-sales" element={<TotalSales />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/audit-logs" element={<AuditLogs />} />
       </Routes>
     </PageWrapper>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

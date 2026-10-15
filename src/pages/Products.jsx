@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { Search, Plus, Edit2, Trash2, X, Barcode, Printer, Tag, Coins, AlertTriangle, Calendar } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
+import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 // SVG Barcode Component for High-Quality Thermal Print
@@ -56,6 +57,7 @@ const BarcodeSVG = ({ value, width = 220, height = 65 }) => {
 };
 
 const Products = () => {
+  const { isAdmin } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -577,14 +579,16 @@ const Products = () => {
                     >
                       <Edit2 size={16} />
                     </button>
-                    {/* Delete Button */}
-                    <button 
-                      title="سڕینەوە"
-                      onClick={() => handleDelete(p.id)} 
-                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {/* Delete Button (Admin Only) */}
+                    {isAdmin && (
+                      <button 
+                        title="سڕینەوە"
+                        onClick={() => handleDelete(p.id)} 
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

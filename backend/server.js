@@ -77,6 +77,10 @@ app.use('/api/needs', needsRoutes);
 const analyticsRoutes = require('./routes/analytics');
 app.use('/api/analytics', analyticsRoutes);
 
+// Audit Logs API (چاودێری و تۆماری چالاکییەکان بۆ ئەدمین)
+const auditRoutes = require('./routes/audit');
+app.use('/api/audit-logs', auditRoutes);
+
 // Database Backup API
 app.get('/api/backup', async (req, res) => {
     try {

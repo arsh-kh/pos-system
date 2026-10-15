@@ -1,4 +1,5 @@
 const db = require('../db');
+const { logAuditAction } = require('../middleware/auditLogger');
 
 exports.createExpense = async (req, res) => {
     const { title, category, amount, expense_date, notes } = req.body;
@@ -14,6 +15,16 @@ exports.createExpense = async (req, res) => {
             'INSERT INTO Expenses (title, description, category, amount, expense_date, notes) VALUES (?, ?, ?, ?, ?, ?)',
             [title.trim(), title.trim(), category.trim(), numAmount, dateVal, notes || null]
         );
+
+        // Audit log expense creation
+        await logAuditAction({
+            req,
+            action_type: 'EXPENSE_CREATE',
+            entity_name: 'Expenses',
+            entity_id: result.insertId,
+            new_value: { title, category, amount: numAmount, expense_date: dateVal, notes },
+            details: `تۆمارکردنی خەرجی نوێ: "${title}" بە بڕی ${numAmount.toLocaleString()} دینار بۆ جۆری [${category}]`
+        });
 
         res.status(201).json({
             status: 'SUCCESS',
@@ -105,8 +116,32 @@ exports.getExpenseSummary = async (req, res) => {
 
 exports.deleteExpense = async (req, res) => {
     const { id } = req.params;
+    const userRole = req.user?.role || req.headers['x-user-role'] || 'CASHIER';
+
+    // Enforce Privilege: Only ADMIN can delete expenses
+    if (userRole === 'CASHIER') {
+        return res.status(403).json({ 
+            status: 'ERROR', 
+            message: 'کاشێر دەسەڵاتی سڕینەوەی مەساریفی نییە. ئەم کردارە تەنها بۆ بەڕێوەبەر (Admin) ڕێپێدراوە.' 
+        });
+    }
+
     try {
+        const [existing] = await db.query('SELECT * FROM Expenses WHERE id = ?', [id]);
+        const deletedExpense = existing[0] || {};
+
         await db.query('DELETE FROM Expenses WHERE id = ?', [id]);
+
+        // Audit log expense deletion
+        await logAuditAction({
+            req,
+            action_type: 'EXPENSE_DELETE',
+            entity_name: 'Expenses',
+            entity_id: id,
+            old_value: deletedExpense,
+            details: `سڕینەوەی خەرجی "${deletedExpense.title || id}" بە بڕی ${Number(deletedExpense.amount || 0).toLocaleString()} دینار`
+        });
+
         res.json({ status: 'SUCCESS', message: 'خەرجی سڕایەوە' });
     } catch (error) {
         console.error('Delete Expense Error:', error);

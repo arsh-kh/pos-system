@@ -7,6 +7,7 @@ import {
   Trash2, 
   X 
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 const CATEGORIES = [
@@ -20,6 +21,7 @@ const CATEGORIES = [
 ];
 
 const Expenses = () => {
+  const { isAdmin } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -282,13 +284,15 @@ const Expenses = () => {
                       {exp.notes || '-'}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
-                      <button 
-                        onClick={() => handleDeleteExpense(exp.id)}
-                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        title="سڕینەوە"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {isAdmin && (
+                        <button 
+                          onClick={() => handleDeleteExpense(exp.id)}
+                          style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="سڕینەوە"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

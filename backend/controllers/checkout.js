@@ -1,4 +1,5 @@
 const db = require('../db');
+const { logAuditAction } = require('../middleware/auditLogger');
 
 const safeBigInt = (val) => {
     const num = Math.round(Number(val) || 0);
@@ -131,6 +132,18 @@ exports.processCheckout = async (req, res) => {
         }
 
         await connection.commit();
+
+        // Audit log manual discount if applied
+        if (discountVal > 0n) {
+            await logAuditAction({
+                req,
+                action_type: 'DISCOUNT_APPLIED',
+                entity_name: 'Sales',
+                entity_id: saleId,
+                new_value: { discount_amount: discountVal.toString(), final_total: finalTotal.toString() },
+                details: `داشکاندنی دەستی لە کاشێر بۆ پسووڵەی #${saleId}: بڕی ${Number(discountVal).toLocaleString()} دینار (کۆی گشتی: ${Number(finalTotal).toLocaleString()} د.ع)`
+            });
+        }
         res.status(201).json({ 
             status: 'SUCCESS', 
             saleId: saleId, 

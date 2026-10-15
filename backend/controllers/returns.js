@@ -1,4 +1,5 @@
 const db = require('../db');
+const { logAuditAction } = require('../middleware/auditLogger');
 
 // Lookup a sale and calculate returnable quantities for each item
 exports.getSaleForReturn = async (req, res) => {
@@ -112,6 +113,16 @@ exports.processReturn = async (req, res) => {
         );
 
         await connection.commit();
+
+        // Audit log refund return
+        await logAuditAction({
+            req,
+            action_type: 'REFUND_RETURN',
+            entity_name: 'Returns',
+            entity_id: sale_id,
+            new_value: { sale_id, product_id, return_qty: returnQty, refunded_amount: refundedAmount, reason },
+            details: `گەڕاندنەوەی ${returnQty} دانە لە کاڵا بۆ پسووڵەی #${sale_id} بە بڕی پارەی ${refundedAmount.toLocaleString()} دینار (هۆکار: ${reason || 'دیارینەکراو'})`
+        });
         res.json({ 
             status: 'SUCCESS', 
             message: 'کاڵا بە سەرکەوتوویی گەڕێنرایەوە بۆ کۆگا و بڕی پارەی پسووڵە نوێکرایەوە', 
