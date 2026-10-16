@@ -22,7 +22,56 @@ import './Dashboard.css';
 
 const Cashier = () => {
   const navigate = useNavigate();
-  const [cart, setCart] = useState([]);
+  // Multi-Cart State (Cart 1, Cart 2, Cart 3)
+  const [activeCartIndex, setActiveCartIndex] = useState(0);
+  const [carts, setCarts] = useState([
+    { id: 1, label: 'سەلە ١', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', isDebtSale: false },
+    { id: 2, label: 'سەلە ٢', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', isDebtSale: false },
+    { id: 3, label: 'سەلە ٣', shortcut: 'F8', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', isDebtSale: false }
+  ]);
+
+  // Active Cart Proxies
+  const currentCartData = carts[activeCartIndex] || carts[0];
+  const cart = currentCartData.items;
+  const selectedCustomerId = currentCartData.customerId;
+  const discountType = currentCartData.discountType;
+  const discountValue = currentCartData.discountValue;
+  const isDebtSale = currentCartData.isDebtSale;
+
+  // Active Cart Updaters
+  const updateActiveCart = (updater) => {
+    setCarts(prevCarts => {
+      const updated = [...prevCarts];
+      const target = updated[activeCartIndex] || updated[0];
+      const newTarget = typeof updater === 'function' ? updater(target) : { ...target, ...updater };
+      updated[activeCartIndex] = newTarget;
+      return updated;
+    });
+  };
+
+  const setCart = (itemsOrFn) => {
+    updateActiveCart(curr => {
+      const newItems = typeof itemsOrFn === 'function' ? itemsOrFn(curr.items) : itemsOrFn;
+      return { ...curr, items: newItems };
+    });
+  };
+
+  const setSelectedCustomerId = (val) => {
+    updateActiveCart(curr => ({ ...curr, customerId: typeof val === 'function' ? val(curr.customerId) : val }));
+  };
+
+  const setDiscountType = (val) => {
+    updateActiveCart(curr => ({ ...curr, discountType: typeof val === 'function' ? val(curr.discountType) : val }));
+  };
+
+  const setDiscountValue = (val) => {
+    updateActiveCart(curr => ({ ...curr, discountValue: typeof val === 'function' ? val(curr.discountValue) : val }));
+  };
+
+  const setIsDebtSale = (val) => {
+    updateActiveCart(curr => ({ ...curr, isDebtSale: typeof val === 'function' ? val(curr.isDebtSale) : val }));
+  };
+
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -49,13 +98,6 @@ const Cashier = () => {
   const [scaleWeight, setScaleWeight] = useState('1.000');
   const [scaleSelectedProductId, setScaleSelectedProductId] = useState('');
 
-  // Discount State (Amount in IQD or Percentage %)
-  const [discountType, setDiscountType] = useState('AMOUNT'); // 'AMOUNT' or 'PERCENT'
-  const [discountValue, setDiscountValue] = useState('');
-
-  // Customer & Payment State
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [isDebtSale, setIsDebtSale] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Receipt Print State
@@ -110,6 +152,15 @@ const Cashier = () => {
       } else if (e.key === 'F4') {
         e.preventDefault();
         discountInputRef.current?.focus();
+      } else if (e.key === 'F6' || (e.ctrlKey && e.key === '1')) {
+        e.preventDefault();
+        setActiveCartIndex(0);
+      } else if (e.key === 'F7' || (e.ctrlKey && e.key === '2')) {
+        e.preventDefault();
+        setActiveCartIndex(1);
+      } else if (e.key === 'F8' || (e.ctrlKey && e.key === '3')) {
+        e.preventDefault();
+        setActiveCartIndex(2);
       } else if (e.key === 'F9') {
         e.preventDefault();
         if (cart.length > 0 && !isCheckingOut) {
@@ -163,10 +214,12 @@ const Cashier = () => {
   };
 
   const clearCart = () => {
-    setCart([]);
-    setSelectedCustomerId('');
-    setIsDebtSale(false);
-    setDiscountValue('');
+    updateActiveCart({
+      items: [],
+      customerId: '',
+      isDebtSale: false,
+      discountValue: ''
+    });
   };
 
   // Add Quick Custom Item
@@ -399,6 +452,13 @@ const Cashier = () => {
         alert(`فرۆشتن بە سەرکەوتوویی ئەنجامدرا! کۆی گشتی: ${grandTotal.toLocaleString()} دینار`);
         clearCart();
         fetchData();
+        // Smart Auto-Return: If finished checking out on a quick cart (Cart 2 or Cart 3) and Cart 1 has items, return to Cart 1
+        setCarts(prevCarts => {
+          if (activeCartIndex !== 0 && prevCarts[0].items.length > 0) {
+            setActiveCartIndex(0);
+          }
+          return prevCarts;
+        });
       }
     } catch (err) {
       alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی فرۆشتن');
@@ -730,6 +790,55 @@ const Cashier = () => {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Multi-Cart Tabs Bar (Quick Sell / Parallel Customers) */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', background: 'rgba(0,0,0,0.3)', padding: '6px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {carts.map((c, idx) => {
+                const isActive = activeCartIndex === idx;
+                const itemCount = c.items.length;
+                const hasItems = itemCount > 0;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setActiveCartIndex(idx)}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: isActive ? '1.5px solid #38bdf8' : (hasItems ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid transparent'),
+                      background: isActive 
+                        ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(14, 165, 233, 0.35))' 
+                        : (hasItems ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255,255,255,0.02)'),
+                      color: isActive ? '#38bdf8' : (hasItems ? '#f59e0b' : '#94a3b8'),
+                      fontWeight: isActive ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: isActive ? '0 4px 12px rgba(56, 189, 248, 0.25)' : 'none'
+                    }}
+                    title={`سویچ بکە بۆ ${c.label} (${c.shortcut})`}
+                  >
+                    <span style={{ fontSize: '0.95rem' }}>{c.label}</span>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      padding: '2px 8px', 
+                      borderRadius: '10px',
+                      background: isActive 
+                        ? 'rgba(56, 189, 248, 0.3)' 
+                        : (hasItems ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.06)'),
+                      color: isActive ? '#ffffff' : (hasItems ? '#f59e0b' : '#64748b'),
+                      fontWeight: 'bold'
+                    }}>
+                      {itemCount > 0 ? `${itemCount} کاڵا` : c.shortcut}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Customer Dropdown for Cash or Credit Sales */}
