@@ -8,7 +8,8 @@ import {
   Plus, 
   X,
   PackagePlus,
-  RotateCcw
+  RotateCcw,
+  Truck
 } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import './Dashboard.css';
@@ -29,6 +30,7 @@ const Purchases = () => {
   });
   const [paymentMethod, setPaymentMethod] = useState('CASH'); // CASH, DEBT, PARTIAL
   const [paidAmount, setPaidAmount] = useState('');
+  const [additionalCost, setAdditionalCost] = useState(''); // Single additional cost field (delivery, lifting, etc.)
 
   // Invoice Items State
   // { product_id, name, barcode, quantity, cost_price, selling_price, stock_before }
@@ -185,8 +187,15 @@ const Purchases = () => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Grand Calculations
-  const { totalInvoiceCost, totalSalesValue, totalProfit } = useMemo(() => {
+  // Grand Calculations (with Exact Proportional Landed Cost Allocation)
+  const { 
+    itemsSubtotal, 
+    effectiveAdditionalCost, 
+    totalInvoiceCost, 
+    totalSalesValue, 
+    totalProfit, 
+    itemsWithLandedCost 
+  } = useMemo(() => {
     let cost = 0;
     let sales = 0;
 
@@ -199,12 +208,45 @@ const Purchases = () => {
       sales += sp * q;
     });
 
+    const addCost = Math.max(0, Math.round(Number(additionalCost) || 0));
+    const grandTotal = cost + addCost;
+
+    // Distribute additional cost proportionally per line item
+    let remainingAdd = addCost;
+    const itemsWithLanded = items.map((item, idx) => {
+      const q = Math.max(1, parseInt(item.quantity) || 1);
+      const cp = Math.max(0, Number(item.cost_price) || 0);
+      const lineSub = cp * q;
+
+      let allocated = 0;
+      if (addCost > 0 && cost > 0) {
+        if (idx === items.length - 1) {
+          allocated = remainingAdd;
+        } else {
+          allocated = Math.round((addCost * lineSub) / cost);
+          remainingAdd -= allocated;
+        }
+      }
+      const perUnitAdd = Math.round(allocated / q);
+      const landedUnitCost = cp + perUnitAdd;
+
+      return {
+        ...item,
+        allocatedCost: allocated,
+        perUnitAdd,
+        landedUnitCost
+      };
+    });
+
     return {
-      totalInvoiceCost: cost,
+      itemsSubtotal: cost,
+      effectiveAdditionalCost: addCost,
+      totalInvoiceCost: grandTotal,
       totalSalesValue: sales,
-      totalProfit: sales - cost
+      totalProfit: sales - grandTotal,
+      itemsWithLandedCost: itemsWithLanded
     };
-  }, [items]);
+  }, [items, additionalCost]);
 
   // Payment Method Smart Auto-Calculation Engine
   useEffect(() => {
@@ -232,6 +274,7 @@ const Purchases = () => {
         invoice_number: invoiceNumber || null,
         invoice_date: invoiceDate,
         payment_method: paymentMethod,
+        additional_cost: effectiveAdditionalCost,
         paid_amount: effectivePaid,
         remaining_amount: totalRemaining,
         items: items.map(i => ({
@@ -252,6 +295,7 @@ const Purchases = () => {
       setItems([]);
       setPaymentMethod('CASH');
       setPaidAmount('');
+      setAdditionalCost('');
 
       // Refresh products to show updated stock
       const prodRes = await axios.get('http://localhost:3001/api/products', getAuthConfig());
@@ -374,7 +418,9 @@ const Purchases = () => {
                     const qty = parseInt(item.quantity) || 0;
                     const cp = Number(item.cost_price) || 0;
                     const sp = Number(item.selling_price) || 0;
-                    const unitProfit = sp - cp;
+                    const itemLanded = itemsWithLandedCost[index];
+                    const effectiveCp = (itemLanded && effectiveAdditionalCost > 0) ? itemLanded.landedUnitCost : cp;
+                    const unitProfit = sp - effectiveCp;
                     const lineTotalSales = sp * qty;
                     const lineStockValuation = sp * ((item.stock_before || 0) + qty);
 
@@ -433,6 +479,11 @@ const Purchases = () => {
                               );
                             }
                           })()}
+                          {effectiveAdditionalCost > 0 && itemLanded && itemLanded.perUnitAdd > 0 && (
+                            <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: '5px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                              🚚 تێچووی گەیشتن: <strong>{itemLanded.landedUnitCost.toLocaleString()}</strong> (+{itemLanded.perUnitAdd.toLocaleString()})
+                            </div>
+                          )}
                         </td>
 
                         <td style={{ padding: '16px' }}>
@@ -446,6 +497,11 @@ const Purchases = () => {
 
                         <td style={{ padding: '16px', fontWeight: 'bold', color: unitProfit >= 0 ? '#10b981' : '#ef4444' }}>
                           {unitProfit.toLocaleString()} دینار
+                          {effectiveAdditionalCost > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'normal' }}>
+                              قازانجی نێت بە کرێوە
+                            </div>
+                          )}
                         </td>
 
                         <td style={{ padding: '16px', fontWeight: 'bold', color: '#38bdf8' }}>
@@ -558,23 +614,73 @@ const Purchases = () => {
               </div>
             </div>
 
+            {/* Single Additional Cost Field (Delivery / Lifting / Freight) */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', color: '#f59e0b', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Truck size={16} /> تێچووی زیادە (بار / گەیاندن / حەماڵی)
+                </span>
+                {effectiveAdditionalCost > 0 && (
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                    دابەشکراو بەسەر کاڵاکاندا
+                  </span>
+                )}
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={additionalCost} 
+                  onChange={(e) => setAdditionalCost(e.target.value)}
+                  placeholder="0"
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px 14px', 
+                    borderRadius: '10px', 
+                    background: 'rgba(245, 158, 11, 0.08)', 
+                    border: '1px solid rgba(245, 158, 11, 0.35)', 
+                    color: '#fbbf24', 
+                    fontFamily: 'monospace', 
+                    fontSize: '1.1rem', 
+                    fontWeight: 'bold' 
+                  }} 
+                />
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#f59e0b', fontSize: '0.85rem' }}>
+                  دینار
+                </span>
+              </div>
+              <small style={{ color: '#64748b', fontSize: '0.74rem', marginTop: '4px', display: 'block' }}>
+                💡 ئەم بڕە دەچێتە سەر کۆی پسووڵە و نرخی تێچووی ڕاستەقینەی دانەکان (Landed Cost) بۆ قازانج حیساب دەکات.
+              </small>
+            </div>
+
             {/* Invoice Summary Card */}
             <div style={{ padding: '1.25rem', background: 'rgba(0,0,0,0.25)', borderRadius: '14px', border: '1px dashed rgba(255,255,255,0.1)', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8' }}>
-                <span>کۆی گشتی تێچووی پسووڵە:</span>
-                <span style={{ color: '#f8fafc', fontWeight: 'bold', fontSize: '1.2rem' }}>{totalInvoiceCost.toLocaleString()} دینار</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+                <span>کۆی کاڵاکان (خام):</span>
+                <span style={{ color: '#cbd5e1', fontWeight: 'bold' }}>{itemsSubtotal.toLocaleString()} دینار</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8' }}>
+              {effectiveAdditionalCost > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', color: '#fbbf24', fontSize: '0.9rem' }}>
+                  <span>+ تێچووی زیادە (بار و حەماڵی):</span>
+                  <span style={{ fontWeight: 'bold' }}>{effectiveAdditionalCost.toLocaleString()} دینار</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', color: '#94a3b8' }}>
+                <span style={{ fontWeight: 'bold' }}>کۆی گشتی تێچووی پسووڵە:</span>
+                <span style={{ color: '#f8fafc', fontWeight: 'bold', fontSize: '1.25rem' }}>{totalInvoiceCost.toLocaleString()} دینار</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', color: '#94a3b8', fontSize: '0.88rem' }}>
                 <span>کۆی فرۆشتنی پێشبینیکراو:</span>
                 <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{totalSalesValue.toLocaleString()} دینار</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem', color: '#94a3b8' }}>
-                <span>کۆی قازانجی پێشبینیکراو:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', color: '#94a3b8', fontSize: '0.88rem' }}>
+                <span>کۆی قازانجی نێت:</span>
                 <span style={{ color: totalProfit >= 0 ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
                   {totalProfit.toLocaleString()} دینار
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.85rem' }}>
                 <span>ژمارەی کاڵاکان:</span>
                 <span style={{ color: '#f8fafc', fontWeight: 'bold' }}>{items.length} جۆر</span>
               </div>

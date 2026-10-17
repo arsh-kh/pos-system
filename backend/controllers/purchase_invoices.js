@@ -1,4 +1,6 @@
 const db = require('../db');
+const { logAuditAction } = require('../middleware/auditLogger');
+const { queueSyncEvent } = require('./sync');
 
 // Safe BigInt parser to prevent floating point crashes
 const safeBigInt = (val) => {
@@ -6,11 +8,13 @@ const safeBigInt = (val) => {
     return BigInt(num);
 };
 
-// Ensure columns for custom invoice number and payment method exist
+// Ensure columns for custom invoice number, payment method, additional cost, and landed cost price exist
 const ensureInvoicesSchema = async () => {
     try {
         try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN invoice_number VARCHAR(100) DEFAULT NULL"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN payment_method VARCHAR(50) DEFAULT 'CASH'"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN additional_cost BIGINT NOT NULL DEFAULT 0"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN landed_cost_price BIGINT DEFAULT NULL"); } catch (_) {}
     } catch (err) {
         console.error('Invoice schema ensure error:', err.message);
     }
@@ -18,7 +22,7 @@ const ensureInvoicesSchema = async () => {
 ensureInvoicesSchema();
 
 exports.createPurchaseInvoice = async (req, res) => {
-    const { supplier_id, paid_amount, remaining_amount, items, invoice_number, payment_method, invoice_date } = req.body;
+    const { supplier_id, paid_amount, remaining_amount, items, invoice_number, payment_method, invoice_date, additional_cost } = req.body;
     
     if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ status: 'ERROR', message: 'تکایە لانیکەم یەک کاڵا دیاری بکە' });
@@ -28,20 +32,28 @@ exports.createPurchaseInvoice = async (req, res) => {
         return res.status(400).json({ status: 'ERROR', message: 'کڕین بە قەرز پێویستی بە هەڵبژاردنی کۆمپانیایە' });
     }
 
+    const additionalCostBigInt = safeBigInt(additional_cost || 0);
+    if (additionalCostBigInt < 0n) {
+        return res.status(400).json({ status: 'ERROR', message: 'تێچووی زیادە ناتوانێت کەمتر بێت لە سفر' });
+    }
+
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
 
-        // Calculate total amount from items safely
-        let total_amount = 0n;
+        // Calculate items subtotal from items safely
+        let items_subtotal = 0n;
         for (const item of items) {
-            total_amount += safeBigInt(item.cost_price) * safeBigInt(item.quantity);
+            items_subtotal += safeBigInt(item.cost_price) * safeBigInt(item.quantity);
         }
+
+        // Grand Total = Items Subtotal + Additional Cost (Delivery / Lifting / Transport)
+        const total_amount = items_subtotal + additionalCostBigInt;
 
         // 1. Create Invoice
         const dateVal = invoice_date ? new Date(invoice_date) : new Date();
         const [invoiceResult] = await connection.query(
-            'INSERT INTO Purchase_Invoices (supplier_id, total_amount, paid_amount, remaining_amount, invoice_number, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Purchase_Invoices (supplier_id, total_amount, paid_amount, remaining_amount, invoice_number, payment_method, additional_cost, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 supplier_id ? supplier_id : null, 
                 total_amount.toString(), 
@@ -49,6 +61,7 @@ exports.createPurchaseInvoice = async (req, res) => {
                 safeBigInt(remaining_amount).toString(),
                 invoice_number || null,
                 payment_method || 'CASH',
+                additionalCostBigInt.toString(),
                 dateVal
             ]
         );
@@ -62,14 +75,44 @@ exports.createPurchaseInvoice = async (req, res) => {
             );
         }
 
-        // 3. Insert Items and Update Stock & Cost Price with FIFO Batches
-        for (const item of items) {
+        // 3. Proportional Landed Cost Allocation per Item
+        // Sum of all allocated fractions must exactly equal additionalCostBigInt
+        let remainingAdditional = additionalCostBigInt;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const rawCost = safeBigInt(item.cost_price);
+            const itemQty = safeBigInt(item.quantity);
+            const itemSubtotal = rawCost * itemQty;
+
+            let allocatedCostForItem = 0n;
+            if (additionalCostBigInt > 0n && items_subtotal > 0n) {
+                if (i === items.length - 1) {
+                    // Final item absorbs any fractional remainder to guarantee exact sum
+                    allocatedCostForItem = remainingAdditional;
+                } else {
+                    allocatedCostForItem = (additionalCostBigInt * itemSubtotal) / items_subtotal;
+                    remainingAdditional -= allocatedCostForItem;
+                }
+            }
+
+            const additionalPerUnit = itemQty > 0n ? (allocatedCostForItem / itemQty) : 0n;
+            const landedUnitCost = rawCost + additionalPerUnit;
+
+            // Record both raw supplier invoice cost and landed unit cost
             await connection.query(
-                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, selling_price) VALUES (?, ?, ?, ?, ?)',
-                [invoice_id, item.product_id, item.quantity, item.cost_price, item.selling_price]
+                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price) VALUES (?, ?, ?, ?, ?, ?)',
+                [
+                    invoice_id, 
+                    item.product_id, 
+                    item.quantity, 
+                    rawCost.toString(), 
+                    landedUnitCost.toString(), 
+                    item.selling_price ? safeBigInt(item.selling_price).toString() : null
+                ]
             );
 
-            // Insert new FIFO batch
+            // Insert new FIFO batch with landedUnitCost so Checkout sales deduct accurate cost
             const batchNum = item.batch_number || `BATCH-${invoice_id}-${item.product_id}`;
             await connection.query(`
                 INSERT INTO Product_Batches (
@@ -90,24 +133,61 @@ exports.createPurchaseInvoice = async (req, res) => {
                 batchNum,
                 item.quantity,
                 item.quantity,
-                safeBigInt(item.cost_price).toString(),
+                landedUnitCost.toString(),
                 item.selling_price ? safeBigInt(item.selling_price).toString() : null,
                 item.expiry_date || null,
                 dateVal
             ]);
 
+            // Update Products stock and set catalog cost_price to landedUnitCost
             await connection.query(
                 'UPDATE Products SET stock = stock + ?, cost_price = ?, selling_price = ? WHERE id = ?',
-                [item.quantity, item.cost_price, item.selling_price, item.product_id]
+                [item.quantity, landedUnitCost.toString(), item.selling_price, item.product_id]
             );
         }
 
         await connection.commit();
-        res.status(201).json({ status: 'SUCCESS', message: 'Purchase invoice created successfully', invoice_id });
+
+        // Audit Logging
+        try {
+            await logAuditAction({
+                req,
+                action_type: 'PURCHASE_INVOICE_CREATED',
+                entity_name: 'Purchase_Invoices',
+                entity_id: invoice_id,
+                details: `تۆمارکردنی پسووڵەی کڕین #${invoice_number || invoice_id} بە بڕی ${Number(total_amount).toLocaleString()} د.ع (تێچووی زیادە: ${Number(additionalCostBigInt).toLocaleString()} د.ع)`
+            });
+        } catch (_) {}
+
+        // Cloud & Offline Sync Event
+        try {
+            await queueSyncEvent({
+                entity_type: 'PURCHASE_INVOICE',
+                entity_id: invoice_id,
+                action_type: 'CREATE',
+                payload: {
+                    invoice_id,
+                    supplier_id,
+                    total_amount: total_amount.toString(),
+                    paid_amount: safeBigInt(paid_amount).toString(),
+                    remaining_amount: safeBigInt(remaining_amount).toString(),
+                    additional_cost: additionalCostBigInt.toString(),
+                    items_count: items.length
+                }
+            });
+        } catch (_) {}
+
+        res.status(201).json({ 
+            status: 'SUCCESS', 
+            message: 'پسووڵەی کڕین بە سەرکەوتوویی تۆمارکرا', 
+            invoice_id,
+            total_amount: total_amount.toString(),
+            additional_cost: additionalCostBigInt.toString()
+        });
     } catch (error) {
         await connection.rollback();
         console.error('Purchase Invoice Error:', error);
-        res.status(500).json({ status: 'ERROR', message: 'Failed to create purchase invoice' });
+        res.status(500).json({ status: 'ERROR', message: 'Failed to create purchase invoice: ' + error.message });
     } finally {
         connection.release();
     }

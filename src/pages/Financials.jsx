@@ -1052,13 +1052,22 @@ const Financials = () => {
             </div>
 
             {/* Financial Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: Number(selectedInvoice.additional_cost) > 0 ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', textAlign: 'center' }}>
                 <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>کۆی تێچووی پسووڵە</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f8fafc', marginTop: '4px' }}>
                   {Number(selectedInvoice.total_amount).toLocaleString()} دینار
                 </div>
               </div>
+
+              {Number(selectedInvoice.additional_cost) > 0 && (
+                <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                  <div style={{ color: '#fbbf24', fontSize: '0.85rem' }}>تێچووی زیادە (بار و حەماڵی)</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fbbf24', marginTop: '4px' }}>
+                    +{Number(selectedInvoice.additional_cost).toLocaleString()} دینار
+                  </div>
+                </div>
+              )}
 
               <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                 <div style={{ color: '#10b981', fontSize: '0.85rem' }}>پارەی دراو</div>
@@ -1084,14 +1093,17 @@ const Financials = () => {
                     <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>ناوی کاڵا</th>
                     <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>بارکۆد</th>
                     <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>بڕ (دانە)</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>نرخی کڕین</th>
+                    <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>نرخی کڕین (خام)</th>
+                    {Number(selectedInvoice.additional_cost) > 0 && (
+                      <th style={{ padding: '12px 16px', color: '#fbbf24', fontSize: '0.9rem' }}>تێچووی گەیشتن (Landed)</th>
+                    )}
                     <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>نرخی فرۆشتن</th>
                     <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>کۆی تێچوو</th>
                   </tr>
                 </thead>
                 <tbody>
                   {!selectedInvoice.items || selectedInvoice.items.length === 0 ? (
-                    <tr><td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>هیچ کاڵایەک نەدۆزرایەوە</td></tr>
+                    <tr><td colSpan={Number(selectedInvoice.additional_cost) > 0 ? "7" : "6"} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>هیچ کاڵایەک نەدۆزرایەوە</td></tr>
                   ) : (
                     selectedInvoice.items.map((it, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -1099,6 +1111,11 @@ const Financials = () => {
                         <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#a78bfa' }}>{it.barcode}</td>
                         <td style={{ padding: '12px 16px' }}>{it.quantity} دانە</td>
                         <td style={{ padding: '12px 16px' }}>{Number(it.cost_price).toLocaleString()} دینار</td>
+                        {Number(selectedInvoice.additional_cost) > 0 && (
+                          <td style={{ padding: '12px 16px', color: '#fbbf24', fontWeight: 'bold' }}>
+                            {Number(it.landed_cost_price || it.cost_price).toLocaleString()} دینار
+                          </td>
+                        )}
                         <td style={{ padding: '12px 16px', color: '#10b981' }}>{Number(it.selling_price).toLocaleString()} دینار</td>
                         <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{(Number(it.cost_price) * Number(it.quantity)).toLocaleString()} دینار</td>
                       </tr>
