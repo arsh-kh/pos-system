@@ -31,3 +31,7 @@ backend/.env.*
 *.njsproj
 *.sln
 *.sw?
+
+# Backups
+backend/backups/*.json
+!backend/backups/.gitkeep

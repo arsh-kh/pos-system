@@ -15,9 +15,25 @@ exports.getDashboardStats = async (req, res) => {
             FROM Expenses 
             WHERE MONTH(expense_date) = MONTH(CURRENT_DATE()) AND YEAR(expense_date) = YEAR(CURRENT_DATE())
         `);
+
+        // This Month Wastage / Damages Loss (زیان و فەوتانی بێداهات)
+        const [damagesMonth] = await db.query(`
+            SELECT 
+                COALESCE(SUM(total_cost_loss), 0) as total_damages_loss,
+                COALESCE(SUM(quantity * units_multiplier), 0) as total_damages_units,
+                COUNT(id) as total_damages_records 
+            FROM Damages 
+            WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())
+        `);
+
         const totalExpenses = Number(expensesMonth[0].total_expenses) || 0;
+        const totalDamagesLoss = Number(damagesMonth[0].total_damages_loss) || 0;
+        const totalDamagesUnits = Number(damagesMonth[0].total_damages_units) || 0;
+        const totalDamagesRecords = Number(damagesMonth[0].total_damages_records) || 0;
+
         const grossProfit = Number(thisMonth[0].total_profit) || 0;
-        const netProfit = grossProfit - totalExpenses;
+        // True Net Profit (قازانجی ڕاستەقینە): Gross Profit - Store Expenses - Wastage Loss
+        const netProfit = grossProfit - totalExpenses - totalDamagesLoss;
 
         // Daily Chart Data
         const [dailyStats] = await db.query(`
@@ -33,7 +49,11 @@ exports.getDashboardStats = async (req, res) => {
             data: { 
                 current_month: {
                     ...thisMonth[0],
+                    gross_profit: grossProfit,
                     total_expenses: totalExpenses,
+                    total_damages_loss: totalDamagesLoss,
+                    total_damages_units: totalDamagesUnits,
+                    total_damages_records: totalDamagesRecords,
                     net_profit: netProfit
                 }, 
                 chart_data: dailyStats 

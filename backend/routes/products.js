@@ -5,6 +5,7 @@ const productsController = require('../controllers/products');
 // router.use(authenticateToken); // Temporarily disabled for UI testing
 
 router.get('/', productsController.getAllProducts);
+router.get('/:id/batches', productsController.getProductBatches);
 router.post('/', productsController.addProduct);
 router.put('/:id', productsController.updateProduct);
 router.delete('/:id', productsController.deleteProduct);

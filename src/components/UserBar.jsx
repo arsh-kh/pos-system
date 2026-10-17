@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, 
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 const UserBar = () => {
+  const navigate = useNavigate();
   const { 
     currentUser, 
     isAdmin, 
@@ -84,7 +86,30 @@ const UserBar = () => {
           )}
         </div>
 
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/settings')}
+              title="بەڕێوەبردنی باکئەپ و پاراستنی داتابەیس"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '5px 12px',
+                borderRadius: '10px',
+                background: 'rgba(56, 189, 248, 0.12)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '0.82rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ShieldCheck size={14} /> باکئەپ و پاراستن
+            </button>
+          )}
+
           <button
             onClick={() => {
               setLoginError('');

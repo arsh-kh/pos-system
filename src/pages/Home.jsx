@@ -15,6 +15,9 @@ import {
     RotateCcw,
     Tag,
     ShieldCheck,
+    PackageX,
+    Truck,
+    ClipboardCheck,
     Settings as SettingsIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -23,8 +26,11 @@ import './Home.css';
 const modules = [
   { id: 'cashier', path: '/cashier', label: 'کاشێر', icon: <ShoppingCart size={32} />, color: '#3b82f6', desc: 'خاڵی فرۆشتن و پسووڵە' },
   { id: 'promotions', path: '/promotions', label: 'ئۆفەر و داشکاندن', icon: <Tag size={32} />, color: '#a855f7', desc: 'ئۆفەری کاتی و داشکاندنی بە سنوور' },
+  { id: 'inventory-audit', path: '/inventory-audit', label: 'جەردکردنی زیرەک', icon: <ClipboardCheck size={32} />, color: '#10b981', desc: 'سکانی ڕەفەکان و دۆزینەوەی نوقسانی' },
   { id: 'shifts', path: '/shifts', label: 'قاسە و داخستنی شیفت', icon: <Lock size={32} />, color: '#10b981', desc: 'چاودێری قاسە و دەرکردنی Z-Report' },
   { id: 'returns', path: '/returns', label: 'گەڕاندنەوەی کاڵا', icon: <RotateCcw size={32} />, color: '#f43f5e', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە' },
+  { id: 'vendor-returns', path: '/vendor-returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', icon: <Truck size={32} />, color: '#0ea5e9', desc: 'گەڕاندنەوە بۆ مەندوب و داشکاندن لە قەرز' },
+  { id: 'wastage', path: '/wastage', label: 'زیان و فەوتان', icon: <PackageX size={32} />, color: '#ef4444', desc: 'تۆمارکردنی کاڵای بەسەرچوو و شکاو' },
   { id: 'products', path: '/products', label: 'کاڵاکان', icon: <Package size={32} />, color: '#8b5cf6', desc: 'بەڕێوەبردنی کۆگا و نرخەکان' },
   { id: 'owes', path: '/owes', label: 'قەرزەکان', icon: <Users size={32} />, color: '#ef4444', desc: 'قەرزی کڕیارەکان و وەرگرتن' },
   { id: 'this-month', path: '/this-month', label: 'ئەم مانگە', icon: <TrendingUp size={32} />, color: '#059669', desc: 'ئاماری فرۆشتنی مانگانە' },

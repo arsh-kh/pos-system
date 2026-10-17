@@ -7,7 +7,7 @@ const safeBigInt = (val) => {
 };
 
 exports.processCheckout = async (req, res) => {
-    const { items, customer_id, discount_id, pay_later_amount, discount_amount } = req.body;
+    const { items, customer_id, discount_id, pay_later_amount, discount_amount, paid_amount, payment_method } = req.body;
     
     if (!items || items.length === 0) {
         return res.status(400).json({ status: 'ERROR', message: 'Cart is empty' });
@@ -36,7 +36,10 @@ exports.processCheckout = async (req, res) => {
                     price: customPrice
                 });
             } else {
-                const [rows] = await connection.query('SELECT id, stock, selling_price, cost_price FROM Products WHERE barcode = ? FOR UPDATE', [item.barcode]);
+                const [rows] = await connection.query(
+                    'SELECT id, stock, selling_price, cost_price, wholesale_price, barcode, box_barcode, units_per_box FROM Products WHERE barcode = ? OR box_barcode = ? FOR UPDATE', 
+                    [item.barcode, item.barcode]
+                );
                 
                 if (rows.length === 0) {
                     throw new Error(`Product not found: ${item.barcode}`);
@@ -46,49 +49,109 @@ exports.processCheckout = async (req, res) => {
                 const regularPrice = Number(product.selling_price);
                 const costPrice = Number(product.cost_price || 0);
 
-                // Check for active promotion on this product
-                const [promos] = await connection.query(`
-                    SELECT * FROM Promotions 
-                    WHERE product_id = ? 
-                      AND is_active = TRUE 
-                      AND CURDATE() BETWEEN start_date AND end_date
-                    ORDER BY id DESC LIMIT 1
-                `, [product.id]);
+                // Detect if this line item is a carton/box
+                const isBox = (item.unit_type === 'BOX') || (Boolean(product.box_barcode) && String(product.box_barcode).trim() === String(item.barcode).trim());
+                const unitsPerBox = isBox ? Math.max(1, parseFloat(product.units_per_box) || 1) : 1;
+                const stockDeductionQty = isBox ? (itemQty * unitsPerBox) : itemQty;
 
                 let itemSellTotal = 0;
                 let effectivePriceAtSale = regularPrice;
 
-                if (promos.length > 0) {
-                    const promo = promos[0];
-                    let promoPrice = regularPrice;
-                    if (promo.discount_type === 'PERCENT') {
-                        promoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
-                    } else {
-                        promoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
-                    }
-
-                    const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-                    const promoQty = Math.min(itemQty, maxLimit);
-                    const regularQty = Math.max(0, itemQty - promoQty);
-
-                    itemSellTotal = Math.round((promoQty * promoPrice) + (regularQty * regularPrice));
-                    effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : promoPrice;
+                if (isBox) {
+                    // Carton / wholesale price calculation
+                    const cartonPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(regularPrice * unitsPerBox);
+                    effectivePriceAtSale = cartonPrice;
+                    itemSellTotal = Math.round(cartonPrice * itemQty);
                 } else {
-                    itemSellTotal = Math.round(regularPrice * itemQty);
+                    // Check for active promotion on this single unit product
+                    const [promos] = await connection.query(`
+                        SELECT * FROM Promotions 
+                        WHERE product_id = ? 
+                          AND is_active = TRUE 
+                          AND CURDATE() BETWEEN start_date AND end_date
+                        ORDER BY id DESC LIMIT 1
+                    `, [product.id]);
+
+                    if (promos.length > 0) {
+                        const promo = promos[0];
+                        let promoPrice = regularPrice;
+                        if (promo.discount_type === 'PERCENT') {
+                            promoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
+                        } else {
+                            promoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                        }
+
+                        const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+                        const promoQty = Math.min(itemQty, maxLimit);
+                        const regularQty = Math.max(0, itemQty - promoQty);
+
+                        itemSellTotal = Math.round((promoQty * promoPrice) + (regularQty * regularPrice));
+                        effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : promoPrice;
+                    } else {
+                        itemSellTotal = Math.round(regularPrice * itemQty);
+                    }
                 }
 
-                const itemCostTotal = Math.round(costPrice * itemQty);
+                // --- FIFO Batch Depletion & Accurate Profit Logic ---
+                const [activeBatches] = await connection.query(`
+                    SELECT id, remaining_quantity, cost_price, batch_number
+                    FROM Product_Batches
+                    WHERE product_id = ? AND status = 'ACTIVE' AND remaining_quantity > 0
+                    ORDER BY created_at ASC, id ASC
+                    FOR UPDATE
+                `, [product.id]);
+
+                let remainingToDeduct = Number(stockDeductionQty);
+                let itemCostTotal = 0;
+                const itemBatchAllocations = [];
+
+                for (const batch of activeBatches) {
+                    if (remainingToDeduct <= 0) break;
+
+                    const batchAvailable = Number(batch.remaining_quantity);
+                    const deductQty = Math.min(remainingToDeduct, batchAvailable);
+                    const batchUnitCost = Number(batch.cost_price || 0);
+
+                    itemCostTotal += Math.round(deductQty * batchUnitCost);
+                    remainingToDeduct -= deductQty;
+
+                    const newRemaining = batchAvailable - deductQty;
+                    const newStatus = newRemaining <= 0 ? 'EXHAUSTED' : 'ACTIVE';
+
+                    await connection.query(`
+                        UPDATE Product_Batches
+                        SET remaining_quantity = ?, status = ?
+                        WHERE id = ?
+                    `, [newRemaining, newStatus, batch.id]);
+
+                    itemBatchAllocations.push({
+                        batch_id: batch.id,
+                        quantity_deducted: deductQty,
+                        unit_cost_price: batchUnitCost,
+                        total_cost: Math.round(deductQty * batchUnitCost)
+                    });
+                }
+
+                // Fallback: If remaining stock to deduct exceeds recorded active batches
+                if (remainingToDeduct > 0) {
+                    const fallbackCost = Number(product.cost_price || 0);
+                    itemCostTotal += Math.round(remainingToDeduct * fallbackCost);
+                }
+
                 totalAmount += safeBigInt(itemSellTotal);
                 totalProfit += safeBigInt(itemSellTotal - itemCostTotal);
 
-                // Deduct stock (supports decimal quantities for weight/scale)
-                await connection.query('UPDATE Products SET stock = stock - ? WHERE barcode = ?', [itemQty, item.barcode]);
+                // Deduct stock (actual single units: carton quantity * unitsPerBox)
+                await connection.query('UPDATE Products SET stock = stock - ? WHERE id = ?', [stockDeductionQty, product.id]);
 
                 processedItems.push({
                     is_custom: false,
                     productId: product.id,
                     quantity: itemQty,
-                    price: effectivePriceAtSale
+                    price: effectivePriceAtSale,
+                    unit_type: isBox ? 'BOX' : 'PIECE',
+                    units_per_box: unitsPerBox,
+                    batchAllocations: itemBatchAllocations
                 });
             }
         }
@@ -98,10 +161,70 @@ exports.processCheckout = async (req, res) => {
         const finalTotal = subtotal > discountVal ? (subtotal - discountVal) : 0n;
         const finalProfit = totalProfit > discountVal ? (totalProfit - discountVal) : 0n;
 
-        // Insert Sale with discount tracking
+        // Determine Payment Mode and Breakdowns
+        let method = (payment_method || '').toUpperCase();
+        let finalPaidAmount = 0n;
+        let finalDebtAmount = 0n;
+
+        if (method === 'DEBT') {
+            if (!customer_id) {
+                throw new Error('تکایە سەرەتا کڕیارێک دیاریبکە بۆ فرۆشتن بە قەرز');
+            }
+            finalDebtAmount = finalTotal;
+            finalPaidAmount = 0n;
+        } else if (method === 'SPLIT') {
+            if (!customer_id) {
+                throw new Error('تکایە سەرەتا کڕیارێک دیاریبکە بۆ فرۆشتنی تێکەڵ (نەقد + قەرز)');
+            }
+            const inputPaid = safeBigInt(paid_amount || 0);
+            const inputDebt = safeBigInt(pay_later_amount || 0);
+
+            if (inputPaid > 0n && inputDebt > 0n) {
+                finalPaidAmount = inputPaid;
+                finalDebtAmount = inputDebt;
+                if (finalPaidAmount + finalDebtAmount !== finalTotal) {
+                    finalDebtAmount = finalTotal > finalPaidAmount ? (finalTotal - finalPaidAmount) : 0n;
+                }
+            } else if (inputPaid > 0n) {
+                finalPaidAmount = inputPaid > finalTotal ? finalTotal : inputPaid;
+                finalDebtAmount = finalTotal - finalPaidAmount;
+            } else if (inputDebt > 0n) {
+                finalDebtAmount = inputDebt > finalTotal ? finalTotal : inputDebt;
+                finalPaidAmount = finalTotal - finalDebtAmount;
+            } else {
+                finalPaidAmount = safeBigInt(Math.floor(Number(finalTotal) / 2));
+                finalDebtAmount = finalTotal - finalPaidAmount;
+            }
+        } else {
+            // Check legacy pay_later_amount
+            if (pay_later_amount && safeBigInt(pay_later_amount) > 0n) {
+                if (!customer_id) {
+                    throw new Error('تکایە سەرەتا کڕیارێک دیاریبکە بۆ فرۆشتن بە قەرز');
+                }
+                finalDebtAmount = safeBigInt(pay_later_amount);
+                finalPaidAmount = finalTotal > finalDebtAmount ? (finalTotal - finalDebtAmount) : 0n;
+                method = finalPaidAmount > 0n ? 'SPLIT' : 'DEBT';
+            } else {
+                method = 'CASH';
+                finalPaidAmount = finalTotal;
+                finalDebtAmount = 0n;
+            }
+        }
+
+        // Insert Sale with discount and split payment tracking
         const [saleResult] = await connection.query(
-            'INSERT INTO Sales (total_amount, total_profit, subtotal_amount, discount_amount, customer_id, discount_id) VALUES (?, ?, ?, ?, ?, ?)',
-            [finalTotal.toString(), finalProfit.toString(), subtotal.toString(), discountVal.toString(), customer_id || null, discount_id || null]
+            'INSERT INTO Sales (total_amount, total_profit, subtotal_amount, discount_amount, customer_id, discount_id, paid_amount, debt_amount, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                finalTotal.toString(), 
+                finalProfit.toString(), 
+                subtotal.toString(), 
+                discountVal.toString(), 
+                customer_id || null, 
+                discount_id || null,
+                finalPaidAmount.toString(),
+                finalDebtAmount.toString(),
+                method
+            ]
         );
         const saleId = saleResult.insertId;
 
@@ -112,22 +235,50 @@ exports.processCheckout = async (req, res) => {
                 const customProductId = customProdRows.length > 0 ? customProdRows[0].id : 1;
 
                 await connection.query(
-                    'INSERT INTO Sale_Items (sale_id, product_id, quantity, price_at_sale, custom_name) VALUES (?, ?, ?, ?, ?)',
-                    [saleId, customProductId, item.quantity, item.price, item.name]
+                    'INSERT INTO Sale_Items (sale_id, product_id, quantity, price_at_sale, custom_name, unit_type, units_per_box) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [saleId, customProductId, item.quantity, item.price, item.name, 'PIECE', 1]
                 );
             } else {
-                await connection.query(
-                    'INSERT INTO Sale_Items (sale_id, product_id, quantity, price_at_sale) VALUES (?, ?, ?, ?)',
-                    [saleId, item.productId, item.quantity, item.price]
+                const [itemResult] = await connection.query(
+                    'INSERT INTO Sale_Items (sale_id, product_id, quantity, price_at_sale, unit_type, units_per_box) VALUES (?, ?, ?, ?, ?, ?)',
+                    [saleId, item.productId, item.quantity, item.price, item.unit_type || 'PIECE', item.units_per_box || 1]
                 );
+                const saleItemId = itemResult.insertId;
+
+                // Record FIFO batch allocations in Sale_Item_Batches
+                if (item.batchAllocations && item.batchAllocations.length > 0) {
+                    for (const alloc of item.batchAllocations) {
+                        await connection.query(`
+                            INSERT INTO Sale_Item_Batches (
+                                sale_id,
+                                sale_item_id,
+                                batch_id,
+                                quantity_deducted,
+                                unit_cost_price,
+                                total_cost
+                            ) VALUES (?, ?, ?, ?, ?, ?)
+                        `, [
+                            saleId,
+                            saleItemId,
+                            alloc.batch_id,
+                            alloc.quantity_deducted,
+                            alloc.unit_cost_price,
+                            alloc.total_cost
+                        ]);
+                    }
+                }
             }
         }
 
         // Handle Customer Debt
-        if (customer_id && pay_later_amount > 0) {
+        if (customer_id && finalDebtAmount > 0n) {
+            const debtNote = method === 'SPLIT'
+                ? `پسووڵەی #${saleId} (تێکەڵ: نەقد ${Number(finalPaidAmount).toLocaleString()} د.ع + قەرز ${Number(finalDebtAmount).toLocaleString()} د.ع)`
+                : `پسووڵەی #${saleId} (فرۆشتنی قەرز)`;
+
             await connection.query(
-                'INSERT INTO Customer_Debts (customer_id, amount, transaction_type) VALUES (?, ?, ?)',
-                [customer_id, safeBigInt(pay_later_amount).toString(), 'ADD']
+                'INSERT INTO Customer_Debts (customer_id, sale_id, amount, transaction_type, note) VALUES (?, ?, ?, ?, ?)',
+                [customer_id, saleId, finalDebtAmount.toString(), 'ADD', debtNote]
             );
         }
 
@@ -150,6 +301,9 @@ exports.processCheckout = async (req, res) => {
             subtotal: subtotal.toString(),
             discount: discountVal.toString(),
             total: finalTotal.toString(),
+            paid_amount: finalPaidAmount.toString(),
+            debt_amount: finalDebtAmount.toString(),
+            payment_method: method,
             message: 'Checkout complete' 
         });
 
@@ -202,7 +356,20 @@ exports.getSaleDetails = async (req, res) => {
             WHERE si.sale_id = ?
         `, [id]);
 
-        res.json({ status: 'SUCCESS', data: { ...sale[0], items } });
+        // Fetch FIFO batch breakdown for each item
+        const [batchAllocations] = await db.query(`
+            SELECT sib.*, pb.batch_number, pb.created_at as batch_date
+            FROM Sale_Item_Batches sib
+            LEFT JOIN Product_Batches pb ON sib.batch_id = pb.id
+            WHERE sib.sale_id = ?
+        `, [id]);
+
+        const itemsWithBatches = items.map(item => ({
+            ...item,
+            batches: batchAllocations.filter(b => b.sale_item_id === item.id)
+        }));
+
+        res.json({ status: 'SUCCESS', data: { ...sale[0], items: itemsWithBatches } });
     } catch (error) {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }

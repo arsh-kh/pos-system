@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { Search, Plus, Edit2, Trash2, X, Barcode, Printer, Tag, Coins, AlertTriangle, Calendar } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Barcode, Printer, Tag, Coins, AlertTriangle, Calendar, Package, Layers } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -73,7 +73,8 @@ const Products = () => {
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL'); // 'ALL', 'LOW_STOCK', 'EXPIRING'
   const [formData, setFormData] = useState({
     name: '', barcode: '', cost_price: '', selling_price: '', stock: '', category_id: '',
-    wholesale_price: '', expiry_date: '', low_stock_threshold: '5'
+    wholesale_price: '', expiry_date: '', low_stock_threshold: '5',
+    box_barcode: '', units_per_box: '1'
   });
 
   // Barcode Printing State
@@ -83,6 +84,27 @@ const Products = () => {
     return localStorage.getItem('pos_store_name') || 'مارکێتی نموونەیی';
   });
   const printAreaRef = useRef(null);
+
+  // FIFO Batches Modal State
+  const [selectedBatchProduct, setSelectedBatchProduct] = useState(null);
+  const [productBatches, setProductBatches] = useState([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+
+  const openBatchesModal = async (product) => {
+    setSelectedBatchProduct(product);
+    setLoadingBatches(true);
+    try {
+      const config = getAuthConfig();
+      const res = await axios.get(`http://localhost:3001/api/products/${product.id}/batches`, config);
+      if (res.data.status === 'SUCCESS') {
+        setProductBatches(res.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching batches:', err);
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
 
   const getAuthConfig = () => {
     const token = localStorage.getItem('token');
@@ -118,7 +140,8 @@ const Products = () => {
     setEditId(null);
     setFormData({ 
       name: '', barcode: '', cost_price: '', selling_price: '', stock: '', category_id: '',
-      wholesale_price: '', expiry_date: '', low_stock_threshold: '5' 
+      wholesale_price: '', expiry_date: '', low_stock_threshold: '5',
+      box_barcode: '', units_per_box: '1' 
     });
     setIsModalOpen(true);
   };
@@ -134,7 +157,9 @@ const Products = () => {
       category_id: p.category_id || '',
       wholesale_price: p.wholesale_price || '',
       expiry_date: p.expiry_date ? p.expiry_date.split('T')[0] : '',
-      low_stock_threshold: p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? p.low_stock_threshold.toString() : '5'
+      low_stock_threshold: p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? p.low_stock_threshold.toString() : '5',
+      box_barcode: p.box_barcode || '',
+      units_per_box: p.units_per_box ? p.units_per_box.toString() : '1'
     });
     setIsModalOpen(true);
   };
@@ -145,7 +170,11 @@ const Products = () => {
     setFormData(prev => ({ ...prev, barcode: randomBarcode }));
   };
 
-
+  const generateBoxBarcode = () => {
+    // Generates a random box barcode
+    const randomBox = 'BOX' + Math.floor(100000000 + Math.random() * 900000000).toString();
+    setFormData(prev => ({ ...prev, box_barcode: randomBox }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -154,10 +183,12 @@ const Products = () => {
       const payload = {
         ...formData,
         cost_price: formData.cost_price ? Number(formData.cost_price) : 0,
-        stock: formData.stock ? parseInt(formData.stock) : 0,
+        stock: formData.stock ? parseFloat(formData.stock) : 0,
         wholesale_price: formData.wholesale_price ? Number(formData.wholesale_price) : 0,
         expiry_date: formData.expiry_date || null,
-        low_stock_threshold: formData.low_stock_threshold !== undefined && formData.low_stock_threshold !== '' ? parseInt(formData.low_stock_threshold) : 5
+        low_stock_threshold: formData.low_stock_threshold !== undefined && formData.low_stock_threshold !== '' ? parseInt(formData.low_stock_threshold) : 5,
+        box_barcode: formData.box_barcode && formData.box_barcode.trim() !== '' ? formData.box_barcode.trim() : null,
+        units_per_box: formData.units_per_box ? Math.max(1, parseFloat(formData.units_per_box)) : 1
       };
       if (editId) {
         await axios.put(`http://localhost:3001/api/products/${editId}`, payload, config);
@@ -430,10 +461,10 @@ const Products = () => {
             <tr>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ناوی کاڵا</th>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کەتەگۆری</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بارکۆد</th>
+              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بارکۆد (دانە / کارتۆن)</th>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی کڕین (دینار)</th>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی فرۆشتن (تاک)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی جوملە (کۆ)</th>
+              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی جوملە (کارتۆن)</th>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کۆگا</th>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بەرواری بەسەرچوون</th>
               <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کردارەکان</th>
@@ -453,8 +484,13 @@ const Products = () => {
                       {p.category_name || 'بێ جۆر'}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 20px', fontFamily: 'monospace', color: '#a78bfa', fontWeight: 'bold' }}>
-                    {p.barcode}
+                  <td style={{ padding: '16px 20px' }}>
+                    <div style={{ fontFamily: 'monospace', color: '#a78bfa', fontWeight: 'bold' }}>{p.barcode}</div>
+                    {p.box_barcode && (
+                      <div style={{ fontFamily: 'monospace', color: '#c084fc', fontSize: '0.75rem', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Package size={12} /> {p.box_barcode}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '16px 20px', color: '#94a3b8' }}>
                     {Number(p.cost_price).toLocaleString()} دینار
@@ -462,13 +498,24 @@ const Products = () => {
                   <td style={{ padding: '16px 20px' }}>
                     <div style={{ color: '#10b981', fontWeight: 'bold' }}>{Number(p.selling_price).toLocaleString()} دینار</div>
                   </td>
-                  <td style={{ padding: '16px 20px', color: p.wholesale_price > 0 ? '#c084fc' : '#64748b', fontWeight: p.wholesale_price > 0 ? 'bold' : 'normal' }}>
-                    {p.wholesale_price > 0 ? `${Number(p.wholesale_price).toLocaleString()} دینار` : '-'}
+                  <td style={{ padding: '16px 20px' }}>
+                    {p.wholesale_price > 0 ? (
+                      <div>
+                        <div style={{ color: '#c084fc', fontWeight: 'bold' }}>{Number(p.wholesale_price).toLocaleString()} دینار</div>
+                        <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                          کارتۆنی {p.units_per_box ? Number(p.units_per_box) : 1} دانەیی
+                        </small>
+                      </div>
+                    ) : (
+                      <span style={{ color: '#64748b' }}>-</span>
+                    )}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     {(() => {
                       const threshold = p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? Number(p.low_stock_threshold) : 5;
                       const isLow = Number(p.stock) <= threshold;
+                      const unitsPerBox = p.units_per_box ? Number(p.units_per_box) : 1;
+                      const boxCount = unitsPerBox > 1 ? Math.floor(Number(p.stock) / unitsPerBox) : null;
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                           <span style={{ 
@@ -485,6 +532,11 @@ const Products = () => {
                             {isLow && <AlertTriangle size={13} />}
                             {p.stock} دانە
                           </span>
+                          {boxCount !== null && (
+                            <small style={{ color: '#38bdf8', fontSize: '0.74rem', fontWeight: 'bold' }}>
+                              ≈ {boxCount} کارتۆن
+                            </small>
+                          )}
                           {isLow && (
                             <small style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 'bold' }}>بەرەو تەواوبوون</small>
                           )}
@@ -523,6 +575,14 @@ const Products = () => {
                     })()}
                   </td>
                   <td style={{ padding: '16px 20px', display: 'flex', gap: '8px' }}>
+                    {/* FIFO Batches Button */}
+                    <button 
+                      title="وەجبەکانی FIFO و تێچوون" 
+                      onClick={() => openBatchesModal(p)} 
+                      style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Layers size={16} /> وەجبەکان
+                    </button>
                     {/* Print Barcode Label Button */}
                     <button 
                       title="چاپی لەزگەی بارکۆد" 
@@ -652,18 +712,73 @@ const Products = () => {
                       style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 'bold' }} 
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Packaging & Wholesale / Carton Section */}
+              <div style={{ background: 'rgba(168, 85, 247, 0.08)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 'bold', color: '#c084fc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Package size={18} color="#c084fc" /> فرۆشتنی فرە-جۆر / کارتۆن و سێت (Wholesale / Box)
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.88rem' }}>
+                      بارکۆدی کارتۆن (Box Barcode)
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="بارکۆدی سەر کارتۆن..."
+                        value={formData.box_barcode} 
+                        onChange={e => setFormData({ ...formData, box_barcode: e.target.value })} 
+                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c084fc', fontFamily: 'monospace' }} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={generateBoxBarcode} 
+                        title="دروستکردنی بارکۆدی کارتۆن"
+                        style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', padding: '0 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 'bold' }}
+                      >
+                        ⚡ دروستکردن
+                      </button>
+                    </div>
+                  </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#c084fc', fontWeight: 'bold' }}>نرخی فرۆشتنی جوملە / کۆ (دینار)</label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.88rem' }}>
+                      ژمارەی دانە لە کارتۆندا
+                    </label>
+                    <input 
+                      type="number" 
+                      min="1"
+                      step="any"
+                      placeholder="بۆ نموونە: 24"
+                      value={formData.units_per_box} 
+                      onChange={e => setFormData({ ...formData, units_per_box: e.target.value })} 
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#fff', fontWeight: 'bold' }} 
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#c084fc', fontWeight: 'bold', fontSize: '0.88rem' }}>
+                      نرخی فرۆشتنی کارتۆن (دینار)
+                    </label>
                     <input 
                       type="number" 
                       placeholder="0"
                       value={formData.wholesale_price} 
                       onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.1)', border: '1px solid rgba(192, 132, 252, 0.3)', color: '#c084fc', fontWeight: 'bold' }} 
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.1)', border: '1px solid rgba(192, 132, 252, 0.3)', color: '#c084fc', fontWeight: 'bold' }} 
                     />
                   </div>
                 </div>
+
+                <small style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', lineHeight: '1.4' }}>
+                  💡 گەر کڕیار بە کارتۆن بیکڕێت، سیستەم ڕاستەوخۆ نرخی کارتۆن حیساب دەکات و بەپێی ژمارەی دانەکان لە کۆگا کەمی دەکاتەوە.
+                </small>
               </div>
 
               {/* Stock and Expiry Section */}
@@ -826,6 +941,127 @@ const Products = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* FIFO Batches Transparency Modal */}
+      {selectedBatchProduct && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '840px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#f8fafc' }}>
+                  <Layers color="#10b981" />
+                  وەجبەکانی کۆگا (حیساباتی وردی FIFO): {selectedBatchProduct.name}
+                </h2>
+                <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '6px', display: 'flex', gap: '15px' }}>
+                  <span>بارکۆد: <code style={{ color: '#38bdf8' }}>{selectedBatchProduct.barcode}</code></span>
+                  <span>کۆی مەخزەنی ئێستا: <b style={{ color: '#10b981' }}>{selectedBatchProduct.stock} دانە</b></span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedBatchProduct(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={26} />
+              </button>
+            </div>
+
+            {loadingBatches ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                چاوەڕوان بە... باردەکرێت
+              </div>
+            ) : productBatches.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', background: 'rgba(255,255,255,0.02)', borderRadius: '14px' }}>
+                هیچ وەجبەیەکی تۆمارکراو بۆ ئەم کاڵایە نییە.
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', padding: '1rem', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#10b981' }}>وەجبە چالاکەکان (ماوە لە کۆگا)</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
+                      {productBatches.filter(b => b.status === 'ACTIVE' && Number(b.remaining_quantity) > 0).length} وەجبە
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)', padding: '1rem', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#38bdf8' }}>کۆی سەرمایەی وەجبە چالاکەکان</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>
+                      {productBatches
+                        .filter(b => b.status === 'ACTIVE')
+                        .reduce((sum, b) => sum + (Number(b.remaining_quantity) * Number(b.cost_price)), 0)
+                        .toLocaleString()} د.ع
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                    <thead style={{ background: 'rgba(0,0,0,0.3)' }}>
+                      <tr>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>ڕیزبەندی (FIFO)</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>کۆد / پسووڵە</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>دابینکەر</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>بەرواری هاتن</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>تێچوونی دانە</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>بڕی سەرەتایی</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>بڕی ماوە</th>
+                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>دۆخ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productBatches.map((batch, idx) => {
+                        const isActive = batch.status === 'ACTIVE' && Number(batch.remaining_quantity) > 0;
+                        return (
+                          <tr key={batch.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: isActive ? 'rgba(16,185,129,0.03)' : 'transparent' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: isActive ? '#10b981' : '#64748b' }}>
+                              #{idx + 1} {isActive ? '⚡' : '✓'}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                              {batch.batch_number || `BATCH-${batch.id}`}
+                              {batch.invoice_number && <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>پسووڵە: {batch.invoice_number}</div>}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: '#cbd5e1' }}>
+                              {batch.supplier_name || 'کڕینی لۆکاڵی'}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: '#94a3b8' }}>
+                              {new Date(batch.created_at).toLocaleDateString('en-GB')}
+                            </td>
+                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#fbbf24' }}>
+                              {Number(batch.cost_price).toLocaleString()} د.ع
+                            </td>
+                            <td style={{ padding: '12px 14px', color: '#94a3b8' }}>
+                              {Number(batch.initial_quantity)} دانە
+                            </td>
+                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: isActive ? '#34d399' : '#64748b' }}>
+                              {Number(batch.remaining_quantity)} دانە
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              {isActive ? (
+                                <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                  چالاک (لە سەرەتادایە)
+                                </span>
+                              ) : (
+                                <span style={{ background: 'rgba(148,163,184,0.15)', color: '#94a3b8', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                  تەواوبوو (فرۆشراو)
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button 
+                    onClick={() => setSelectedBatchProduct(null)}
+                    style={{ padding: '10px 24px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    داخستن
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

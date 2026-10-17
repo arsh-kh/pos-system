@@ -58,11 +58,12 @@ exports.getCustomerProfile = async (req, res) => {
 
 exports.addDebtTransaction = async (req, res) => {
     const { id } = req.params;
-    const { amount, transaction_type } = req.body; // 'ADD' or 'PAY'
+    const { amount, transaction_type, note } = req.body; // 'ADD' or 'PAY'
     try {
+        const defaultNote = transaction_type === 'PAY' ? 'دانەوەی قەرز بە دەستی' : 'زیادکردنی قەرز بە دەستی';
         const [result] = await db.query(
-            'INSERT INTO Customer_Debts (customer_id, amount, transaction_type) VALUES (?, ?, ?)',
-            [id, amount, transaction_type]
+            'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',
+            [id, amount, transaction_type, note || defaultNote]
         );
         res.status(201).json({ status: 'SUCCESS', message: 'Transaction recorded' });
     } catch (error) {

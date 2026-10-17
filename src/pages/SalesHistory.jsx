@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Search, FileText, X, Printer } from 'lucide-react';
+import { Search, FileText, X, Printer, Layers } from 'lucide-react';
 import './Dashboard.css';
 
 const SalesHistory = () => {
@@ -202,6 +202,7 @@ const SalesHistory = () => {
               <tr>
                 <th style={{ padding: '16px 20px', color: '#94a3b8' }}>ژمارەی پسووڵە</th>
                 <th style={{ padding: '16px 20px', color: '#94a3b8' }}>کڕیار</th>
+                <th style={{ padding: '16px 20px', color: '#94a3b8' }}>شێوازی پارەدان</th>
                 <th style={{ padding: '16px 20px', color: '#94a3b8' }}>ژمارەی کاڵا</th>
                 <th style={{ padding: '16px 20px', color: '#94a3b8' }}>کۆی فرۆشتن (دینار)</th>
                 <th style={{ padding: '16px 20px', color: '#94a3b8' }}>قازانج (دینار)</th>
@@ -211,14 +212,29 @@ const SalesHistory = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>چاوەڕوان بە، باردەکرێت...</td></tr>
+                <tr><td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>چاوەڕوان بە، باردەکرێت...</td></tr>
               ) : filteredSales.length === 0 ? (
-                <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ پسووڵەیەک نەدۆزرایەوە</td></tr>
+                <tr><td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ پسووڵەیەک نەدۆزرایەوە</td></tr>
               ) : (
                 filteredSales.map((s) => (
                   <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', color: '#38bdf8' }}>#{s.id}</td>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{s.customer_name}</td>
+                    <td style={{ padding: '16px 20px' }}>
+                      {s.payment_method === 'DEBT' ? (
+                        <span style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          قەرز
+                        </span>
+                      ) : s.payment_method === 'SPLIT' ? (
+                        <span style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          تێکەڵ (نەقد: {Number(s.paid_amount || 0).toLocaleString()} | قەرز: {Number(s.debt_amount || 0).toLocaleString()})
+                        </span>
+                      ) : (
+                        <span style={{ padding: '4px 8px', borderRadius: '6px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          نەقد
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '16px 20px', color: '#94a3b8' }}>{s.item_count} دانە</td>
                     <td style={{ padding: '16px 20px', color: '#38bdf8', fontWeight: 'bold' }}>{Number(s.total_amount).toLocaleString()} دینار</td>
                     <td style={{ padding: '16px 20px', color: '#10b981', fontWeight: 'bold' }}>{Number(s.total_profit).toLocaleString()} دینار</td>
@@ -254,17 +270,25 @@ const SalesHistory = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ flex: 1, minWidth: '140px', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>کڕیار</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '4px' }}>{selectedSale.customer_name}</div>
               </div>
-              <div style={{ flex: 1, padding: '1rem', background: 'rgba(56,189,248,0.05)', borderRadius: '12px', border: '1px solid rgba(56,189,248,0.2)' }}>
+              <div style={{ flex: 1, minWidth: '140px', padding: '1rem', background: 'rgba(56,189,248,0.05)', borderRadius: '12px', border: '1px solid rgba(56,189,248,0.2)' }}>
                 <div style={{ fontSize: '0.85rem', color: '#38bdf8' }}>کۆی گشتی فرۆشتن</div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>{Number(selectedSale.total_amount).toLocaleString()} دینار</div>
               </div>
-              <div style={{ flex: 1, padding: '1rem', background: 'rgba(16,185,129,0.05)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <div style={{ fontSize: '0.85rem', color: '#10b981' }}>قازانجی سافی</div>
+              <div style={{ flex: 1, minWidth: '140px', padding: '1rem', background: 'rgba(16,185,129,0.05)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <div style={{ fontSize: '0.85rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Layers size={15} /> قازانجی سافی (FIFO)
+                </div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>{Number(selectedSale.total_profit).toLocaleString()} دینار</div>
+              </div>
+              <div style={{ flex: 1.2, minWidth: '180px', padding: '1rem', background: selectedSale.payment_method === 'DEBT' ? 'rgba(239,68,68,0.08)' : (selectedSale.payment_method === 'SPLIT' ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)'), borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>شێوازی پارەدان</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 'bold', marginTop: '4px', color: selectedSale.payment_method === 'DEBT' ? '#ef4444' : (selectedSale.payment_method === 'SPLIT' ? '#f59e0b' : '#10b981') }}>
+                  {selectedSale.payment_method === 'DEBT' ? 'قەرز (تەواو)' : (selectedSale.payment_method === 'SPLIT' ? `تێکەڵ (نەقد: ${Number(selectedSale.paid_amount || 0).toLocaleString()} | قەرز: ${Number(selectedSale.debt_amount || 0).toLocaleString()} د.ع)` : 'نەقد')}
+                </div>
               </div>
             </div>
 
@@ -273,7 +297,7 @@ const SalesHistory = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
                 <thead style={{ background: 'rgba(255,255,255,0.05)' }}>
                   <tr>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>ناوی کاڵا</th>
+                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>ناوی کاڵا و وەجبەکانی FIFO</th>
                     <th style={{ padding: '12px 16px', color: '#94a3b8' }}>بارکۆد</th>
                     <th style={{ padding: '12px 16px', color: '#94a3b8' }}>دانە</th>
                     <th style={{ padding: '12px 16px', color: '#94a3b8' }}>نرخ لە فرۆشتندا</th>
@@ -283,7 +307,31 @@ const SalesHistory = () => {
                 <tbody>
                   {selectedSale.items?.map((item) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>{item.product_name}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '500' }}>
+                        <div>{item.product_name}</div>
+                        {item.batches && item.batches.length > 0 && (
+                          <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {item.batches.map((b, bIdx) => (
+                              <span 
+                                key={bIdx}
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(16, 185, 129, 0.12)',
+                                  color: '#34d399',
+                                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                📦 {b.batch_number || `وەجبەی #${b.batch_id}`}: <b>{Number(b.quantity_deducted)} دانە</b> بە تێچوونی <b>{Number(b.unit_cost_price).toLocaleString()} د.ع</b>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem', fontFamily: 'monospace' }}>{item.barcode}</td>
                       <td style={{ padding: '12px 16px' }}>{item.quantity} دانە</td>
                       <td style={{ padding: '12px 16px' }}>{Number(item.price_at_sale).toLocaleString()} دینار</td>
@@ -352,6 +400,28 @@ const SalesHistory = () => {
             <span>کۆی گشتی:</span>
             <span>{Number(reprintReceipt.total_amount).toLocaleString()} دینار</span>
           </div>
+
+          {reprintReceipt.payment_method === 'SPLIT' ? (
+            <div style={{ margin: '4px 0', padding: '4px 0', borderTop: '1px dashed #000' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
+                <span>شێوازی پارەدان:</span>
+                <span>فرە-جۆر (تێکەڵ)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span>دراو بە نەقد:</span>
+                <span>{Number(reprintReceipt.paid_amount || 0).toLocaleString()} دینار</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
+                <span>ماوە بە قەرز:</span>
+                <span>{Number(reprintReceipt.debt_amount || 0).toLocaleString()} دینار</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '2px' }}>
+              <span>شێوازی پارەدان:</span>
+              <span>{reprintReceipt.payment_method === 'DEBT' ? 'قەرز' : 'نەقد'}</span>
+            </div>
+          )}
 
           <div className="receipt-divider"></div>
           <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>وەسڵی فرۆشتن (لەپێشینە)</div>

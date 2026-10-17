@@ -33,6 +33,7 @@ const Returns = () => {
   // Return Processing
   const [returnQtys, setReturnQtys] = useState({});
   const [returnReasons, setReturnReasons] = useState({});
+  const [refundMethod, setRefundMethod] = useState('CASH');
   const [processingItemId, setProcessingItemId] = useState(null);
 
   // History & Stats
@@ -74,6 +75,7 @@ const Returns = () => {
       const res = await axios.get(`http://localhost:3001/api/returns/sale/${id}`);
       if (res.data.status === 'SUCCESS') {
         setSearchedSale(res.data.data);
+        setRefundMethod(res.data.data.recommended_refund_method || 'CASH');
         // Initialize default return quantities to 1 or returnable_qty
         const initQtys = {};
         const initReasons = {};
@@ -102,7 +104,11 @@ const Returns = () => {
 
     const reason = returnReasons[item.product_id] || 'گەڕاندنەوە لە کڕیار';
 
-    if (!window.confirm(`دڵنیایت لە گەڕاندنەوەی ${qtyToReturn} ${item.unit || 'دانە'} لە "${item.product_name}"؟`)) {
+    const confirmMsg = refundMethod === 'DEBT'
+      ? `دڵنیایت لە گەڕاندنەوەی ${qtyToReturn} ${item.unit || 'دانە'} لە "${item.product_name}"؟ (پارەکەی لە قەرزی کڕیار کەم دەکرێتەوە)`
+      : `دڵنیایت لە گەڕاندنەوەی ${qtyToReturn} ${item.unit || 'دانە'} لە "${item.product_name}"؟ (پارەکەی بە نەقد لە سندوق دەدرێتەوە)`;
+
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
@@ -112,7 +118,8 @@ const Returns = () => {
         sale_id: searchedSale.id,
         product_id: item.product_id,
         quantity: qtyToReturn,
-        reason: reason
+        reason: reason,
+        refund_method: refundMethod
       });
 
       if (res.data.status === 'SUCCESS') {
@@ -127,6 +134,7 @@ const Returns = () => {
           unit: item.unit || 'دانە',
           price_at_sale: item.price_at_sale,
           refunded_amount: res.data.refunded_amount,
+          refund_method: res.data.refund_method || refundMethod,
           customer_name: searchedSale.customer_name,
           reason: reason,
           created_at: new Date().toISOString()
@@ -245,25 +253,111 @@ const Returns = () => {
         {/* Display Searched Sale Information */}
         {searchedSale && (
           <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            {/* Sale Meta Card */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '16px 20px', borderRadius: '14px', marginBottom: '20px', flexWrap: 'wrap', gap: '1rem' }}>
+            {/* Smart Settlement Sale Meta Card */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              background: searchedSale.payment_method === 'DEBT' 
+                ? 'rgba(239, 68, 68, 0.08)' 
+                : (searchedSale.payment_method === 'SPLIT' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)'), 
+              padding: '16px 20px', 
+              borderRadius: '16px', 
+              marginBottom: '20px', 
+              border: `1px solid ${searchedSale.payment_method === 'DEBT' ? 'rgba(239, 68, 68, 0.25)' : (searchedSale.payment_method === 'SPLIT' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(16, 185, 129, 0.25)')}`,
+              flexWrap: 'wrap', 
+              gap: '1rem' 
+            }}>
               <div>
-                <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1.1rem' }}>پسووڵەی ژمارە #{searchedSale.id}</span>
-                <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '4px' }}>
-                  کڕیار: <strong style={{ color: 'white' }}>{searchedSale.customer_name}</strong> {searchedSale.customer_phone ? `(${searchedSale.customer_phone})` : ''}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1.2rem' }}>پسووڵەی ژمارە #{searchedSale.id}</span>
+                  <span style={{ 
+                    padding: '4px 12px', 
+                    borderRadius: '8px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: 'bold',
+                    background: searchedSale.payment_method === 'DEBT' ? 'rgba(239, 68, 68, 0.2)' : (searchedSale.payment_method === 'SPLIT' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)'),
+                    color: searchedSale.payment_method === 'DEBT' ? '#ef4444' : (searchedSale.payment_method === 'SPLIT' ? '#f59e0b' : '#10b981')
+                  }}>
+                    {searchedSale.payment_method === 'DEBT' ? 'فرۆشراو بە قەرز 💳' : (searchedSale.payment_method === 'SPLIT' ? 'فرۆشراو بە تێکەڵ ⚖️' : 'فرۆشراو بە نەقد 💵')}
+                  </span>
                 </div>
+                <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '6px' }}>
+                  کڕیار: <strong style={{ color: 'white' }}>{searchedSale.customer_name}</strong> {searchedSale.customer_phone ? `(${searchedSale.customer_phone})` : ''}
+                  {searchedSale.customer_id && (
+                    <span style={{ marginRight: '10px', color: '#f59e0b', fontWeight: 'bold' }}>
+                      (قەرزی ئێستای کڕیار: {Number(searchedSale.customer_total_debt || 0).toLocaleString()} د.ع)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Settlement Mode Selector & Notice */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 'bold' }}>
+                  شێوازی دانەوەی پارەی گەڕاوە:
+                </div>
+                {searchedSale.payment_method === 'SPLIT' ? (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setRefundMethod('DEBT')}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        border: refundMethod === 'DEBT' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
+                        background: refundMethod === 'DEBT' ? '#ef4444' : 'rgba(255,255,255,0.05)',
+                        color: 'white'
+                      }}
+                    >
+                      💳 کەمکردنەوە لە قەرز (پێشنیارکراو)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRefundMethod('CASH')}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        border: refundMethod === 'CASH' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
+                        background: refundMethod === 'CASH' ? '#10b981' : 'rgba(255,255,255,0.05)',
+                        color: 'white'
+                      }}
+                    >
+                      💵 دانەوە بە نەقد لە سندوق
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    fontSize: '0.85rem', 
+                    color: refundMethod === 'DEBT' ? '#f87171' : '#34d399',
+                    fontWeight: 'bold',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px' 
+                  }}>
+                    {refundMethod === 'DEBT' 
+                      ? '💳 ڕاستەوخۆ لە دەفتەری قەرزی کڕیار کەم دەکرێتەوە (سندوق دەستکاری ناکرێت)' 
+                      : '💵 پارەی نەقد لە سندوقی کاشێر دەدرێتەوە'}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                 <div>
                   <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>بەرواری فرۆشتن:</div>
                   <div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>
-                    {new Date(searchedSale.created_at).toLocaleDateString('ku-IQ')} - {new Date(searchedSale.created_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(searchedSale.created_at).toLocaleDateString('ku-IQ')}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>کۆی گشتی پسووڵە:</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>کۆی وەسڵ:</div>
                   <div style={{ color: '#34d399', fontSize: '1.2rem', fontWeight: 'bold' }}>
                     {Number(searchedSale.total_amount || 0).toLocaleString()} دینار
                   </div>
@@ -388,6 +482,7 @@ const Returns = () => {
                 <th style={{ padding: '14px 18px', color: '#94a3b8' }}>#</th>
                 <th style={{ padding: '14px 18px', color: '#94a3b8' }}>بەروار</th>
                 <th style={{ padding: '14px 18px', color: '#94a3b8' }}>پسووڵە</th>
+                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>شێوازی دانەوە</th>
                 <th style={{ padding: '14px 18px', color: '#94a3b8' }}>ناوی کاڵا</th>
                 <th style={{ padding: '14px 18px', color: '#94a3b8' }}>بارکۆد</th>
                 <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کڕیار</th>
@@ -400,7 +495,7 @@ const Returns = () => {
             <tbody>
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                  <td colSpan="11" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
                     هیچ کاڵایەکی گەڕێنراوە لە سیستەمدا نەدۆزرایەوە
                   </td>
                 </tr>
@@ -413,6 +508,17 @@ const Returns = () => {
                     </td>
                     <td style={{ padding: '14px 18px', color: '#38bdf8', fontWeight: 'bold' }}>
                       #{ret.sale_id}
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      {ret.refund_method === 'DEBT' ? (
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          💳 لە قەرز
+                        </span>
+                      ) : (
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                          💵 لە سندوق
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>{ret.product_name}</td>
                     <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '0.9rem' }}>{ret.barcode || '-'}</td>
@@ -433,6 +539,7 @@ const Returns = () => {
                           quantity: ret.quantity,
                           unit: ret.unit || 'دانە',
                           refunded_amount: ret.refunded_amount,
+                          refund_method: ret.refund_method,
                           customer_name: ret.customer_name,
                           reason: ret.reason,
                           created_at: ret.created_at
@@ -500,9 +607,15 @@ const Returns = () => {
               </div>
 
               <div style={{ borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', color: '#000' }}>
-                  <span>کۆی پارەی دراوەتەوە:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', color: '#000', marginBottom: '6px' }}>
+                  <span>کۆی پارەی گەڕێنراوە:</span>
                   <span>{Number(selectedReceipt.refunded_amount || 0).toLocaleString()} دینار</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold', color: selectedReceipt.refund_method === 'DEBT' ? '#b45309' : '#047857' }}>
+                  <span>شێوازی پاکتاوکردن:</span>
+                  <span>
+                    {selectedReceipt.refund_method === 'DEBT' ? '💳 داشکاندن لە قەرزی کڕیار' : '💵 دانەوەی نەقد لە سندوق'}
+                  </span>
                 </div>
               </div>
 

@@ -594,6 +594,11 @@ const Owes = () => {
                                 <ArrowDownCircle size={16}/> قەرز وەرگیرا (-)
                               </span>
                             )}
+                            {h.note && (
+                              <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '4px' }}>
+                                📝 {h.note}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '16px 20px', fontWeight: 'bold', fontSize: '1.1rem', color: h.transaction_type === 'ADD' ? '#ef4444' : '#10b981' }}>
                             {Number(h.amount).toLocaleString()} دینار

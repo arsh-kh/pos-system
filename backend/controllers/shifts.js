@@ -27,16 +27,24 @@ exports.getCurrentShift = async (req, res) => {
         const debtSales = Number(debtRows[0].debt_sales) || 0;
         const cashSales = Math.max(0, totalSales - debtSales);
 
-        // 3. Expenses during this shift
+        // 3. Cash refunds during this shift
+        const [refundRows] = await db.query(
+            "SELECT COALESCE(SUM(refunded_amount), 0) as cash_refunds, COUNT(id) as refund_count FROM Returns WHERE refund_method = 'CASH' AND created_at >= ?",
+            [openedAt]
+        );
+        const cashRefunds = Number(refundRows[0].cash_refunds) || 0;
+        const refundCount = Number(refundRows[0].refund_count) || 0;
+
+        // 4. Expenses during this shift
         const [expenseRows] = await db.query(
             "SELECT COALESCE(SUM(amount), 0) as expenses_paid, COUNT(id) as expense_count FROM Expenses WHERE created_at >= ?",
             [openedAt]
         );
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
 
-        // 4. Expected cash in register
+        // 5. Expected cash in register (Opening Cash + Cash Sales - Expenses - Cash Refunds)
         const openingCash = Number(shift.opening_cash) || 0;
-        const expectedCash = openingCash + cashSales - expensesPaid;
+        const expectedCash = openingCash + cashSales - expensesPaid - cashRefunds;
 
         res.json({
             status: 'SUCCESS',
@@ -47,9 +55,11 @@ exports.getCurrentShift = async (req, res) => {
                     total_sales: totalSales,
                     cash_sales: cashSales,
                     debt_sales: debtSales,
+                    cash_refunds: cashRefunds,
                     expenses_paid: expensesPaid,
                     expected_cash: expectedCash,
-                    sale_count: saleCount
+                    sale_count: saleCount,
+                    refund_count: refundCount
                 }
             }
         });
@@ -123,6 +133,12 @@ exports.closeShift = async (req, res) => {
         const debtSales = Number(debtRows[0].debt_sales) || 0;
         const cashSales = Math.max(0, totalSales - debtSales);
 
+        const [refundRows] = await db.query(
+            "SELECT COALESCE(SUM(refunded_amount), 0) as cash_refunds FROM Returns WHERE refund_method = 'CASH' AND created_at >= ?",
+            [openedAt]
+        );
+        const cashRefunds = Number(refundRows[0].cash_refunds) || 0;
+
         const [expenseRows] = await db.query(
             "SELECT COALESCE(SUM(amount), 0) as expenses_paid FROM Expenses WHERE created_at >= ?",
             [openedAt]
@@ -130,7 +146,7 @@ exports.closeShift = async (req, res) => {
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
 
         const openingCash = Number(shift.opening_cash) || 0;
-        const expectedCash = openingCash + cashSales - expensesPaid;
+        const expectedCash = openingCash + cashSales - expensesPaid - cashRefunds;
         const countedCash = Math.max(0, Math.round(Number(actual_cash) || 0));
         const diff = countedCash - expectedCash;
 

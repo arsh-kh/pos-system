@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -55,16 +56,52 @@ ipcMain.on('print-receipt', (event, receiptData) => {
   
   receiptText += "------------------------\n";
   receiptText += `TOTAL: ${receiptData.total} IQD\n`;
+  if (receiptData.isSplit) {
+    receiptText += `CASH PAID: ${receiptData.paidAmount} IQD\n`;
+    receiptText += `DEBT: ${receiptData.debtAmount} IQD\n`;
+    receiptText += `CUSTOMER: ${receiptData.customerName}\n`;
+  } else if (receiptData.isDebt) {
+    receiptText += `PAYMENT: CREDIT (${receiptData.customerName})\n`;
+  }
   receiptText += "\n\n\n\n"; // Feed paper
   receiptText += GS + "V" + "A" + "\x00"; // Cut paper
-
-  // For real hardware:
-  // const client = new net.Socket();
-  // client.connect(9100, '192.168.1.100', () => {
-  //   client.write(Buffer.from(receiptText));
-  //   client.destroy();
-  // });
 
   console.log(receiptText);
   event.reply('print-receipt-reply', { success: true });
 });
+
+// IPC Handler: Open Backups Folder in Windows Explorer
+ipcMain.handle('open-backups-folder', async () => {
+  try {
+    const backupsDir = path.resolve(__dirname, 'backend', 'backups');
+    if (!fs.existsSync(backupsDir)) {
+      fs.mkdirSync(backupsDir, { recursive: true });
+    }
+    await shell.openPath(backupsDir);
+    return { success: true, path: backupsDir };
+  } catch (err) {
+    console.error('Failed to open backups folder:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// IPC Handler: Save Backup with Native Windows Save Dialog
+ipcMain.handle('save-backup-dialog', async (event, { defaultFileName, content }) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'پاشەکەوتکردنی فایلی باکئەپ لە کۆمپیوتەر یان فلاش (USB)',
+      defaultPath: defaultFileName,
+      filters: [{ name: 'JSON Backup (*.json)', extensions: ['json'] }]
+    });
+
+    if (!canceled && filePath) {
+      fs.writeFileSync(filePath, typeof content === 'string' ? content : JSON.stringify(content, null, 2), 'utf8');
+      return { success: true, filePath };
+    }
+    return { canceled: true };
+  } catch (err) {
+    console.error('Failed to save backup via dialog:', err);
+    return { success: false, error: err.message };
+  }
+});
+

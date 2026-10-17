@@ -15,19 +15,19 @@ import {
   Percent,
   Keyboard,
   Lock,
-  Tag
+  Tag,
+  Package
 } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import './Dashboard.css';
 
 const Cashier = () => {
   const navigate = useNavigate();
-  // Multi-Cart State (Cart 1, Cart 2, Cart 3)
+  // Multi-Cart State (Cart 1: Main, Cart 2: Quick-Sell)
   const [activeCartIndex, setActiveCartIndex] = useState(0);
   const [carts, setCarts] = useState([
-    { id: 1, label: 'سەلە ١', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', isDebtSale: false },
-    { id: 2, label: 'سەلە ٢', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', isDebtSale: false },
-    { id: 3, label: 'سەلە ٣', shortcut: 'F8', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', isDebtSale: false }
+    { id: 1, label: 'سەلە ١ (سەرەکی)', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' },
+    { id: 2, label: 'سەلە ٢ (خێرا)', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' }
   ]);
 
   // Active Cart Proxies
@@ -36,7 +36,10 @@ const Cashier = () => {
   const selectedCustomerId = currentCartData.customerId;
   const discountType = currentCartData.discountType;
   const discountValue = currentCartData.discountValue;
-  const isDebtSale = currentCartData.isDebtSale;
+  const paymentMode = currentCartData.paymentMode || (currentCartData.isDebtSale ? 'DEBT' : 'CASH');
+  const splitCashAmount = currentCartData.splitCashAmount || '';
+  const isDebtSale = paymentMode === 'DEBT';
+  const isSplitSale = paymentMode === 'SPLIT';
 
   // Active Cart Updaters
   const updateActiveCart = (updater) => {
@@ -68,8 +71,17 @@ const Cashier = () => {
     updateActiveCart(curr => ({ ...curr, discountValue: typeof val === 'function' ? val(curr.discountValue) : val }));
   };
 
+  const setPaymentMode = (mode) => {
+    updateActiveCart(curr => ({ ...curr, paymentMode: mode, isDebtSale: mode === 'DEBT' }));
+  };
+
+  const setSplitCashAmount = (val) => {
+    updateActiveCart(curr => ({ ...curr, splitCashAmount: typeof val === 'function' ? val(curr.splitCashAmount) : val }));
+  };
+
   const setIsDebtSale = (val) => {
-    updateActiveCart(curr => ({ ...curr, isDebtSale: typeof val === 'function' ? val(curr.isDebtSale) : val }));
+    const isDebt = typeof val === 'function' ? val(paymentMode === 'DEBT') : val;
+    setPaymentMode(isDebt ? 'DEBT' : 'CASH');
   };
 
   const [products, setProducts] = useState([]);
@@ -158,9 +170,6 @@ const Cashier = () => {
       } else if (e.key === 'F7' || (e.ctrlKey && e.key === '2')) {
         e.preventDefault();
         setActiveCartIndex(1);
-      } else if (e.key === 'F8' || (e.ctrlKey && e.key === '3')) {
-        e.preventDefault();
-        setActiveCartIndex(2);
       } else if (e.key === 'F9') {
         e.preventDefault();
         if (cart.length > 0 && !isCheckingOut) {
@@ -177,9 +186,17 @@ const Cashier = () => {
   });
 
   // Cart Add & Update
-  const addToCart = (product, addQty = 1) => {
+  const addToCart = (product, addQty = 1, unitType = 'PIECE') => {
     setCart(prevCart => {
-      const existingIdx = prevCart.findIndex(item => item.barcode === product.barcode);
+      const isBox = unitType === 'BOX';
+      const unitsPerBox = Math.max(1, parseFloat(product.units_per_box) || 1);
+      const singlePrice = Number(product.selling_price) || 0;
+      const boxPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(singlePrice * unitsPerBox);
+      const effectivePrice = isBox ? boxPrice : singlePrice;
+      const cartKey = `${product.id}_${unitType}`;
+
+      const existingIdx = prevCart.findIndex(item => (item.cartKey === cartKey) || (item.id === product.id && (item.unit_type || 'PIECE') === unitType));
+
       if (existingIdx >= 0) {
         const updated = [...prevCart];
         const newQty = Math.round((Number(updated[existingIdx].quantity) + Number(addQty)) * 1000) / 1000;
@@ -190,33 +207,66 @@ const Cashier = () => {
           ...prevCart,
           {
             id: product.id,
-            name: product.name,
+            cartKey: cartKey,
+            baseName: product.name,
+            name: isBox ? `${product.name} (کارتۆن - ${unitsPerBox} دانە)` : product.name,
             barcode: product.barcode,
-            price: Number(product.selling_price) || 0,
+            box_barcode: product.box_barcode,
+            price: effectivePrice,
+            single_price: singlePrice,
+            wholesale_price: Number(product.wholesale_price) || 0,
+            units_per_box: unitsPerBox,
+            unit_type: unitType,
             stock: product.stock || 0,
             quantity: Math.max(0.001, Number(addQty)),
-            unit: product.unit || 'دانە'
+            unit: isBox ? 'کارتۆن' : (product.unit || 'دانە')
           }
         ];
       }
     });
   };
 
-  const updateQuantity = (barcode, newQty) => {
+  const setItemUnitType = (key, targetUnitType) => {
+    setCart(prevCart => {
+      return prevCart.map(item => {
+        if (item.cartKey !== key && item.barcode !== key) return item;
+        if (item.unit_type === targetUnitType) return item;
+
+        const isToBox = targetUnitType === 'BOX';
+        const unitsPerBox = Number(item.units_per_box) || 1;
+        const singlePrice = Number(item.single_price) || Number(item.price);
+        const boxPrice = Number(item.wholesale_price) > 0 ? Number(item.wholesale_price) : Math.round(singlePrice * unitsPerBox);
+        const baseName = item.baseName || item.name.replace(/\s*\(کارتۆن.*?\)/, '');
+
+        return {
+          ...item,
+          cartKey: `${item.id}_${targetUnitType}`,
+          unit_type: targetUnitType,
+          price: isToBox ? boxPrice : singlePrice,
+          name: isToBox ? `${baseName} (کارتۆن - ${unitsPerBox} دانە)` : baseName,
+          unit: isToBox ? 'کارتۆن' : 'دانە'
+        };
+      });
+    });
+  };
+
+  const updateQuantity = (key, newQty) => {
     const qty = parseFloat(newQty);
     if (isNaN(qty) || qty <= 0) return;
     const roundedQty = Math.round(qty * 1000) / 1000;
-    setCart(prev => prev.map(item => item.barcode === barcode ? { ...item, quantity: roundedQty } : item));
+    setCart(prev => prev.map(item => (item.cartKey === key || item.barcode === key) ? { ...item, quantity: roundedQty } : item));
   };
 
-  const removeFromCart = (barcode) => {
-    setCart(prev => prev.filter(item => item.barcode !== barcode));
+  const removeFromCart = (key) => {
+    setCart(prev => prev.filter(item => item.cartKey !== key && item.barcode !== key));
   };
 
   const clearCart = () => {
     updateActiveCart({
       items: [],
       customerId: '',
+      paymentMode: 'CASH',
+      splitCashAmount: '',
       isDebtSale: false,
       discountValue: ''
     });
@@ -293,10 +343,18 @@ const Cashier = () => {
   const handleProcessBarcode = (code) => {
     if (!code) return;
     const cleanCode = code.trim();
-    const product = products.find(p => p.barcode === cleanCode);
 
-    if (product) {
-      addToCart(product, 1);
+    // 1. Check if barcode matches a carton/box barcode directly
+    const productBox = products.find(p => p.box_barcode && String(p.box_barcode).trim() === cleanCode);
+    // 2. Check if barcode matches a single piece barcode
+    const productPiece = products.find(p => String(p.barcode).trim() === cleanCode);
+
+    if (productBox) {
+      // Scanned carton barcode -> Directly add as BOX with wholesale price and box units deduction
+      addToCart(productBox, 1, 'BOX');
+    } else if (productPiece) {
+      // Scanned regular piece barcode
+      addToCart(productPiece, 1, 'PIECE');
     } else {
       alert(`کاڵاکە نەدۆزرایەوە بۆ ئەم بارکۆدە: ${cleanCode}`);
     }
@@ -313,6 +371,22 @@ const Cashier = () => {
 
   // Helper: Calculate item pricing considering active promotion & tiered quantity limits
   const getItemPricing = useCallback((item) => {
+    // If item is sold as a carton/box, wholesale price applies directly
+    if (item.unit_type === 'BOX') {
+      const boxPrice = Number(item.price);
+      const qty = Number(item.quantity);
+      return {
+        hasPromo: false,
+        promoQty: 0,
+        regularQty: qty,
+        promoPrice: boxPrice,
+        regularPrice: boxPrice,
+        maxLimit: null,
+        lineTotal: Math.round(boxPrice * qty),
+        totalSavings: 0
+      };
+    }
+
     const promo = activePromotions[item.id];
     const regularPrice = Number(item.price);
     const qty = Number(item.quantity);
@@ -379,11 +453,32 @@ const Cashier = () => {
     return customers.find(c => String(c.id) === String(selectedCustomerId)) || null;
   }, [customers, selectedCustomerId]);
 
+  // Split payment effective cash and debt calculations
+  const effectiveCashPaid = useMemo(() => {
+    if (paymentMode === 'CASH') return grandTotal;
+    if (paymentMode === 'DEBT') return 0;
+    if (paymentMode === 'SPLIT') {
+      const parsed = parseFloat(splitCashAmount);
+      if (isNaN(parsed) || parsed < 0) return 0;
+      return Math.min(grandTotal, Math.round(parsed));
+    }
+    return grandTotal;
+  }, [paymentMode, splitCashAmount, grandTotal]);
+
+  const effectiveDebtAmount = useMemo(() => {
+    if (paymentMode === 'CASH') return 0;
+    if (paymentMode === 'DEBT') return grandTotal;
+    if (paymentMode === 'SPLIT') {
+      return Math.max(0, grandTotal - effectiveCashPaid);
+    }
+    return 0;
+  }, [paymentMode, grandTotal, effectiveCashPaid]);
+
   // Process Checkout
   const handleCheckout = async (forcePrint = null) => {
     if (cart.length === 0) return alert('عەرەبانەی کڕین واڵایە!');
-    if (isDebtSale && !selectedCustomerId) {
-      return alert('تکایە سەرەتا کڕیارێک دیاریبکە بۆ فرۆشتن بە قەرز');
+    if ((paymentMode === 'DEBT' || paymentMode === 'SPLIT') && !selectedCustomerId) {
+      return alert('تکایە سەرەتا کڕیارێک دیاریبکە بۆ فرۆشتن بە قەرز یان فرە-جۆر (تێکەڵ)');
     }
 
     const shouldPrint = forcePrint !== null ? forcePrint : autoPrint;
@@ -396,10 +491,14 @@ const Cashier = () => {
           quantity: i.quantity,
           is_custom: i.is_custom || false,
           price: i.price,
-          name: i.name
+          name: i.name,
+          unit_type: i.unit_type || 'PIECE',
+          units_per_box: i.units_per_box || 1
         })),
         customer_id: selectedCustomerId || null,
-        pay_later_amount: isDebtSale ? grandTotal : 0,
+        paid_amount: effectiveCashPaid,
+        pay_later_amount: effectiveDebtAmount,
+        payment_method: paymentMode,
         subtotal_amount: subtotal,
         discount_amount: calculatedDiscount
       };
@@ -408,13 +507,17 @@ const Cashier = () => {
       if (res.data.status === 'SUCCESS') {
         const saleId = res.data.saleId;
         
-        // Prepare Receipt Data with Promotion Breakdown
+        // Prepare Receipt Data with Promotion Breakdown & Split Payment details
         const receiptData = {
           saleId,
           date: new Date().toLocaleString('en-US', { hour12: true }),
           customerName: selectedCustomer ? selectedCustomer.name : 'کڕیاری گشتی',
           customerPhone: selectedCustomer ? selectedCustomer.phone : '',
-          isDebt: isDebtSale,
+          paymentMethod: paymentMode,
+          paidAmount: effectiveCashPaid,
+          debtAmount: effectiveDebtAmount,
+          isDebt: paymentMode === 'DEBT',
+          isSplit: paymentMode === 'SPLIT',
           subtotal: subtotal,
           promotionalSavings: totalPromotionalSavings,
           discount: calculatedDiscount,
@@ -428,7 +531,8 @@ const Cashier = () => {
               total: pricing.lineTotal,
               hasPromo: pricing.hasPromo,
               promoSavings: pricing.totalSavings,
-              unit: i.unit || 'دانە'
+              unit: i.unit || 'دانە',
+              unit_type: i.unit_type || 'PIECE'
             };
           })
         };
@@ -731,17 +835,43 @@ const Cashier = () => {
                       </span>
                     )}
 
-                    <span style={{ 
-                      background: promo ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)', 
-                      color: promo ? '#c084fc' : '#38bdf8', 
-                      padding: '3px 8px', 
-                      borderRadius: '6px', 
-                      fontSize: '0.72rem', 
-                      fontWeight: 'bold',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {promo && promo.max_qty_per_sale ? `سنوور: ${promo.max_qty_per_sale}` : `+١ ${p.unit || 'دانە'}`}
-                    </span>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <span style={{ 
+                        background: promo ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)', 
+                        color: promo ? '#c084fc' : '#38bdf8', 
+                        padding: '3px 8px', 
+                        borderRadius: '6px', 
+                        fontSize: '0.72rem', 
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {promo && promo.max_qty_per_sale ? `سنوور: ${promo.max_qty_per_sale}` : `+١ ${p.unit || 'دانە'}`}
+                      </span>
+
+                      {(p.units_per_box > 1 || p.wholesale_price > 0) && (
+                        <span
+                          role="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p, 1, 'BOX');
+                          }}
+                          title={`زیادکردنی ١ کارتۆن (${p.units_per_box || 1} دانە) بە نرخی ${Number(p.wholesale_price).toLocaleString()} د.ع`}
+                          style={{
+                            background: 'rgba(168, 85, 247, 0.25)',
+                            border: '1px solid rgba(168, 85, 247, 0.5)',
+                            color: '#c084fc',
+                            padding: '3px 7px',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          📦 کارتۆن
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
@@ -841,18 +971,30 @@ const Cashier = () => {
               })}
             </div>
 
-            {/* Customer Dropdown for Cash or Credit Sales */}
-            <div style={{ marginBottom: '1rem', padding: '10px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
-                کڕیار (بۆ فرۆشتن بە قەرز یان تۆمارکردن):
-              </label>
+            {/* Customer & Payment Mode Selection */}
+            <div style={{ marginBottom: '1rem', padding: '12px', background: 'rgba(0,0,0,0.25)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'bold' }}>
+                  کڕیار (بۆ قەرز یان داشکاندن):
+                </label>
+                {selectedCustomer && (
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b' }}>
+                    قەرزی پێشوو: {Number(selectedCustomer.total_debt || 0).toLocaleString()} د.ع
+                  </span>
+                )}
+              </div>
+
               <select 
                 value={selectedCustomerId}
                 onChange={(e) => {
-                  setSelectedCustomerId(e.target.value);
-                  if (!e.target.value) setIsDebtSale(false);
+                  const val = e.target.value;
+                  setSelectedCustomerId(val);
+                  if (!val) {
+                    setPaymentMode('CASH');
+                    setSplitCashAmount('');
+                  }
                 }}
-                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
               >
                 <option value="">کڕیاری گشتی (نەقد)...</option>
                 {customers.map(c => (
@@ -862,19 +1004,119 @@ const Cashier = () => {
                 ))}
               </select>
 
-              {/* Debt Sale Toggle Checkbox */}
-              {selectedCustomerId && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={isDebtSale}
-                    onChange={(e) => setIsDebtSale(e.target.checked)}
-                    style={{ accentColor: '#ef4444', width: '16px', height: '16px' }}
-                  />
-                  <span style={{ fontSize: '0.85rem', color: isDebtSale ? '#ef4444' : '#94a3b8', fontWeight: isDebtSale ? 'bold' : 'normal' }}>
-                    فرۆشتن بە قەرز (ڕاستەوخۆ دەچێتە سەر قەرزی ئەم کڕیارە)
-                  </span>
-                </label>
+              {/* Payment Mode Selector Tabs (CASH, DEBT, SPLIT) */}
+              <div style={{ marginTop: '10px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '6px' }}>شێوازی پارەدان:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode('CASH');
+                      setSplitCashAmount('');
+                    }}
+                    style={{
+                      padding: '7px 4px',
+                      borderRadius: '8px',
+                      border: paymentMode === 'CASH' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
+                      background: paymentMode === 'CASH' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.03)',
+                      color: paymentMode === 'CASH' ? '#10b981' : '#94a3b8',
+                      fontWeight: paymentMode === 'CASH' ? 'bold' : 'normal',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    💵 نەقد
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!selectedCustomerId}
+                    onClick={() => {
+                      if (!selectedCustomerId) return;
+                      setPaymentMode('DEBT');
+                      setSplitCashAmount('');
+                    }}
+                    style={{
+                      padding: '7px 4px',
+                      borderRadius: '8px',
+                      border: paymentMode === 'DEBT' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)',
+                      background: paymentMode === 'DEBT' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.03)',
+                      color: !selectedCustomerId ? '#64748b' : (paymentMode === 'DEBT' ? '#ef4444' : '#94a3b8'),
+                      fontWeight: paymentMode === 'DEBT' ? 'bold' : 'normal',
+                      fontSize: '0.8rem',
+                      cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
+                  >
+                    💳 قەرز
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!selectedCustomerId}
+                    onClick={() => {
+                      if (!selectedCustomerId) return;
+                      setPaymentMode('SPLIT');
+                      if (!splitCashAmount) {
+                        setSplitCashAmount(String(Math.round(grandTotal / 2)));
+                      }
+                    }}
+                    style={{
+                      padding: '7px 4px',
+                      borderRadius: '8px',
+                      border: paymentMode === 'SPLIT' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)',
+                      background: paymentMode === 'SPLIT' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.03)',
+                      color: !selectedCustomerId ? '#64748b' : (paymentMode === 'SPLIT' ? '#f59e0b' : '#94a3b8'),
+                      fontWeight: paymentMode === 'SPLIT' ? 'bold' : 'normal',
+                      fontSize: '0.8rem',
+                      cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
+                  >
+                    ⚖️ تێکەڵ (نەقد+قەرز)
+                  </button>
+                </div>
+              </div>
+
+              {/* Interactive Split Payment Calculator */}
+              {paymentMode === 'SPLIT' && (
+                <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(245, 158, 11, 0.08)', borderRadius: '10px', border: '1px dashed rgba(245, 158, 11, 0.3)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                      بڕی پارەی نەقد (کاش):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSplitCashAmount(String(Math.round(grandTotal / 2)))}
+                      style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', cursor: 'pointer' }}
+                    >
+                      ٥٠٪ (نیوە)
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max={grandTotal}
+                      step="250"
+                      value={splitCashAmount}
+                      placeholder="بڕی نەقد بنووسە..."
+                      onChange={(e) => setSplitCashAmount(e.target.value)}
+                      style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', background: '#0f172a', border: '1px solid #f59e0b', color: '#10b981', fontSize: '1rem', fontWeight: 'bold', outline: 'none' }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>دینار</span>
+                  </div>
+
+                  {/* Realtime Split Breakdown */}
+                  <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ color: '#10b981' }}>💵 نەقد: {effectiveCashPaid.toLocaleString()} د.ع</span>
+                    <span style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ ماوە بە قەرز: {effectiveDebtAmount.toLocaleString()} د.ع</span>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -890,14 +1132,15 @@ const Cashier = () => {
                   const pricing = getItemPricing(item);
                   const lineTotal = pricing.lineTotal;
                   const isKg = item.unit === 'کگم' || item.is_weighted;
+                  const itemKey = item.cartKey || item.barcode;
                   return (
                     <div 
-                      key={item.barcode}
+                      key={itemKey}
                       style={{
                         padding: '12px',
                         borderRadius: '12px',
-                        background: pricing.hasPromo ? 'rgba(168, 85, 247, 0.08)' : 'rgba(0,0,0,0.2)',
-                        border: pricing.hasPromo ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                        background: item.unit_type === 'BOX' ? 'rgba(168, 85, 247, 0.12)' : (pricing.hasPromo ? 'rgba(168, 85, 247, 0.08)' : 'rgba(0,0,0,0.2)'),
+                        border: item.unit_type === 'BOX' ? '1px solid rgba(168, 85, 247, 0.4)' : (pricing.hasPromo ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(255,255,255,0.05)'),
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '8px'
@@ -905,14 +1148,19 @@ const Cashier = () => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             {item.name}
                             {item.is_custom && (
                               <span style={{ fontSize: '0.72rem', background: isKg ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: isKg ? '#c084fc' : '#f59e0b', padding: '1px 6px', borderRadius: '4px' }}>
                                 {isKg ? '⚖️ بە کێش' : 'دەستی'}
                               </span>
                             )}
-                            {pricing.hasPromo && (
+                            {item.unit_type === 'BOX' && (
+                              <span style={{ fontSize: '0.72rem', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.5)', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Package size={11} /> کارتۆن ({item.units_per_box || 1} دانە)
+                              </span>
+                            )}
+                            {pricing.hasPromo && item.unit_type !== 'BOX' && (
                               <span style={{ fontSize: '0.72rem', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
                                 🏷️ ئۆفەر
                               </span>
@@ -920,7 +1168,7 @@ const Cashier = () => {
                           </div>
 
                           {/* Promotional Tiered Explanation */}
-                          {pricing.hasPromo ? (
+                          {pricing.hasPromo && item.unit_type !== 'BOX' ? (
                             <div style={{ marginTop: '4px' }}>
                               {pricing.regularQty > 0 ? (
                                 <div style={{ fontSize: '0.78rem', color: '#c084fc' }}>
@@ -940,16 +1188,21 @@ const Cashier = () => {
                           ) : (
                             <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                               {item.price.toLocaleString()} دینار بۆ هەر {item.unit || 'دانە'}
+                              {item.unit_type === 'BOX' && (
+                                <span style={{ color: '#c084fc', marginRight: '6px' }}>
+                                  (تێچووی کۆگایی: {item.units_per_box || 1} دانە بە کۆ)
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
 
                         <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontWeight: 'bold', color: '#10b981', fontSize: '1rem' }}>
+                          <div style={{ fontWeight: 'bold', color: item.unit_type === 'BOX' ? '#c084fc' : '#10b981', fontSize: '1rem' }}>
                             {lineTotal.toLocaleString()} دینار
                           </div>
                           <button 
-                            onClick={() => removeFromCart(item.barcode)}
+                            onClick={() => removeFromCart(itemKey)}
                             style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', marginTop: '2px' }}
                             title="سڕینەوە"
                           >
@@ -958,13 +1211,13 @@ const Cashier = () => {
                         </div>
                       </div>
 
-                      {/* Quantity Stepper & Quick Multipliers */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      {/* Quantity Stepper & Unit Switcher & Quick Multipliers */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         
                         {/* Stepper +/- */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '2px' }}>
                           <button 
-                            onClick={() => updateQuantity(item.barcode, Math.max(0.1, item.quantity - (isKg ? 0.25 : 1)))}
+                            onClick={() => updateQuantity(itemKey, Math.max(0.1, item.quantity - (isKg ? 0.25 : 1)))}
                             style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Minus size={14} />
@@ -975,24 +1228,62 @@ const Cashier = () => {
                             step={isKg ? '0.05' : '1'}
                             min="0.01"
                             value={item.quantity}
-                            onChange={(e) => updateQuantity(item.barcode, e.target.value)}
+                            onChange={(e) => updateQuantity(itemKey, e.target.value)}
                             style={{ width: '60px', textAlign: 'center', background: 'transparent', border: 'none', color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}
                           />
 
                           <button 
-                            onClick={() => updateQuantity(item.barcode, item.quantity + (isKg ? 0.25 : 1))}
+                            onClick={() => updateQuantity(itemKey, item.quantity + (isKg ? 0.25 : 1))}
                             style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Plus size={14} />
                           </button>
                         </div>
 
+                        {/* Unit Switcher: دانە vs کارتۆن */}
+                        {(item.units_per_box > 1 || item.wholesale_price > 0 || item.unit_type === 'BOX') && (
+                          <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.35)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(168, 85, 247, 0.35)' }}>
+                            <button
+                              type="button"
+                              onClick={() => setItemUnitType(itemKey, 'PIECE')}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '0.74rem',
+                                fontWeight: 'bold',
+                                background: item.unit_type !== 'BOX' ? '#38bdf8' : 'transparent',
+                                color: item.unit_type !== 'BOX' ? '#0f172a' : '#94a3b8'
+                              }}
+                            >
+                              دانە 🏷️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setItemUnitType(itemKey, 'BOX')}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '0.74rem',
+                                fontWeight: 'bold',
+                                background: item.unit_type === 'BOX' ? '#c084fc' : 'transparent',
+                                color: item.unit_type === 'BOX' ? '#0f172a' : '#94a3b8'
+                              }}
+                            >
+                              کارتۆن 📦 ({item.units_per_box || 1})
+                            </button>
+                          </div>
+                        )}
+
                         {/* Quick Presets Buttons */}
                         <div style={{ display: 'flex', gap: '4px' }}>
                           {(isKg ? [0.25, 0.5, 1, 2] : [1, 5, 10, 20]).map(q => (
                             <button
                               key={q}
-                              onClick={() => updateQuantity(item.barcode, q)}
+                              onClick={() => updateQuantity(itemKey, q)}
                               style={{
                                 padding: '4px 8px',
                                 borderRadius: '6px',
@@ -1106,14 +1397,24 @@ const Cashier = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '1.1rem', color: '#94a3b8' }}>کۆی کۆتایی:</span>
-                <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: isDebtSale ? '#ef4444' : '#10b981' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: paymentMode === 'DEBT' ? '#ef4444' : (paymentMode === 'SPLIT' ? '#f59e0b' : '#10b981') }}>
                   {grandTotal.toLocaleString()} دینار
                 </span>
               </div>
 
-              {isDebtSale && (
+              {paymentMode === 'DEBT' && (
                 <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem', textAlign: 'center', fontWeight: 'bold' }}>
                   ⚠️ ئەم بڕە دەچێتە سەر قەرزی: {selectedCustomer?.name}
+                </div>
+              )}
+
+              {paymentMode === 'SPLIT' && (
+                <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '10px', color: '#f59e0b', fontSize: '0.85rem', marginBottom: '1rem', border: '1px solid rgba(245, 158, 11, 0.25)', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 'bold' }}>⚖️ فرۆشتنی فرە-جۆر (تێکەڵ):</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>
+                    💵 نەقد: <strong style={{ color: '#10b981' }}>{effectiveCashPaid.toLocaleString()} د.ع</strong> | 
+                    ⚠️ قەرز: <strong style={{ color: '#ef4444' }}>{effectiveDebtAmount.toLocaleString()} د.ع</strong>
+                  </div>
                 </div>
               )}
 
@@ -1167,7 +1468,9 @@ const Cashier = () => {
                   style={{
                     padding: '14px 10px',
                     borderRadius: '12px',
-                    background: cart.length === 0 ? 'rgba(255,255,255,0.08)' : (isDebtSale ? '#ef4444' : 'linear-gradient(135deg, #10b981, #059669)'),
+                    background: cart.length === 0 
+                      ? 'rgba(255,255,255,0.08)' 
+                      : (paymentMode === 'DEBT' ? '#ef4444' : (paymentMode === 'SPLIT' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)')),
                     color: cart.length === 0 ? '#64748b' : 'white',
                     border: 'none',
                     fontWeight: 'bold',
@@ -1177,7 +1480,9 @@ const Cashier = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    boxShadow: cart.length === 0 ? 'none' : '0 4px 12px rgba(16,185,129,0.3)'
+                    boxShadow: cart.length === 0 
+                      ? 'none' 
+                      : (paymentMode === 'DEBT' ? '0 4px 12px rgba(239,68,68,0.3)' : (paymentMode === 'SPLIT' ? '0 4px 12px rgba(245,158,11,0.3)' : '0 4px 12px rgba(16,185,129,0.3)'))
                   }}
                 >
                   <Printer size={18} />
@@ -1251,10 +1556,32 @@ const Cashier = () => {
             <span>کۆی گشتی:</span>
             <span>{printedReceipt.total.toLocaleString()} دینار</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '2px' }}>
-            <span>شێوازی پارەدان:</span>
-            <span>{printedReceipt.isDebt ? 'قەرز' : 'نەقد'}</span>
-          </div>
+
+          {printedReceipt.isSplit ? (
+            <div style={{ margin: '4px 0', padding: '4px 0', borderTop: '1px dashed #000' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
+                <span>شێوازی پارەدان:</span>
+                <span>فرە-جۆر (تێکەڵ)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span>دراو بە نەقد:</span>
+                <span>{Number(printedReceipt.paidAmount || 0).toLocaleString()} دینار</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
+                <span>ماوە بە قەرز:</span>
+                <span>{Number(printedReceipt.debtAmount || 0).toLocaleString()} دینار</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#555' }}>
+                <span>خاوەن قەرز:</span>
+                <span>{printedReceipt.customerName}</span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '2px' }}>
+              <span>شێوازی پارەدان:</span>
+              <span>{printedReceipt.isDebt ? `قەرز (${printedReceipt.customerName})` : 'نەقد'}</span>
+            </div>
+          )}
 
           <div className="receipt-divider"></div>
           <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>سوپاس بۆ سەردانەکەتان</div>

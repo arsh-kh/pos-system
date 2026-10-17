@@ -62,12 +62,39 @@ exports.createPurchaseInvoice = async (req, res) => {
             );
         }
 
-        // 3. Insert Items and Update Stock & Cost Price
+        // 3. Insert Items and Update Stock & Cost Price with FIFO Batches
         for (const item of items) {
             await connection.query(
                 'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, selling_price) VALUES (?, ?, ?, ?, ?)',
                 [invoice_id, item.product_id, item.quantity, item.cost_price, item.selling_price]
             );
+
+            // Insert new FIFO batch
+            const batchNum = item.batch_number || `BATCH-${invoice_id}-${item.product_id}`;
+            await connection.query(`
+                INSERT INTO Product_Batches (
+                    product_id,
+                    purchase_invoice_id,
+                    batch_number,
+                    initial_quantity,
+                    remaining_quantity,
+                    cost_price,
+                    selling_price,
+                    expiry_date,
+                    status,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+            `, [
+                item.product_id,
+                invoice_id,
+                batchNum,
+                item.quantity,
+                item.quantity,
+                safeBigInt(item.cost_price).toString(),
+                item.selling_price ? safeBigInt(item.selling_price).toString() : null,
+                item.expiry_date || null,
+                dateVal
+            ]);
 
             await connection.query(
                 'UPDATE Products SET stock = stock + ?, cost_price = ?, selling_price = ? WHERE id = ?',

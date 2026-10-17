@@ -15,6 +15,9 @@ import Purchases from './pages/Purchases';
 import Expenses from './pages/Expenses';
 import CashDrawer from './pages/CashDrawer';
 import Returns from './pages/Returns';
+import Wastage from './pages/Wastage';
+import VendorReturns from './pages/VendorReturns';
+import InventoryAudit from './pages/InventoryAudit';
 import Promotions from './pages/Promotions';
 import SalesHistory from './pages/SalesHistory';
 import TotalSales from './pages/TotalSales';
@@ -70,6 +73,9 @@ function AppContent() {
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/shifts" element={<CashDrawer />} />
         <Route path="/returns" element={<Returns />} />
+        <Route path="/wastage" element={<Wastage />} />
+        <Route path="/vendor-returns" element={<VendorReturns />} />
+        <Route path="/inventory-audit" element={<InventoryAudit />} />
         <Route path="/needs" element={<Needs />} />
         <Route path="/financials" element={<Financials />} />
         <Route path="/purchases" element={<Purchases />} />

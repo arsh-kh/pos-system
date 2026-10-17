@@ -12,7 +12,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
-  BarChart3
+  BarChart3,
+  PackageX,
+  Wallet,
+  AlertCircle
 } from 'lucide-react';
 import './Dashboard.css';
 
@@ -77,7 +80,11 @@ const ThisMonth = () => {
 
   const current = data.current_month || {};
   const totalSales = Number(current.total_sales || 0);
-  const totalProfit = Number(current.total_profit || 0);
+  const grossProfit = Number(current.gross_profit !== undefined ? current.gross_profit : (current.total_profit || 0));
+  const totalExpenses = Number(current.total_expenses || 0);
+  const totalDamagesLoss = Number(current.total_damages_loss || 0);
+  const totalDamagesUnits = Number(current.total_damages_units || 0);
+  const netProfit = Number(current.net_profit !== undefined ? current.net_profit : (grossProfit - totalExpenses - totalDamagesLoss));
   const daysRecorded = processedDailyData.length;
   const averageDaily = daysRecorded > 0 ? Math.round(totalSales / daysRecorded) : 0;
 
@@ -140,33 +147,68 @@ const ThisMonth = () => {
           )}
         </div>
 
-        {/* Net Profit */}
+        {/* True Net Profit */}
         <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
-          <h3>قازانجی سافی ئەم مانگە</h3>
-          <div className="value success" style={{ color: '#10b981' }}>{totalProfit.toLocaleString()} دینار</div>
+          <h3>قازانجی سافی ڕاستەقینە</h3>
+          <div className="value success" style={{ color: '#10b981' }}>{netProfit.toLocaleString()} دینار</div>
           <div className="sub-text" style={{ color: '#94a3b8' }}>
-            ڕێژەی قازانج: {totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(1) : 0}% لە فرۆش
+            دوای داشکاندنی خەرجی و زیانەکان
           </div>
         </div>
 
-        {/* Average Daily Sales */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.25)' }}>
-          <h3>تێکڕای فرۆشتنی ڕۆژانە</h3>
-          <div className="value" style={{ color: '#f59e0b' }}>{averageDaily.toLocaleString()} دینار</div>
-          <div className="sub-text" style={{ color: '#94a3b8' }}>
-            لە {daysRecorded} ڕۆژی چالاک و تۆمارکراو
+        {/* Store Expenses */}
+        <div className="stat-card glass-panel" style={{ background: 'rgba(244, 63, 94, 0.08)', borderColor: 'rgba(244, 63, 94, 0.25)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>خەرجییەکانی ئەم مانگە</h3>
+            <Wallet size={18} color="#fb7185" />
+          </div>
+          <div className="value" style={{ color: '#fb7185' }}>{totalExpenses.toLocaleString()} دینار</div>
+          <div className="sub-text" style={{ color: '#fda4af' }}>
+            مەساریف و تێچووەکانی فرۆشگا
           </div>
         </div>
 
-        {/* Highest Sales Single Day */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(168, 85, 247, 0.08)', borderColor: 'rgba(168, 85, 247, 0.25)' }}>
-          <h3>زۆرترین فرۆشتنی یەک ڕۆژ</h3>
-          <div className="value" style={{ color: '#c084fc' }}>{maxDay.sales.toLocaleString()} دینار</div>
-          <div className="sub-text" style={{ color: '#a78bfa', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Award size={14} /> بەروار: {maxDay.formattedDate}
+        {/* Wastage / Damage Loss */}
+        <div className="stat-card glass-panel" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.25)', cursor: 'pointer' }} onClick={() => navigate('/wastage')}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>زیانی کاڵای فەوتاو</h3>
+            <PackageX size={18} color="#ef4444" />
+          </div>
+          <div className="value" style={{ color: '#f87171' }}>{totalDamagesLoss.toLocaleString()} دینار</div>
+          <div className="sub-text" style={{ color: '#fca5a5' }}>
+            {totalDamagesUnits} دانە کاڵای بەسەرچوو یان شکاو
           </div>
         </div>
 
+      </div>
+
+      {/* True Profit & Loss Breakdown Banner */}
+      <div className="glass-panel mb-8" style={{ padding: '20px 24px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TrendingUp size={18} /> باڵانسی قازانجی ڕاستەقینەی ئەم مانگە (P&L Breakdown)
+            </h4>
+            <div style={{ fontSize: '0.88rem', color: '#94a3b8' }}>
+              حیسابکردنی وردی داهات بە کەمکردنەوەی نرخی تێچووی کۆگا، مەساریف، و زیانی کاڵای بەسەرچوو و شکاو
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.9rem' }}>
+            <div style={{ padding: '8px 14px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }}>
+              قازانجی خاو: +{grossProfit.toLocaleString()} د.ع
+            </div>
+            <div style={{ padding: '8px 14px', borderRadius: '10px', background: 'rgba(244, 63, 94, 0.1)', color: '#fb7185' }}>
+              مەساریف: -{totalExpenses.toLocaleString()} د.ع
+            </div>
+            <div style={{ padding: '8px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171' }}>
+              زیانی فەوتان: -{totalDamagesLoss.toLocaleString()} د.ع
+            </div>
+            <div style={{ padding: '8px 16px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', fontWeight: 'bold', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+              قازانجی سافی پوخت: = {netProfit.toLocaleString()} دینار
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Dual Gradient Area Chart: Sales vs Net Profit (User Approved) */}

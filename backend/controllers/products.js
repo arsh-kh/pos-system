@@ -16,10 +16,13 @@ exports.getAllProducts = async (req, res) => {
 };
 
 exports.addProduct = async (req, res) => {
-    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold } = req.body;
+    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box } = req.body;
     try {
+        const cleanBoxBarcode = box_barcode && String(box_barcode).trim() !== '' ? String(box_barcode).trim() : null;
+        const cleanUnitsPerBox = Math.max(1, parseFloat(units_per_box) || 1);
+
         const [result] = await db.query(
-            'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name, 
                 barcode, 
@@ -30,9 +33,35 @@ exports.addProduct = async (req, res) => {
                 category_id || null,
                 wholesale_price || 0,
                 expiry_date || null,
-                low_stock_threshold !== undefined && low_stock_threshold !== '' ? parseInt(low_stock_threshold) : 5
+                low_stock_threshold !== undefined && low_stock_threshold !== '' ? parseInt(low_stock_threshold) : 5,
+                cleanBoxBarcode,
+                cleanUnitsPerBox
             ]
         );
+
+        // If product is added with initial stock, create initial FIFO batch
+        if (Number(stock) > 0) {
+            await db.query(`
+                INSERT INTO Product_Batches (
+                    product_id,
+                    batch_number,
+                    initial_quantity,
+                    remaining_quantity,
+                    cost_price,
+                    selling_price,
+                    expiry_date,
+                    status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+            `, [
+                result.insertId,
+                `INIT-${result.insertId}`,
+                stock,
+                stock,
+                BigInt(Math.round(Number(cost_price) || 0)).toString(),
+                BigInt(Math.round(Number(selling_price) || 0)).toString(),
+                expiry_date || null
+            ]);
+        }
 
         // Audit log product creation
         await logAuditAction({
@@ -47,7 +76,7 @@ exports.addProduct = async (req, res) => {
         res.status(201).json({ status: 'SUCCESS', message: 'Product added successfully', id: result.insertId });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ status: 'ERROR', message: 'Barcode already exists' });
+            return res.status(400).json({ status: 'ERROR', message: 'بارکۆدی دانە یان بارکۆدی کارتۆن پێشتر تۆمارکراوە' });
         }
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
@@ -55,7 +84,7 @@ exports.addProduct = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
     const { id } = req.params;
-    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold } = req.body;
+    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box } = req.body;
     try {
         // 1. Fetch current product before update to compare changes
         const [currentRows] = await db.query('SELECT * FROM Products WHERE id = ?', [id]);
@@ -64,9 +93,12 @@ exports.updateProduct = async (req, res) => {
         }
         const oldP = currentRows[0];
 
+        const cleanBoxBarcode = box_barcode && String(box_barcode).trim() !== '' ? String(box_barcode).trim() : null;
+        const cleanUnitsPerBox = Math.max(1, parseFloat(units_per_box) || 1);
+
         // 2. Perform database update
         await db.query(
-            'UPDATE Products SET name=?, barcode=?, cost_price=?, selling_price=?, usd_price=?, stock=?, category_id=?, wholesale_price=?, expiry_date=?, low_stock_threshold=? WHERE id=?',
+            'UPDATE Products SET name=?, barcode=?, cost_price=?, selling_price=?, usd_price=?, stock=?, category_id=?, wholesale_price=?, expiry_date=?, low_stock_threshold=?, box_barcode=?, units_per_box=? WHERE id=?',
             [
                 name, 
                 barcode, 
@@ -78,6 +110,8 @@ exports.updateProduct = async (req, res) => {
                 wholesale_price || 0,
                 expiry_date || null,
                 low_stock_threshold !== undefined && low_stock_threshold !== '' ? parseInt(low_stock_threshold) : 5,
+                cleanBoxBarcode,
+                cleanUnitsPerBox,
                 id
             ]
         );
@@ -162,3 +196,23 @@ exports.deleteProduct = async (req, res) => {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
+
+exports.getProductBatches = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [batches] = await db.query(`
+            SELECT b.*, 
+                   pi.invoice_number, 
+                   COALESCE(s.name, 'مەخزەنی سەرەتایی / کڕینی لۆکاڵی') as supplier_name
+            FROM Product_Batches b
+            LEFT JOIN Purchase_Invoices pi ON b.purchase_invoice_id = pi.id
+            LEFT JOIN Suppliers s ON pi.supplier_id = s.id
+            WHERE b.product_id = ?
+            ORDER BY b.created_at ASC, b.id ASC
+        `, [id]);
+        res.json({ status: 'SUCCESS', data: batches });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+

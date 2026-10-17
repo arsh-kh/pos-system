@@ -49,9 +49,10 @@ const purchaseInvoicesRoutes = require('./routes/purchase_invoices');
 app.use('/api/purchases', purchaseInvoicesRoutes);
 app.use('/api/purchase-invoices', purchaseInvoicesRoutes);
 
-// Purchase Returns API (Returns to Suppliers)
+// Purchase Returns API (Returns to Suppliers / RTV)
 const purchaseReturnsRoutes = require('./routes/purchase_returns');
 app.use('/api/purchase-returns', purchaseReturnsRoutes);
+app.use('/api/rtv', purchaseReturnsRoutes);
 
 // Expenses API (Store Expenses / مەساریف)
 const expensesRoutes = require('./routes/expenses');
@@ -69,6 +70,11 @@ app.use('/api/promotions', promotionsRoutes);
 const returnsRoutes = require('./routes/returns');
 app.use('/api/returns', returnsRoutes);
 
+// Damages & Wastage API (تۆمارکردنی زیان و فەوتانی کاڵا)
+const damagesRoutes = require('./routes/damages');
+app.use('/api/damages', damagesRoutes);
+app.use('/api/wastage', damagesRoutes);
+
 // Needs API
 const needsRoutes = require('./routes/needs');
 app.use('/api/needs', needsRoutes);
@@ -81,26 +87,13 @@ app.use('/api/analytics', analyticsRoutes);
 const auditRoutes = require('./routes/audit');
 app.use('/api/audit-logs', auditRoutes);
 
-// Database Backup API
-app.get('/api/backup', async (req, res) => {
-    try {
-        const tables = ['Categories', 'Products', 'Customers', 'Customer_Debts', 'Suppliers', 'Purchase_Invoices', 'Purchase_Invoice_Items', 'Purchase_Returns', 'Expenses', 'Shifts', 'Promotions', 'Sales', 'Sale_Items', 'Needs'];
-        const backupData = { exported_at: new Date().toISOString() };
-        for (const tbl of tables) {
-            try {
-                const [rows] = await db.query(`SELECT * FROM ${tbl}`);
-                backupData[tbl] = rows;
-            } catch (err) {
-                backupData[tbl] = [];
-            }
-        }
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename=pos_backup_${new Date().toISOString().split('T')[0]}.json`);
-        res.json(backupData);
-    } catch (error) {
-        res.status(500).json({ status: 'ERROR', message: error.message });
-    }
-});
+// Smart Inventory Audit API (جەردکردنی زیرەکی کۆگا)
+const inventoryAuditRoutes = require('./routes/inventory_audit');
+app.use('/api/inventory-audit', inventoryAuditRoutes);
+
+// Database Backup & Restore API
+const backupRoutes = require('./routes/backup');
+app.use('/api/backup', backupRoutes);
 
 app.listen(port, () => {
     console.log(`Backend server running on port ${port}`);
