@@ -37,18 +37,16 @@ const Settings = () => {
   const [autoSyncToggle, setAutoSyncToggle] = useState(true);
   const [syncFilter, setSyncFilter] = useState('ALL'); // 'ALL', 'PENDING', 'SYNCED', 'FAILED'
 
-  // Telegram Cloud Backup State
+  // Telegram Cloud Backup State (Multiple Recipients Support)
   const [telegramSettings, setTelegramSettings] = useState(null);
-  const [telegramTokenInput, setTelegramTokenInput] = useState('');
-  const [telegramChatIdInput, setTelegramChatIdInput] = useState('');
-  const [telegramAutoBackup, setTelegramAutoBackup] = useState(false);
-  const [showToken, setShowToken] = useState(false);
   const [telegramTesting, setTelegramTesting] = useState(false);
-  const [telegramSaving, setTelegramSaving] = useState(false);
   const [telegramSending, setTelegramSending] = useState(false);
   const [telegramSendSnapLoading, setTelegramSendSnapLoading] = useState(null);
   const [telegramNotice, setTelegramNotice] = useState(null);
-  const [showTelegramHelp, setShowTelegramHelp] = useState(false);
+  const [telegramCheckingPair, setTelegramCheckingPair] = useState(false);
+  const [newRecipientName, setNewRecipientName] = useState('');
+  const [newRecipientChatId, setNewRecipientChatId] = useState('');
+  const [addingRecipient, setAddingRecipient] = useState(false);
 
   // Restore Modal State
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
@@ -97,9 +95,6 @@ const Settings = () => {
       }
       if (tgJson.status === 'SUCCESS' && tgJson.data) {
         setTelegramSettings(tgJson.data);
-        setTelegramTokenInput(tgJson.data.bot_token || '');
-        setTelegramChatIdInput(tgJson.data.chat_id || '');
-        setTelegramAutoBackup(Boolean(tgJson.data.auto_backup_enabled));
       }
     } catch (err) {
       console.error('Error fetching backup & sync info:', err);
@@ -287,48 +282,126 @@ const Settings = () => {
     }
   };
 
-  // Handle Telegram Settings Save
-  const handleSaveTelegramSettings = async () => {
-    setTelegramSaving(true);
+  // Toggle Recipient Active Checkbox
+  const handleToggleRecipient = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/backup/telegram/recipients/${id}/toggle`, { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        fetchBackupData();
+      }
+    } catch (err) {
+      alert('هەڵە لە گۆڕینی دۆخ: ' + err.message);
+    }
+  };
+
+  // Add New Recipient
+  const handleAddRecipient = async (e) => {
+    e.preventDefault();
+    if (!newRecipientChatId.trim()) {
+      alert('تکایە Chat ID یان Group ID بنووسە');
+      return;
+    }
+    setAddingRecipient(true);
     setTelegramNotice(null);
     try {
-      const res = await fetch('http://localhost:3001/api/backup/telegram/settings', {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/recipients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bot_token: telegramTokenInput,
-          chat_id: telegramChatIdInput,
-          auto_backup_enabled: telegramAutoBackup,
-          backup_frequency: 'DAILY'
+          chat_id: newRecipientChatId.trim(),
+          recipient_name: newRecipientName.trim()
         })
       });
       const data = await res.json();
       if (data.status === 'SUCCESS') {
-        setTelegramNotice({ type: 'success', message: 'ڕێکخستنەکانی تێلیگرام بە سەرکەوتوویی پاشەکەوت کران' });
+        setTelegramNotice({ type: 'success', message: data.message });
+        setNewRecipientName('');
+        setNewRecipientChatId('');
         fetchBackupData();
       } else {
-        setTelegramNotice({ type: 'error', message: data.message || 'هەڵە لە پاشەکەوتکردن' });
+        setTelegramNotice({ type: 'error', message: data.message || 'هەڵە لە زیادکردن' });
       }
     } catch (err) {
       setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
     } finally {
-      setTelegramSaving(false);
-      setTimeout(() => setTelegramNotice(null), 6000);
+      setAddingRecipient(false);
     }
   };
 
-  // Handle Telegram Test Connection
+  // Delete Recipient
+  const handleDeleteRecipient = async (id, name) => {
+    if (!window.confirm(`ئایا دڵنیایت لە سڕینەوەی وەرگر: ${name}؟`)) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/backup/telegram/recipients/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      fetchBackupData();
+      setTelegramNotice({ type: 'success', message: data.message });
+    } catch (err) {
+      alert('هەڵە لە سڕینەوە: ' + err.message);
+    }
+  };
+
+  // Test Specific Recipient Ping
+  const handleTestRecipient = async (id) => {
+    setTelegramNotice(null);
+    try {
+      const res = await fetch(`http://localhost:3001/api/backup/telegram/recipients/${id}/test`, { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        setTelegramNotice({ type: 'success', message: data.message });
+      } else {
+        setTelegramNotice({ type: 'error', message: data.message || 'ناردن سەرکەوتوو نەبوو' });
+      }
+    } catch (err) {
+      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
+    }
+  };
+
+  // Toggle Auto-Backup
+  const handleToggleTelegramAuto = async (enabled) => {
+    try {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/toggle-auto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        fetchBackupData();
+      }
+    } catch (err) {
+      alert('هەڵە لە گۆڕینی دۆخ: ' + err.message);
+    }
+  };
+
+  // Check Pairing Status
+  const handleCheckPairing = async () => {
+    setTelegramCheckingPair(true);
+    setTelegramNotice(null);
+    try {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/auto-detect', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        setTelegramNotice({ type: 'success', message: data.message });
+        fetchBackupData();
+      } else {
+        setTelegramNotice({ type: 'error', message: data.message });
+      }
+    } catch (err) {
+      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
+    } finally {
+      setTelegramCheckingPair(false);
+    }
+  };
+
+  // Handle Telegram Test Connection Ping
   const handleTestTelegramConnection = async () => {
     setTelegramTesting(true);
     setTelegramNotice(null);
     try {
       const res = await fetch('http://localhost:3001/api/backup/telegram/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bot_token: telegramTokenInput,
-          chat_id: telegramChatIdInput
-        })
+        method: 'POST'
       });
       const data = await res.json();
       if (data.status === 'SUCCESS') {
@@ -355,7 +428,7 @@ const Settings = () => {
       if (data.status === 'SUCCESS') {
         setTelegramNotice({ 
           type: 'success', 
-          message: `باکئەپەکە بە سەرکەوتوویی بۆ تێلیگرام نێردرا! (${data.data.filename} - ${Math.round(data.data.sizeBytes / 1024)} KB)` 
+          message: data.message 
         });
         fetchBackupData();
       } else {
@@ -673,35 +746,25 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Telegram Cloud Backup Card */}
+        {/* Telegram Cloud Backup Card (Multiple Recipients & Clean Folder Naming) */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#229ED9' }}>
               <Send size={24} /> باکئەپی کلاودی تێلیگرام
             </h3>
-            <button
-              onClick={() => setShowTelegramHelp(!showTelegramHelp)}
-              style={{ background: 'rgba(34, 158, 217, 0.15)', border: '1px solid rgba(34, 158, 217, 0.3)', color: '#38bdf8', padding: '4px 10px', borderRadius: '10px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
-            >
-              <HelpCircle size={14} /> {showTelegramHelp ? 'شاردنەوەی ڕێنمایی' : 'چۆن کار دەکات؟'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                🤖 @{telegramSettings?.bot_username || 'cashier_system_bot'}
+              </span>
+              <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                {telegramSettings?.activeCount || 0} وەرگر چالاکە
+              </span>
+            </div>
           </div>
 
           <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.2rem', lineHeight: '1.5' }}>
-            ناردنی فایلی تەواوی باکئەپی داتابەیس بۆ ناو تێلیگرامی خاوەنکار. ئەگەر کۆمپیوتەر یان هارد دیسک بسووتێت، هەموو داتاکانت لەسەر مۆبایلەکەت پارێزراوە!
+            دەتوانیت چەندین چاتی تێلیگرام (خاوەنکار، شەریک، موحاسب، یان گرووپ) دیاریبکەیت؛ لە کاتی ناردندا باکئەپەکە بە شێوەیەکی خۆکار بۆ هەموو چاتە هەڵبژێردراوەکان دەنێردرێت.
           </p>
-
-          {/* Quick Help Box */}
-          {showTelegramHelp && (
-            <div style={{ padding: '1rem', background: 'rgba(34, 158, 217, 0.08)', borderRadius: '14px', border: '1px solid rgba(34, 158, 217, 0.25)', marginBottom: '1.2rem', fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.6' }}>
-              <div style={{ fontWeight: 'bold', color: '#38bdf8', marginBottom: '6px' }}>📌 ڕێنمایی بەدەستهێنانی تۆکن و Chat ID:</div>
-              <ol style={{ margin: 0, paddingRight: '1.2rem' }}>
-                <li>لە تێلیگرام بچۆ ناو <strong>@BotFather</strong> و فەرمانی <code>/newbot</code> لێبدە بۆ دروستکردنی بۆت و کۆپیکردنی Bot Token.</li>
-                <li>بچۆ ناو <strong>@userinfobot</strong> و فەرمانی <code>/start</code> لێبدە؛ ژمارەی <code>Id</code>ی خۆت کۆپی بکە بۆ خوارەوە.</li>
-                <li><strong>زۆر گرنگ:</strong> پێش ناردن، لەناو تێلیگرام نامەیەک بۆ بۆتەکەت بنێرە (یان Start لێبدە) تاوەکو بۆتەکە مۆڵەتی ناردنی نامەی بۆ تۆ هەبێت!</li>
-              </ol>
-            </div>
-          )}
 
           {/* Status Alert if any */}
           {telegramNotice && (
@@ -711,10 +774,151 @@ const Settings = () => {
             </div>
           )}
 
+          {/* Recipients List Section */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.88rem', fontWeight: 'bold', color: '#cbd5e1' }}>
+                لیستی وەرگرانی باکئەپ (کێ فایلەکە وەربگرێت؟):
+              </span>
+              <button
+                onClick={handleCheckPairing}
+                disabled={telegramCheckingPair}
+                title="نوێکردنەوەی لیستی وەرگران"
+                style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <RefreshCw size={12} className={telegramCheckingPair ? 'animate-spin' : ''} /> نوێکردنەوە
+              </button>
+            </div>
+
+            {(!telegramSettings?.recipients || telegramSettings.recipients.length === 0) ? (
+              <div style={{ padding: '1rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '0.85rem' }}>
+                هیچ وەرگرێک تۆمار نەکراوە. دەتوانیت لە خوارەوە Chat ID زیادبکەیت یان بە مۆبایل بچیتە ناو @cashier_system_bot و Start لێبدەیت.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {telegramSettings.recipients.map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      background: r.is_active ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                      border: `1px solid ${r.is_active ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)'}`,
+                      borderRadius: '12px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={r.is_active}
+                        onChange={() => handleToggleRecipient(r.id)}
+                        style={{ width: '17px', height: '17px', cursor: 'pointer', accentColor: '#10b981' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: r.is_active ? '#34d399' : '#94a3b8' }}>
+                          {r.recipient_name}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
+                          ID: {r.chat_id}
+                        </div>
+                      </div>
+                    </label>
+
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleTestRecipient(r.id)}
+                        title="ناردنی پەیامی تاقیکاری تەنها بۆ ئەم چاتە"
+                        style={{ padding: '5px 9px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        ⚡ پشکنین
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRecipient(r.id, r.recipient_name)}
+                        title="سڕینەوەی ئەم وەرگرە"
+                        style={{ padding: '5px 8px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Add New Recipient Form */}
+          <form onSubmit={handleAddRecipient} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.2rem' }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#38bdf8', marginBottom: '8px' }}>
+              ➕ زیادکردنی چات / کەسێکی تر بۆ وەرگرتنی باکئەپ:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="ناوی کەسەکە (نموونە: شەریک)"
+                value={newRecipientName}
+                onChange={e => setNewRecipientName(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: '0.85rem' }}
+              />
+              <input
+                type="text"
+                placeholder="Chat ID (نموونە: 1796577602)"
+                value={newRecipientChatId}
+                onChange={e => setNewRecipientChatId(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: '0.85rem' }}
+              />
+              <button
+                type="submit"
+                disabled={addingRecipient}
+                style={{ padding: '8px 14px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', cursor: addingRecipient ? 'not-allowed' : 'pointer' }}
+              >
+                {addingRecipient ? 'دەکرێت...' : '+ زیادکردن'}
+              </button>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '6px' }}>
+              💡 یان هەر کەسێک لە تێلیگرامەوە بچێتە ناو <strong>@cashier_system_bot</strong> و Start لێبدات، خۆکارانە ناوی لەم لیستەدا تۆمار دەبێت!
+            </div>
+          </form>
+
+          {/* Clean Naming & Folder Preview */}
+          <div style={{ padding: '0.8rem 1rem', background: 'rgba(56, 189, 248, 0.04)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.12)', marginBottom: '1.2rem', fontSize: '0.82rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+              <span style={{ color: '#94a3b8' }}>📁 بوخچە لە تێلیگرام: <strong style={{ color: '#38bdf8' }}>POS_Backups_{new Date().toISOString().slice(0, 7)}/</strong></span>
+              <span style={{ color: '#94a3b8' }}>📄 ناوی فایلی باکئەپ: <strong style={{ color: '#34d399' }}>POS_Backup_{new Date().toISOString().slice(0, 10)}_...json</strong></span>
+            </div>
+          </div>
+
+          {/* Auto-Backup Toggle */}
+          <div style={{ padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#cbd5e1' }}>
+              <input
+                type="checkbox"
+                checked={telegramSettings?.auto_backup_enabled ?? true}
+                onChange={e => handleToggleTelegramAuto(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+              />
+              ناردنی خۆکاری ڕۆژانەی باکئەپ بۆ هەموو وەرگرە چالاکەکان
+            </label>
+          </div>
+
+          {/* Broadcast Action Button */}
+          <button
+            onClick={handleSendBackupToTelegram}
+            disabled={telegramSending || !telegramSettings?.activeCount}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: telegramSettings?.activeCount ? 'linear-gradient(135deg, #0284c7, #229ED9)' : 'rgba(255,255,255,0.06)', color: telegramSettings?.activeCount ? 'white' : '#64748b', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: (!telegramSettings?.activeCount || telegramSending) ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: telegramSettings?.activeCount ? '0 4px 15px rgba(34, 158, 217, 0.3)' : 'none' }}
+          >
+            <Send size={18} className={telegramSending ? 'animate-spin' : ''} />
+            {telegramSending ? 'باکئەپ دەنێردرێت بۆ هەموو وەرگرەکان...' : `📤 ناردنی باکئەپ بۆ هەموو چاتە دیاریکراوەکان (${telegramSettings?.activeCount || 0} کەس)`}
+          </button>
+
           {/* Last Sent Info */}
-          <div style={{ padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '1.2rem', fontSize: '0.82rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ marginTop: '1rem', fontSize: '0.82rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
             <div>
-              <span style={{ color: '#cbd5e1' }}>دواین باکئەپی تێلیگرام: </span>
+              <span>دواین باکئەپی نێردراو: </span>
               {telegramSettings?.last_sent_at ? (
                 <span style={{ color: '#34d399', fontWeight: 'bold' }}>
                   {new Date(telegramSettings.last_sent_at).toLocaleString('en-GB')}
@@ -723,90 +927,12 @@ const Settings = () => {
                 <span>هێشتا نەنێردراوە</span>
               )}
             </div>
-            {telegramSettings?.last_status && telegramSettings.last_status !== 'NONE' && (
-              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', background: telegramSettings.last_status === 'SUCCESS' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: telegramSettings.last_status === 'SUCCESS' ? '#34d399' : '#f87171' }}>
-                {telegramSettings.last_status === 'SUCCESS' ? 'سەرکەوتوو' : 'شکستهێناوە'}
+            {telegramSettings?.last_filename && (
+              <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                {telegramSettings.last_filename} ({Math.round(telegramSettings.last_file_size / 1024)} KB)
               </span>
             )}
           </div>
-
-          {/* Form Inputs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginBottom: '1.2rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
-                تۆکنی بۆتی تێلیگرام (Bot Token):
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showToken ? 'text' : 'password'}
-                  placeholder={telegramSettings?.masked_token || '123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ'}
-                  value={telegramTokenInput}
-                  onChange={e => setTelegramTokenInput(e.target.value)}
-                  style={{ width: '100%', padding: '9px 40px 9px 12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.88rem', fontFamily: 'monospace', boxSizing: 'border-box' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
-                >
-                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
-                ناسنامەی چات (Chat ID / Group ID):
-              </label>
-              <input
-                type="text"
-                placeholder="نموونە: 987654321 یان -100123456789"
-                value={telegramChatIdInput}
-                onChange={e => setTelegramChatIdInput(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.88rem', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#cbd5e1', marginTop: '2px' }}>
-              <input
-                type="checkbox"
-                checked={telegramAutoBackup}
-                onChange={e => setTelegramAutoBackup(e.target.checked)}
-                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-              />
-              ناردنی خۆکاری ڕۆژانەی باکئەپ بۆ تێلیگرام (لە کاتی باکئەپی سیستمدا)
-            </label>
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <button
-              onClick={handleTestTelegramConnection}
-              disabled={telegramTesting}
-              style={{ flex: 1, padding: '9px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.35)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.88rem', cursor: telegramTesting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              <RefreshCw size={15} className={telegramTesting ? 'animate-spin' : ''} />
-              {telegramTesting ? 'پشکنین دەکرێت...' : 'پشکنینی پەیوەندی'}
-            </button>
-            <button
-              onClick={handleSaveTelegramSettings}
-              disabled={telegramSaving}
-              style={{ flex: 1, padding: '9px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.88rem', cursor: telegramSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              <Save size={15} />
-              {telegramSaving ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردن'}
-            </button>
-          </div>
-
-          {/* Big Instant Backup to Telegram button */}
-          <button
-            onClick={handleSendBackupToTelegram}
-            disabled={telegramSending}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: 'linear-gradient(135deg, #0284c7, #229ED9)', color: 'white', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: telegramSending ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(34, 158, 217, 0.3)' }}
-          >
-            <Send size={18} className={telegramSending ? 'animate-spin' : ''} />
-            {telegramSending ? 'باکئەپ کۆدەکرێتەوە و دەنێردرێت بۆ تێلیگرام...' : '📤 ناردنی باکئەپی تەواو بۆ تێلیگرام (دەستی)'}
-          </button>
         </div>
 
       </div>

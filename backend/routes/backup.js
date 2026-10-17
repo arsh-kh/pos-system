@@ -15,10 +15,14 @@ router.post('/restore-local', backupController.restoreFromLocal);
 
 // Telegram Cloud Backup routes
 router.get('/telegram/settings', telegramBackupController.getTelegramSettings);
-router.post('/telegram/settings', telegramBackupController.updateTelegramSettings);
-router.post('/telegram/test', telegramBackupController.testTelegramConnection);
+router.post('/telegram/recipients', telegramBackupController.addRecipient);
+router.post('/telegram/recipients/:id/toggle', telegramBackupController.toggleRecipient);
+router.delete('/telegram/recipients/:id', telegramBackupController.deleteRecipient);
+router.post('/telegram/recipients/:id/test', telegramBackupController.testRecipient);
+router.post('/telegram/toggle-auto', telegramBackupController.toggleAutoBackup);
 router.post('/telegram/send', telegramBackupController.sendBackupToTelegram);
 router.post('/telegram/send-snapshot/:filename', telegramBackupController.sendSnapshotToTelegram);
+router.post('/telegram/auto-detect', telegramBackupController.autoDetectChatId);
 
 module.exports = router;
 

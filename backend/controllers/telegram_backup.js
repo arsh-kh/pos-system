@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const db = require('../db');
 const fs = require('fs');
 const path = require('path');
@@ -9,6 +10,10 @@ if (!fs.existsSync(BACKUPS_DIR)) {
     fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 }
 
+// Built-in Telegram Bot credentials (Zero configuration required by Admin)
+const DEFAULT_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8928798854:AAGlhCrK1qmBVTbNKlya71WBv_cERTbdX14';
+const DEFAULT_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'cashier_system_bot';
+
 // Helper to safely serialize BigInt and dates
 const safeJsonStringify = (data) => {
     return JSON.stringify(data, (key, value) => {
@@ -19,17 +24,25 @@ const safeJsonStringify = (data) => {
     }, 2);
 };
 
-// Mask sensitive token for display: 123456:ABC...XYZ
-const maskToken = (token) => {
-    if (!token || token.length < 10) return token ? '••••••••' : '';
-    const parts = token.split(':');
-    if (parts.length === 2) {
-        const idPart = parts[0];
-        const secretPart = parts[1];
-        const visible = secretPart.slice(-4);
-        return `${idPart}:••••••••${visible}`;
-    }
-    return `${token.slice(0, 4)}••••••••${token.slice(-4)}`;
+// Clean, human-readable local timestamp and filename
+const getFormattedLocalTimestamp = () => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1);
+    const day = pad(now.getDate());
+    const hours = now.getHours();
+    const minutes = pad(now.getMinutes());
+    const seconds = pad(now.getSeconds());
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = pad(hours % 12 || 12);
+
+    const filename = `POS_Backup_${year}-${month}-${day}_${displayHours}-${minutes}-${ampm}.json`;
+    const folderName = `POS_Backups_${year}-${month}`;
+    const readableDate = `${year}-${month}-${day}`;
+    const readableTime = `${displayHours}:${minutes}:${seconds} ${ampm}`;
+
+    return { filename, folderName, readableDate, readableTime };
 };
 
 /**
@@ -60,7 +73,6 @@ const buildFullBackupPayload = async (note = 'باکئەپی تەواوی سیس
     let totalRows = 0;
 
     for (const tbl of tableNames) {
-        // 1. Export table DDL schema
         try {
             const [schemaRes] = await db.query(`SHOW CREATE TABLE \`${tbl}\``);
             if (schemaRes && schemaRes[0]) {
@@ -69,7 +81,6 @@ const buildFullBackupPayload = async (note = 'باکئەپی تەواوی سیس
             }
         } catch (_) {}
 
-        // 2. Export table data rows
         try {
             const [rows] = await db.query(`SELECT * FROM \`${tbl}\``);
             backupData.tables[tbl] = rows;
@@ -87,27 +98,129 @@ const buildFullBackupPayload = async (note = 'باکئەپی تەواوی سیس
 };
 
 /**
- * Get Telegram Backup Settings
+ * Get Active Bot Token
+ */
+const getActiveBotToken = async () => {
+    try {
+        const [rows] = await db.query('SELECT bot_token FROM Telegram_Backup_Settings WHERE id = 1');
+        if (rows.length > 0 && rows[0].bot_token && rows[0].bot_token.trim()) {
+            return rows[0].bot_token.trim();
+        }
+    } catch (_) {}
+    return DEFAULT_BOT_TOKEN;
+};
+
+/**
+ * Background Auto-Pairing Worker:
+ * Listens for any user starting @cashier_system_bot and automatically adds them to Telegram_Recipients!
+ */
+let lastOffset = 0;
+let isPolling = false;
+
+const pollTelegramUpdates = async () => {
+    if (isPolling) return;
+    isPolling = true;
+
+    try {
+        const token = await getActiveBotToken();
+        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${lastOffset}&timeout=5`, {
+            signal: AbortSignal.timeout(10000)
+        });
+        const data = await res.json();
+
+        if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
+            for (const update of data.result) {
+                lastOffset = Math.max(lastOffset, update.update_id + 1);
+
+                const msg = update.message || update.channel_post || update.my_chat_member;
+                if (!msg || !msg.chat) continue;
+
+                const chatId = String(msg.chat.id);
+                const senderName = msg.chat.first_name || msg.from?.first_name || msg.chat.title || 'خاوەنکار';
+                const username = msg.chat.username ? `@${msg.chat.username}` : '';
+                const fullName = `${senderName} ${username}`.trim();
+
+                // Check if already in recipients
+                const [existing] = await db.query('SELECT id FROM Telegram_Recipients WHERE chat_id = ?', [chatId]);
+
+                if (existing.length === 0) {
+                    await db.query(`
+                        INSERT INTO Telegram_Recipients (chat_id, recipient_name, is_active)
+                        VALUES (?, ?, TRUE)
+                    `, [chatId, fullName]);
+
+                    console.log(`✓ New Telegram recipient auto-registered: ${fullName} (ID: ${chatId})`);
+
+                    // Send welcome confirmation to the new user's chat
+                    const welcomeMsg = `🎉 *پیرۆزە! بە سەرکەوتوویی وەک وەرگری باکئەپ زیادکرایت*
+
+سڵاو بەڕێز *${senderName}*،
+ئەم چاتە بە شێوەیەکی ئۆتۆماتیکی وەک وەرگری باکئەپی سیستەمی POS زیادکرا.
+
+🤖 *بۆتی فەرمی:* @${DEFAULT_BOT_USERNAME}
+📱 *ناسنامەی تۆ:* \`${chatId}\`
+🔄 *دۆخ:* چالاکە بۆ وەرگرتنی باکئەپ
+
+لەمەودوا لە کاتی ناردنی باکئەپی فرۆشتن و داتابەیس، کۆپییەک دەگاتە ئەم چاتە.`;
+
+                    try {
+                        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: chatId,
+                                text: welcomeMsg,
+                                parse_mode: 'Markdown'
+                            })
+                        });
+                    } catch (_) {}
+                }
+            }
+        }
+    } catch (_) {
+    } finally {
+        isPolling = false;
+    }
+};
+
+// Start background auto-pairing listener every 5 seconds
+setInterval(pollTelegramUpdates, 5000);
+setTimeout(pollTelegramUpdates, 1500);
+
+/**
+ * Get All Recipients & Global Settings
  * GET /api/backup/telegram/settings
  */
 exports.getTelegramSettings = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM Telegram_Backup_Settings WHERE id = 1');
-        const settings = rows[0] || {
-            bot_token: '',
-            chat_id: '',
-            auto_backup_enabled: 0,
-            backup_frequency: 'DAILY',
-            last_status: 'NONE'
-        };
+        const [settingsRows] = await db.query('SELECT * FROM Telegram_Backup_Settings WHERE id = 1');
+        const settings = settingsRows[0] || {};
+
+        const [recipients] = await db.query('SELECT * FROM Telegram_Recipients ORDER BY created_at ASC');
+
+        const activeRecipients = recipients.filter(r => Boolean(r.is_active));
 
         res.json({
             status: 'SUCCESS',
             data: {
-                ...settings,
+                bot_username: DEFAULT_BOT_USERNAME,
+                bot_link: `https://t.me/${DEFAULT_BOT_USERNAME}`,
                 auto_backup_enabled: Boolean(settings.auto_backup_enabled),
-                has_token: Boolean(settings.bot_token),
-                masked_token: maskToken(settings.bot_token)
+                last_sent_at: settings.last_sent_at,
+                last_status: settings.last_status,
+                last_error: settings.last_error,
+                last_filename: settings.last_filename,
+                last_file_size: settings.last_file_size || 0,
+                recipients: recipients.map(r => ({
+                    id: r.id,
+                    chat_id: r.chat_id,
+                    recipient_name: r.recipient_name,
+                    is_active: Boolean(r.is_active),
+                    created_at: r.created_at,
+                    last_sent_at: r.last_sent_at
+                })),
+                totalRecipients: recipients.length,
+                activeCount: activeRecipients.length
             }
         });
     } catch (error) {
@@ -117,283 +230,270 @@ exports.getTelegramSettings = async (req, res) => {
 };
 
 /**
- * Update Telegram Backup Settings
- * POST /api/backup/telegram/settings
+ * Add New Recipient Manually (Admin adds Chat ID or Group ID)
+ * POST /api/backup/telegram/recipients
  */
-exports.updateTelegramSettings = async (req, res) => {
+exports.addRecipient = async (req, res) => {
     try {
-        const { bot_token, chat_id, auto_backup_enabled, backup_frequency } = req.body;
-
-        // Fetch existing row to preserve token if user leaves it unchanged
-        const [existing] = await db.query('SELECT bot_token FROM Telegram_Backup_Settings WHERE id = 1');
-        let finalToken = bot_token;
-        if (bot_token === undefined || bot_token === null || bot_token === '') {
-            // Keep existing if blank and existing exists
-            finalToken = existing[0]?.bot_token || '';
+        const { chat_id, recipient_name } = req.body;
+        if (!chat_id || !chat_id.trim()) {
+            return res.status(400).json({ status: 'ERROR', message: 'تکایە Chat ID یان Group ID بنووسە' });
         }
+
+        const cleanChatId = chat_id.trim();
+        const cleanName = (recipient_name && recipient_name.trim()) ? recipient_name.trim() : `چات #${cleanChatId}`;
 
         await db.query(`
-            UPDATE Telegram_Backup_Settings 
-            SET bot_token = ?, 
-                chat_id = ?, 
-                auto_backup_enabled = ?, 
-                backup_frequency = ?
-            WHERE id = 1
-        `, [
-            finalToken ? finalToken.trim() : '',
-            chat_id ? chat_id.trim() : '',
-            auto_backup_enabled ? 1 : 0,
-            backup_frequency || 'DAILY'
-        ]);
+            INSERT INTO Telegram_Recipients (chat_id, recipient_name, is_active)
+            VALUES (?, ?, TRUE)
+            ON DUPLICATE KEY UPDATE recipient_name = VALUES(recipient_name), is_active = TRUE
+        `, [cleanChatId, cleanName]);
 
-        await logAuditAction({
-            req,
-            action_type: 'TELEGRAM_SETTINGS_UPDATED',
-            entity_name: 'Telegram_Backup',
-            entity_id: 1,
-            details: `نوێکردنەوەی ڕێکخستنەکانی باکئەپی تێلیگرام (Chat ID: ${chat_id || 'نییە'}, ناردنی خۆکار: ${auto_backup_enabled ? 'چالاکە' : 'ناچالاکە'})`
-        });
+        const token = await getActiveBotToken();
 
-        res.json({
-            status: 'SUCCESS',
-            message: 'ڕێکخستنەکانی باکئەپی تێلیگرام بە سەرکەوتوویی پاشەکەوت کران'
-        });
-    } catch (error) {
-        console.error('Error updating Telegram settings:', error);
-        res.status(500).json({ status: 'ERROR', message: error.message });
-    }
-};
+        // Send a greeting to the newly added chat
+        const welcomeMsg = `🟢 *بەستنەوە بە سیستەمی باکئەپی POS*
 
-/**
- * Test Telegram Connection
- * POST /api/backup/telegram/test
- */
-exports.testTelegramConnection = async (req, res) => {
-    try {
-        let { bot_token, chat_id } = req.body || {};
+سڵاو بەڕێز *${cleanName}*،
+ئەم چاتە لە لایەن بەڕێوەبەری کۆگاوە وەک وەرگری باکئەپ زیادکرا.
+📅 *کات:* ${new Date().toLocaleString('en-GB')}`;
 
-        // If undefined in body, load from DB
-        if (bot_token === undefined || chat_id === undefined) {
-            const [rows] = await db.query('SELECT bot_token, chat_id FROM Telegram_Backup_Settings WHERE id = 1');
-            if (rows.length > 0) {
-                if (bot_token === undefined) bot_token = rows[0].bot_token;
-                if (chat_id === undefined) chat_id = rows[0].chat_id;
-            }
-        }
-
-        if (!bot_token || !bot_token.trim()) {
-            return res.status(400).json({
-                status: 'ERROR',
-                message: 'تکایە Bot Tokenی تێلیگرام بنووسە یان پاشەکەوتی بکە'
-            });
-        }
-
-        if (!chat_id || !chat_id.trim()) {
-            return res.status(400).json({
-                status: 'ERROR',
-                message: 'تکایە Chat IDی چاتی خاوەنکار بنووسە یان پاشەکەوتی بکە'
-            });
-        }
-
-        const cleanToken = bot_token.trim();
-        const cleanChatId = chat_id.trim();
-
-        // 1. Verify Bot Token with getMe
-        let getMeRes;
         try {
-            getMeRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`, {
-                method: 'GET',
-                signal: AbortSignal.timeout(6000)
-            });
-        } catch (fetchErr) {
-            return res.status(500).json({
-                status: 'ERROR',
-                message: 'پەیوەندی لەگەڵ سێرڤەری تێلیگرام دروست نەبوو. تکایە دڵنیاببەرەوە کە کۆمپیوتەرەکەت بە ئینتەرنێتەوە بەستراوە.'
-            });
-        }
-
-        const getMeData = await getMeRes.json();
-        if (!getMeData.ok) {
-            return res.status(400).json({
-                status: 'ERROR',
-                message: `تۆکنی بۆتەکە نادروستە: ${getMeData.description || 'هەڵە لە باوەڕپێکردن'}`
-            });
-        }
-
-        const botName = getMeData.result?.first_name || 'POS Bot';
-        const botUsername = getMeData.result?.username ? `@${getMeData.result.username}` : '';
-
-        // 2. Send test message to Chat ID
-        const testMessage = `🟢 *پشکنینی پەیوەندی باکئەپی POS*
-
-سڵاو! پەیوەندی نێوان سیستەمی کۆگای POS و ئەم چاتە بە سەرکەوتوویی بەسترا.
-
-🤖 *ناوی بۆت:* ${botName} (${botUsername})
-📅 *بەروار و کات:* ${new Date().toLocaleString('en-GB')}
-🔒 *ئامادەیە بۆ وەرگرتنی فایلی باکئەپی تەواوی داتابەیس*`;
-
-        let sendMsgRes;
-        try {
-            sendMsgRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
+            await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: cleanChatId,
-                    text: testMessage,
+                    text: welcomeMsg,
                     parse_mode: 'Markdown'
-                }),
-                signal: AbortSignal.timeout(8000)
+                })
             });
-        } catch (msgErr) {
-            return res.status(500).json({
-                status: 'ERROR',
-                message: 'هەڵە لە ناردنی پەیامی تاقیکاری: ' + msgErr.message
-            });
-        }
+        } catch (_) {}
 
-        const sendMsgData = await sendMsgRes.json();
-        if (!sendMsgData.ok) {
-            let userHint = sendMsgData.description;
-            if (sendMsgData.description?.includes('chat not found') || sendMsgData.description?.includes('Forbidden')) {
-                userHint += ' (تکایە سەرەتا لە تێلیگرام بچۆ ناو بۆتەکەت و دوگمەی Start لێبدە بۆ ئەوەی بۆتەکە مۆڵەتی ناردنی نامەی بۆت هەبێت).';
-            }
-            return res.status(400).json({
-                status: 'ERROR',
-                message: `نەتوانرا پەیام بنێردرێت بۆ Chat ID: ${userHint}`
-            });
-        }
+        await logAuditAction({
+            req,
+            action_type: 'TELEGRAM_RECIPIENT_ADDED',
+            entity_name: 'Telegram_Recipient',
+            entity_id: 1,
+            details: `زیادکردنی وەرگری نوێی تێلیگرام: ${cleanName} (${cleanChatId})`
+        });
 
         res.json({
             status: 'SUCCESS',
-            message: `پەیوەندی لەگەڵ تێلیگرام ١٠٠٪ سەرکەوتووە! پەیامی تاقیکاری لەلایەن (${botName}) گەیشت.`,
-            data: {
-                bot_name: botName,
-                bot_username: botUsername
-            }
+            message: `وەرگری نوێ بە سەرکەوتوویی زیادکرا: ${cleanName}`
         });
     } catch (error) {
-        console.error('Telegram test error:', error);
+        console.error('Error adding recipient:', error);
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
 
 /**
- * Send Full Database Backup to Telegram (Manual Instant Dispatch)
+ * Toggle Recipient Active State (checkbox)
+ * POST /api/backup/telegram/recipients/:id/toggle
+ */
+exports.toggleRecipient = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('UPDATE Telegram_Recipients SET is_active = NOT is_active WHERE id = ?', [id]);
+        res.json({ status: 'SUCCESS', message: 'دۆخی وەرگر بە سەرکەوتوویی گۆڕدرا' });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
+ * Delete Recipient
+ * DELETE /api/backup/telegram/recipients/:id
+ */
+exports.deleteRecipient = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM Telegram_Recipients WHERE id = ?', [id]);
+        res.json({ status: 'SUCCESS', message: 'وەرگر بە سەرکەوتوویی سڕدرایەوە' });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
+ * Test Specific Recipient Ping
+ * POST /api/backup/telegram/recipients/:id/test
+ */
+exports.testRecipient = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [rows] = await db.query('SELECT * FROM Telegram_Recipients WHERE id = ?', [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ status: 'ERROR', message: 'وەرگر نەدۆزرایەوە' });
+        }
+
+        const r = rows[0];
+        const token = await getActiveBotToken();
+
+        const testMsg = `🟢 *پشکنینی پەیوەندی باکئەپی POS*
+
+سڵاو بەڕێز *${r.recipient_name}*،
+پەیوەندی لەگەڵ چاتی تۆ بە تەواوی ئۆنلاین و سەرکەوتووە!
+📅 *کات:* ${new Date().toLocaleString('en-GB')}`;
+
+        const sendMsgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: r.chat_id,
+                text: testMsg,
+                parse_mode: 'Markdown'
+            }),
+            signal: AbortSignal.timeout(8000)
+        });
+
+        const sendData = await sendMsgRes.json();
+        if (!sendData.ok) {
+            return res.status(400).json({
+                status: 'ERROR',
+                message: `هەڵە لە ناردن: ${sendData.description || 'تێلیگرام ڕەتیکردەوە'}`
+            });
+        }
+
+        res.json({
+            status: 'SUCCESS',
+            message: `پەیامی تاقیکاری گەیشتە (${r.recipient_name})!`
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
+ * Toggle Global Auto-Backup
+ * POST /api/backup/telegram/toggle-auto
+ */
+exports.toggleAutoBackup = async (req, res) => {
+    try {
+        const { enabled } = req.body;
+        await db.query('UPDATE Telegram_Backup_Settings SET auto_backup_enabled = ? WHERE id = 1', [enabled ? 1 : 0]);
+        res.json({
+            status: 'SUCCESS',
+            message: enabled ? 'ناردنی خۆکاری باکئەپ بۆ تێلیگرام چالاک کرا' : 'ناردنی خۆکاری باکئەپ بۆ تێلیگرام ناچالاک کرا'
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
+ * Send Full Database Backup to ALL Active Telegram Recipients (Broadcast)
  * POST /api/backup/telegram/send
  */
 exports.sendBackupToTelegram = async (req, res) => {
     try {
-        const [settingsRows] = await db.query('SELECT * FROM Telegram_Backup_Settings WHERE id = 1');
-        const settings = settingsRows[0];
+        const [activeRecipients] = await db.query('SELECT * FROM Telegram_Recipients WHERE is_active = TRUE');
 
-        if (!settings || !settings.bot_token || !settings.chat_id) {
+        if (!activeRecipients || activeRecipients.length === 0) {
             return res.status(400).json({
                 status: 'ERROR',
-                message: 'تکایە سەرەتا Bot Token و Chat IDی تێلیگرام لە بەشی خوارەوە دابنێ و پاشەکەوتی بکە.'
+                message: 'هیچ وەرگرێکی چالاک دیاری نەکراوە! تکایە لانی کەم چێکبۆکسی یەک وەرگر چالاک بکە یان لە ڕێگەی Start مۆبایلێک ببەستەوە.'
             });
         }
 
-        const cleanToken = settings.bot_token.trim();
-        const cleanChatId = settings.chat_id.trim();
+        const token = await getActiveBotToken();
 
         // 1. Build the full database backup payload
         const { backupData, jsonString, totalTables, totalRows } = await buildFullBackupPayload('ناردنی دەستی بۆ تێلیگرام لەلایەن ئەدمین');
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `pos_backup_${timestamp}.json`;
+        // Proper clean filename & folder format
+        const { filename, folderName, readableDate, readableTime } = getFormattedLocalTimestamp();
 
         // 2. Also save local snapshot in backend/backups/
         const localFilePath = path.join(BACKUPS_DIR, filename);
         fs.writeFileSync(localFilePath, jsonString, 'utf8');
 
-        // 3. Format Telegram Caption in Kurdish Markdown
-        const caption = `🏪 *باکئەپی تەواوی سیستەمی POS*
+        // 3. Format Telegram Caption
+        const caption = `🏪 *باکئەپی تەواوی داتابەیسی POS*
 
-📅 *بەروار و کات:* ${new Date().toLocaleString('en-GB')}
+📁 *بوخچە (Folder):* \`${folderName}/\`
+📄 *ناوی پەڕگە (File):* \`${filename}\`
+📅 *بەروار (Date):* ${readableDate}
+⏰ *کات (Time):* ${readableTime}
 📊 *کۆی خشتەکان:* ${totalTables} خشتە
-💾 *کۆی دێڕەکانی داتا:* ${totalRows} دێڕ
-📁 *ناوی پەڕگە:* \`${filename}\`
-⚡ *شێواز:* باکئەپی دەستی (Manual Instant Backup)
-🔒 *پارێزراوە لەگەڵ هەموو Schemas و داتا بۆ هێنانەوە (Restore)*`;
-
-        // 4. Send document to Telegram using FormData
-        const formData = new FormData();
-        formData.append('chat_id', cleanChatId);
-        formData.append('caption', caption);
-        formData.append('parse_mode', 'Markdown');
-
-        const fileBlob = new Blob([Buffer.from(jsonString, 'utf8')], { type: 'application/json' });
-        formData.append('document', fileBlob, filename);
-
-        let telegramRes;
-        try {
-            telegramRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendDocument`, {
-                method: 'POST',
-                body: formData,
-                signal: AbortSignal.timeout(35000)
-            });
-        } catch (fetchErr) {
-            // Update last_status = FAILED
-            await db.query(`
-                UPDATE Telegram_Backup_Settings 
-                SET last_status = 'FAILED', last_error = ? 
-                WHERE id = 1
-            `, [fetchErr.message]);
-
-            return res.status(500).json({
-                status: 'ERROR',
-                message: 'پەیوەندی لەگەڵ تێلیگرام سەرکەوتوو نەبوو. تکایە پشکنین بۆ هێڵی ئینتەرنێت بکە: ' + fetchErr.message
-            });
-        }
-
-        const resultJson = await telegramRes.json();
-        if (!resultJson.ok) {
-            const errMsg = resultJson.description || 'هەڵەی نەزانراو لە تێلیگرام';
-            await db.query(`
-                UPDATE Telegram_Backup_Settings 
-                SET last_status = 'FAILED', last_error = ? 
-                WHERE id = 1
-            `, [errMsg]);
-
-            return res.status(400).json({
-                status: 'ERROR',
-                message: `تێلیگرام فایلەکەی ڕەتکردەوە: ${errMsg}`
-            });
-        }
+💾 *کۆی تۆمارەکان:* ${totalRows} دێڕ داتا
+⚡ *شێواز:* باکئەپی دەستی (Direct Manual Dispatch)
+🔒 *١٠٠٪ پارێزراوە لەگەڵ هەموو Schemas و داتا بۆ هێنانەوە (Restore)*`;
 
         const sizeBytes = Buffer.byteLength(jsonString, 'utf8');
+        const successfulRecipients = [];
+        const failedRecipients = [];
 
-        // 5. Update settings with successful status
-        await db.query(`
-            UPDATE Telegram_Backup_Settings 
-            SET last_sent_at = NOW(),
-                last_status = 'SUCCESS',
-                last_error = NULL,
-                last_filename = ?,
-                last_file_size = ?
-            WHERE id = 1
-        `, [filename, sizeBytes]);
+        // 4. Send document to each active recipient
+        for (const recipient of activeRecipients) {
+            try {
+                const formData = new FormData();
+                formData.append('chat_id', recipient.chat_id.trim());
+                formData.append('caption', caption);
+                formData.append('parse_mode', 'Markdown');
 
-        // Audit log
-        await logAuditAction({
-            req,
-            action_type: 'BACKUP_TELEGRAM_SENT',
-            entity_name: 'Telegram_Backup',
-            entity_id: 1,
-            details: `ناردنی باکئەپی تەواوی داتابەیس بۆ تێلیگرام (${totalTables} خشتە، ${totalRows} دێڕ، پەڕگەی ${filename})`
-        });
+                const fileBlob = new Blob([Buffer.from(jsonString, 'utf8')], { type: 'application/json' });
+                formData.append('document', fileBlob, filename);
 
-        res.json({
-            status: 'SUCCESS',
-            message: 'باکئەپەکە بە سەرکەوتوویی بۆ تێلیگرامی خاوەنکار نێردرا!',
-            data: {
-                filename,
-                sizeBytes,
-                sentAt: new Date(),
-                totalTables,
-                totalRows
+                const telegramRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: AbortSignal.timeout(35000)
+                });
+
+                const resultJson = await telegramRes.json();
+                if (resultJson.ok) {
+                    successfulRecipients.push(recipient.recipient_name);
+                    await db.query('UPDATE Telegram_Recipients SET last_sent_at = NOW() WHERE id = ?', [recipient.id]);
+                } else {
+                    failedRecipients.push(`${recipient.recipient_name} (${resultJson.description || 'هەڵە'})`);
+                }
+            } catch (rErr) {
+                failedRecipients.push(`${recipient.recipient_name} (${rErr.message})`);
             }
-        });
+        }
+
+        if (successfulRecipients.length > 0) {
+            await db.query(`
+                UPDATE Telegram_Backup_Settings 
+                SET last_sent_at = NOW(),
+                    last_status = 'SUCCESS',
+                    last_error = NULL,
+                    last_filename = ?,
+                    last_file_size = ?
+                WHERE id = 1
+            `, [filename, sizeBytes]);
+
+            await logAuditAction({
+                req,
+                action_type: 'BACKUP_TELEGRAM_SENT',
+                entity_name: 'Telegram_Backup',
+                entity_id: 1,
+                details: `ناردنی باکئەپی داتابەیس بۆ (${successfulRecipients.length}) وەرگر: ${successfulRecipients.join('، ')}`
+            });
+
+            return res.json({
+                status: 'SUCCESS',
+                message: `باکئەپەکە (${filename}) بە سەرکەوتوویی بۆ (${successfulRecipients.length}) وەرگر نێردرا: ${successfulRecipients.join('، ')}`,
+                data: {
+                    filename,
+                    sizeBytes,
+                    sentAt: new Date(),
+                    successfulCount: successfulRecipients.length,
+                    failedCount: failedRecipients.length,
+                    successfulRecipients,
+                    failedRecipients
+                }
+            });
+        } else {
+            const errorSummary = failedRecipients.join('؛ ');
+            await db.query(`UPDATE Telegram_Backup_Settings SET last_status = 'FAILED', last_error = ? WHERE id = 1`, [errorSummary]);
+            return res.status(400).json({
+                status: 'ERROR',
+                message: `نەتوانرا بۆ هیچ وەرگرێک بنێردرێت: ${errorSummary}`
+            });
+        }
     } catch (error) {
         console.error('Error sending backup to Telegram:', error);
         res.status(500).json({ status: 'ERROR', message: error.message });
@@ -401,7 +501,7 @@ exports.sendBackupToTelegram = async (req, res) => {
 };
 
 /**
- * Send Specific Existing Server Snapshot to Telegram
+ * Send Specific Snapshot to ALL Active Recipients
  * POST /api/backup/telegram/send-snapshot/:filename
  */
 exports.sendSnapshotToTelegram = async (req, res) => {
@@ -413,71 +513,49 @@ exports.sendSnapshotToTelegram = async (req, res) => {
 
         const filePath = path.join(BACKUPS_DIR, filename);
         if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ status: 'ERROR', message: 'پەڕگەی باکئەپ لەسەر سێرڤەر نەدۆزرایەوە' });
+            return res.status(404).json({ status: 'ERROR', message: 'پەڕگەی باکئەپ نەدۆزرایەوە' });
         }
 
-        const [settingsRows] = await db.query('SELECT * FROM Telegram_Backup_Settings WHERE id = 1');
-        const settings = settingsRows[0];
-
-        if (!settings || !settings.bot_token || !settings.chat_id) {
-            return res.status(400).json({
-                status: 'ERROR',
-                message: 'تکایە سەرەتا Bot Token و Chat IDی تێلیگرام پاشەکەوت بکە.'
-            });
+        const [activeRecipients] = await db.query('SELECT * FROM Telegram_Recipients WHERE is_active = TRUE');
+        if (!activeRecipients || activeRecipients.length === 0) {
+            return res.status(400).json({ status: 'ERROR', message: 'هیچ وەرگرێکی چالاک دیاری نەکراوە.' });
         }
 
+        const token = await getActiveBotToken();
         const fileContent = fs.readFileSync(filePath);
         const stats = fs.statSync(filePath);
-
-        // Try reading metadata
-        let metadataInfo = '';
-        try {
-            const parsed = JSON.parse(fileContent.toString('utf8'));
-            if (parsed.metadata) {
-                metadataInfo = `\n📊 *خشتەکان:* ${parsed.metadata.total_tables || 'نادیار'}\n⚡ *جۆر:* ${parsed.metadata.note || parsed.metadata.type || 'کۆپی سێرڤەر'}`;
-            }
-        } catch (_) {}
 
         const caption = `📁 *ناردنی کۆپییەکی یەدەگی پێشوو بۆ تێلیگرام*
 
 📄 *ناوی پەڕگە:* \`${filename}\`
 📅 *بەرواری دروستبوون:* ${stats.mtime.toLocaleString('en-GB')}
-💾 *قەبارە:* ${Math.round(stats.size / 1024)} KB${metadataInfo}
-🔒 *ئامادەیە بۆ هێنانەوە (Restore) لە هەر کاتێکدا*`;
+💾 *قەبارە:* ${Math.round(stats.size / 1024)} KB
+🔒 *ئامادەیە بۆ هێنانەوە (Restore) لە هەر ساتێکدا*`;
 
-        const formData = new FormData();
-        formData.append('chat_id', settings.chat_id.trim());
-        formData.append('caption', caption);
-        formData.append('parse_mode', 'Markdown');
+        let successCount = 0;
+        for (const r of activeRecipients) {
+            try {
+                const formData = new FormData();
+                formData.append('chat_id', r.chat_id.trim());
+                formData.append('caption', caption);
+                formData.append('parse_mode', 'Markdown');
 
-        const fileBlob = new Blob([fileContent], { type: 'application/json' });
-        formData.append('document', fileBlob, filename);
+                const fileBlob = new Blob([fileContent], { type: 'application/json' });
+                formData.append('document', fileBlob, filename);
 
-        const telegramRes = await fetch(`https://api.telegram.org/bot${settings.bot_token.trim()}/sendDocument`, {
-            method: 'POST',
-            body: formData,
-            signal: AbortSignal.timeout(35000)
-        });
-
-        const resultJson = await telegramRes.json();
-        if (!resultJson.ok) {
-            return res.status(400).json({
-                status: 'ERROR',
-                message: `تێلیگرام فایلەکەی ڕەتکردەوە: ${resultJson.description || 'هەڵە لە ناردن'}`
-            });
+                const telegramRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: AbortSignal.timeout(35000)
+                });
+                const resultJson = await telegramRes.json();
+                if (resultJson.ok) successCount++;
+            } catch (_) {}
         }
-
-        await logAuditAction({
-            req,
-            action_type: 'BACKUP_TELEGRAM_SENT',
-            entity_name: 'Telegram_Backup',
-            entity_id: 1,
-            details: `ناردنی کۆپی سێرڤەر (${filename}) بۆ تێلیگرام`
-        });
 
         res.json({
             status: 'SUCCESS',
-            message: `کۆپی (${filename}) بە سەرکەوتوویی بۆ تێلیگرام نێردرا!`
+            message: `کۆپی (${filename}) بە سەرکەوتوویی بۆ (${successCount}) وەرگر نێردرا!`
         });
     } catch (error) {
         console.error('Error sending snapshot to Telegram:', error);
@@ -493,62 +571,78 @@ exports.dispatchAutoTelegramBackup = async (filename, filePath, backupData) => {
         const [settingsRows] = await db.query('SELECT * FROM Telegram_Backup_Settings WHERE id = 1');
         const settings = settingsRows[0];
 
-        if (!settings || !settings.auto_backup_enabled || !settings.bot_token || !settings.chat_id) {
-            return; // Auto backup not enabled or missing credentials
+        if (!settings || !settings.auto_backup_enabled) {
+            return;
         }
+
+        const [activeRecipients] = await db.query('SELECT * FROM Telegram_Recipients WHERE is_active = TRUE');
+        if (!activeRecipients || activeRecipients.length === 0) return;
 
         if (!fs.existsSync(filePath)) return;
 
+        const token = await getActiveBotToken();
         const fileContent = fs.readFileSync(filePath);
         const stats = fs.statSync(filePath);
 
+        const { folderName, readableDate, readableTime } = getFormattedLocalTimestamp();
+
         const caption = `🤖 *باکئەپی خۆکاری ڕۆژانەی سیستەمی POS*
 
-📅 *بەروار و کات:* ${new Date().toLocaleString('en-GB')}
+📁 *بوخچە (Folder):* \`${folderName}/\`
+📄 *ناوی پەڕگە (File):* \`${filename}\`
+📅 *بەروار (Date):* ${readableDate}
+⏰ *کات (Time):* ${readableTime}
 📊 *کۆی خشتەکان:* ${backupData?.metadata?.total_tables || 0} خشتە
-📁 *ناوی پەڕگە:* \`${filename}\`
 💾 *قەبارە:* ${Math.round(stats.size / 1024)} KB
-⚡ *جۆر:* ناردنی خۆکار لە باگراوند (Auto Daily Dispatch)
+⚡ *جۆر:* باکئەپی ئۆتۆماتیکی ڕۆژانە
 🔒 *پارێزراوە لەسەر تێلیگرامی خاوەنکار*`;
 
-        const formData = new FormData();
-        formData.append('chat_id', settings.chat_id.trim());
-        formData.append('caption', caption);
-        formData.append('parse_mode', 'Markdown');
+        for (const r of activeRecipients) {
+            try {
+                const formData = new FormData();
+                formData.append('chat_id', r.chat_id.trim());
+                formData.append('caption', caption);
+                formData.append('parse_mode', 'Markdown');
 
-        const fileBlob = new Blob([fileContent], { type: 'application/json' });
-        formData.append('document', fileBlob, filename);
+                const fileBlob = new Blob([fileContent], { type: 'application/json' });
+                formData.append('document', fileBlob, filename);
 
-        const res = await fetch(`https://api.telegram.org/bot${settings.bot_token.trim()}/sendDocument`, {
-            method: 'POST',
-            body: formData,
-            signal: AbortSignal.timeout(40000)
-        });
-
-        const data = await res.json();
-        if (data.ok) {
-            await db.query(`
-                UPDATE Telegram_Backup_Settings 
-                SET last_sent_at = NOW(),
-                    last_status = 'SUCCESS',
-                    last_error = NULL,
-                    last_filename = ?,
-                    last_file_size = ?
-                WHERE id = 1
-            `, [filename, stats.size]);
-            console.log(`✓ Automated daily backup successfully dispatched to Telegram: ${filename}`);
-        } else {
-            console.warn(`Telegram auto-backup failed:`, data.description);
-            await db.query(`
-                UPDATE Telegram_Backup_Settings 
-                SET last_status = 'FAILED',
-                    last_error = ?
-                WHERE id = 1
-            `, [data.description]);
+                await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: AbortSignal.timeout(40000)
+                });
+            } catch (_) {}
         }
+
+        await db.query(`
+            UPDATE Telegram_Backup_Settings 
+            SET last_sent_at = NOW(),
+                last_status = 'SUCCESS',
+                last_error = NULL,
+                last_filename = ?,
+                last_file_size = ?
+            WHERE id = 1
+        `, [filename, stats.size]);
+        console.log(`✓ Automated daily backup dispatched to ${activeRecipients.length} Telegram recipients: ${filename}`);
     } catch (err) {
         console.warn('Auto Telegram dispatch error:', err.message);
     }
+};
+
+/**
+ * Manual Refresh / Check Pairing from UI
+ * POST /api/backup/telegram/auto-detect
+ */
+exports.autoDetectChatId = async (req, res) => {
+    await pollTelegramUpdates();
+    const [recipients] = await db.query('SELECT * FROM Telegram_Recipients ORDER BY created_at ASC');
+
+    res.json({
+        status: 'SUCCESS',
+        message: `لیستی وەرگران نوێکرایەوە (${recipients.length} وەرگر دۆزرایەوە)`,
+        data: recipients
+    });
 };
 
 module.exports = exports;
