@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Moon, Sun, Database, Shield, CheckCircle2, AlertTriangle, 
   Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
-  AlertCircle, PlusCircle, Trash2, FolderOpen, Save 
+  AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
+  Wifi, WifiOff, Cloud, Globe, Filter
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -27,6 +28,14 @@ const Settings = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [snapshotCreating, setSnapshotCreating] = useState(false);
+
+  // Sync & Cloud State
+  const [syncData, setSyncData] = useState(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncSaving, setSyncSaving] = useState(false);
+  const [cloudUrlInput, setCloudUrlInput] = useState('http://localhost:3001/api/cloud-sync');
+  const [autoSyncToggle, setAutoSyncToggle] = useState(true);
+  const [syncFilter, setSyncFilter] = useState('ALL'); // 'ALL', 'PENDING', 'SYNCED', 'FAILED'
 
   // Restore Modal State
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
@@ -54,16 +63,25 @@ const Settings = () => {
   const fetchBackupData = async () => {
     setStatsLoading(true);
     try {
-      const [statsRes, snapsRes] = await Promise.all([
+      const [statsRes, snapsRes, syncRes] = await Promise.all([
         fetch('http://localhost:3001/api/backup/stats'),
-        fetch('http://localhost:3001/api/backup/local-snapshots')
+        fetch('http://localhost:3001/api/backup/local-snapshots'),
+        fetch('http://localhost:3001/api/sync/status')
       ]);
       const statsJson = await statsRes.json();
       const snapsJson = await snapsRes.json();
+      const syncJson = await syncRes.json();
       if (statsJson.status === 'SUCCESS') setBackupStats(statsJson.data);
       if (snapsJson.status === 'SUCCESS') setLocalSnapshots(snapsJson.data);
+      if (syncJson.status === 'SUCCESS') {
+        setSyncData(syncJson.data);
+        if (syncJson.data.settings) {
+          setCloudUrlInput(syncJson.data.settings.cloud_url || 'http://localhost:3001/api/cloud-sync');
+          setAutoSyncToggle(syncJson.data.settings.auto_sync_enabled);
+        }
+      }
     } catch (err) {
-      console.error('Error fetching backup info:', err);
+      console.error('Error fetching backup & sync info:', err);
     } finally {
       setStatsLoading(false);
     }
@@ -74,6 +92,7 @@ const Settings = () => {
       fetchBackupData();
     }
   }, [isAdmin]);
+
 
   // Handle Full Backup Download
   const handleDownloadBackup = async () => {
@@ -187,6 +206,66 @@ const Settings = () => {
       }
     }
   };
+
+  // Handle Trigger Live Sync
+  const handleTriggerSyncNow = async () => {
+    setSyncLoading(true);
+    try {
+      const res = await fetch('http://localhost:3001/api/sync/trigger', { method: 'POST' });
+      const json = await res.json();
+      if (json.status === 'SUCCESS') {
+        alert(json.message);
+        fetchBackupData();
+      } else {
+        alert(json.message || 'هەڵە لە هاوکاتکردن');
+      }
+    } catch (err) {
+      alert('هەڵە لە پەیوەندی: ' + err.message);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  // Handle Save Cloud & Sync Settings
+  const handleSaveSyncSettings = async () => {
+    setSyncSaving(true);
+    try {
+      const res = await fetch('http://localhost:3001/api/sync/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cloud_url: cloudUrlInput,
+          auto_sync_enabled: autoSyncToggle
+        })
+      });
+      const json = await res.json();
+      if (json.status === 'SUCCESS') {
+        setSavedNotice(true);
+        setTimeout(() => setSavedNotice(false), 2500);
+        fetchBackupData();
+      } else {
+        alert('هەڵە: ' + json.message);
+      }
+    } catch (err) {
+      alert('هەڵە لە پاشەکەوتکردن: ' + err.message);
+    } finally {
+      setSyncSaving(false);
+    }
+  };
+
+  // Handle Cleanup Synced Queue
+  const handleCleanupSynced = async () => {
+    if (!window.confirm('ئایا دڵنیایت لە سڕینەوەی تۆمارە هاوکاتکراوە کۆنەکان؟')) return;
+    try {
+      const res = await fetch('http://localhost:3001/api/sync/cleanup', { method: 'POST' });
+      const json = await res.json();
+      alert(json.message);
+      fetchBackupData();
+    } catch (err) {
+      alert('هەڵە لە پاککردنەوە: ' + err.message);
+    }
+  };
+
 
   // Handle File Upload Selection
   const handleFileSelect = (e) => {
@@ -426,6 +505,51 @@ const Settings = () => {
           </label>
         </div>
 
+        {/* Cloud & Offline Sync Card */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#38bdf8' }}>
+              <Cloud size={24} /> هاوکاتکردنی کلاود و ئۆفلاین
+            </h3>
+            {syncData && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '10px', background: syncData.isOnline ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: syncData.isOnline ? '#34d399' : '#f87171', border: `1px solid ${syncData.isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, fontSize: '0.8rem', fontWeight: 'bold' }}>
+                {syncData.isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
+                {syncData.isOnline ? 'ئۆنلاین' : 'ئۆفلاین'}
+              </span>
+            )}
+          </div>
+
+          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.2rem', lineHeight: '1.5' }}>
+            هاوکاتکردنی خۆکاری فرۆشتن، مەخزەن و داتاکان لەگەڵ سێرڤەری کلاود. لە نەبوونی ئینتەرنێتدا سیستەم ١٠٠٪ بە ئۆفلاین بەردەوام دەبێت.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.2rem' }}>
+            <div style={{ padding: '0.8rem', background: 'rgba(245, 158, 11, 0.08)', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+              <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>چاوەڕوانکراوی هاوکات</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#fbbf24', marginTop: '2px' }}>
+                {syncData?.pendingCount || 0} پسووڵە
+              </div>
+            </div>
+            <div style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+              <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>هاوکاتکراوەکان</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#34d399', marginTop: '2px' }}>
+                {syncData?.syncedCount || 0} تۆمار
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              onClick={handleTriggerSyncNow}
+              disabled={syncLoading}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#0f172a', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: syncLoading ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+            >
+              <RefreshCw size={18} className={syncLoading ? 'animate-spin' : ''} />
+              {syncLoading ? 'هاوکات دەکرێت...' : 'هاوکاتکردنی دەستبەجێ (Sync Now)'}
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {/* Local Server Snapshots Section */}
@@ -540,6 +664,146 @@ const Settings = () => {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Cloud Sync Queue Management Section */}
+      <div className="glass-panel mt-8" style={{ padding: '2rem', borderRadius: '24px', marginTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#38bdf8' }}>
+              <Cloud size={22} /> ڕیزبەندی هاوکاتکردنی کلاود (Cloud Sync Queue)
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
+              هەموو فرۆشتن، گەڕاندنەوە، زیان، و جەردێک لە کاتی ئۆفلاین لەم ڕیزبەندییەدا کۆدەبنەوە و بە ئۆنلاینبوون دەنێردرێن:
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleCleanupSynced}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              <Trash2 size={14} /> پاککردنەوەی کۆنەکان
+            </button>
+          </div>
+        </div>
+
+        {/* Sync Settings Bar */}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
+          <div style={{ flex: 1, minWidth: '260px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>ناونیشانی سێرڤەری کلاود (Cloud URL):</label>
+            <input 
+              type="text" 
+              value={cloudUrlInput}
+              onChange={e => setCloudUrlInput(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.88rem' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#cbd5e1' }}>
+              <input 
+                type="checkbox" 
+                checked={autoSyncToggle} 
+                onChange={e => setAutoSyncToggle(e.target.checked)} 
+              />
+              هاوکاتکردنی خۆکار لە باکگراوند (Auto-Sync)
+            </label>
+
+            <button
+              onClick={handleSaveSyncSettings}
+              disabled={syncSaving}
+              style={{ padding: '8px 16px', borderRadius: '8px', background: '#38bdf8', color: '#0f172a', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              {syncSaving ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردن'}
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
+          {['ALL', 'PENDING', 'SYNCED', 'FAILED'].map(f => {
+            const labels = { ALL: 'هەمووی', PENDING: 'چاوەڕوان', SYNCED: 'هاوکاتکراو', FAILED: 'شکستهێناو' };
+            const isActive = syncFilter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setSyncFilter(f)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '10px',
+                  background: isActive ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.04)',
+                  color: isActive ? '#38bdf8' : '#94a3b8',
+                  border: `1px solid ${isActive ? '#38bdf8' : 'rgba(255,255,255,0.08)'}`,
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                {labels[f]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Queue Items Table */}
+        {(!syncData?.recentQueue || syncData.recentQueue.length === 0) ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+            هیچ تۆمارێک لە ڕیزبەندی هاوکاتکردندا نییە
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+              <thead style={{ background: 'rgba(0,0,0,0.3)' }}>
+                <tr>
+                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>جۆری کردە</th>
+                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>ناسنامەی تۆمار</th>
+                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>دۆخ</th>
+                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>کات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {syncData.recentQueue
+                  .filter(item => syncFilter === 'ALL' || item.status === syncFilter)
+                  .map((item, idx) => {
+                    const typeLabels = {
+                      SALE: 'فرۆشتن',
+                      RETURN: 'گەڕاندنەوە',
+                      DAMAGE: 'زیانەکان',
+                      INVENTORY_AUDIT: 'جەردی کۆگا',
+                      VENDOR_RETURN: 'گەڕاندنەوە بۆ کۆمپانیا',
+                      PRODUCT: 'کاڵا'
+                    };
+                    const statusColors = {
+                      PENDING: { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', label: 'لە چاوەڕوانیدایە' },
+                      SYNCED: { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', label: 'هاوکات کرا' },
+                      SYNCING: { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'دەگوازرێتەوە' },
+                      FAILED: { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171', label: 'شکست' }
+                    };
+                    const s = statusColors[item.status] || statusColors.PENDING;
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#f1f5f9' }}>
+                          {typeLabels[item.entity_type] || item.entity_type}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38bdf8', fontSize: '0.9rem' }}>
+                          #{item.entity_id}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ padding: '4px 10px', borderRadius: '8px', background: s.bg, color: s.text, fontWeight: 'bold', fontSize: '0.82rem' }}>
+                            {s.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '0.88rem', color: '#cbd5e1' }}>
+                          {new Date(item.created_at).toLocaleString('en-GB')}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

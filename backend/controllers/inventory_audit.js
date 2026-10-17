@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { queueSyncEvent } = require('./sync');
 
 /**
  * Reconcile Product Stock during Smart Inventory Audit.
@@ -150,6 +151,26 @@ exports.reconcileProductStock = async (req, res) => {
         ]);
 
         await connection.commit();
+
+        // Queue Inventory Audit for Offline & Online Sync
+        await queueSyncEvent({
+            entity_type: 'INVENTORY_AUDIT',
+            entity_id: auditRes.insertId,
+            action_type: 'CREATE',
+            payload: {
+                audit_id: auditRes.insertId,
+                product_id: product.id,
+                product_name: product.name,
+                barcode: activeBarcode,
+                unit_type,
+                system_units: systemUnits,
+                counted_units: countedUnits,
+                difference_units: differenceUnits,
+                status,
+                damage_id: damageId,
+                timestamp: new Date().toISOString()
+            }
+        });
 
         // 5. Audit Log
         let auditDetails = `جەردکردنی کاڵای "${product.name}": ژمارەی پێشوو: ${systemUnits} دانە، ژمارەی جەردکراو: ${countedUnits} دانە. `;

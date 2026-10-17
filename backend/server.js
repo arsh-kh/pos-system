@@ -95,6 +95,12 @@ app.use('/api/inventory-audit', inventoryAuditRoutes);
 const backupRoutes = require('./routes/backup');
 app.use('/api/backup', backupRoutes);
 
+// Offline & Online Sync API (سیستەمی هاوکاتکردنی کلاود و ئۆفلاین)
+const syncRoutes = require('./routes/sync');
+app.use('/api/sync', syncRoutes);
+app.use('/api/cloud-sync', syncRoutes);
+
 app.listen(port, () => {
+
     console.log(`Backend server running on port ${port}`);
 });

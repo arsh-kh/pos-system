@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { queueSyncEvent } = require('./sync');
 
 // Reason labels mapping in Kurdish Sorani
 const REASON_LABELS = {
@@ -131,6 +132,27 @@ exports.recordDamage = async (req, res) => {
         ]);
 
         await connection.commit();
+
+        // Queue Damage entry for Offline & Online Sync
+        await queueSyncEvent({
+            entity_type: 'DAMAGE',
+            entity_id: damageResult.insertId,
+            action_type: 'CREATE',
+            payload: {
+                damage_id: damageResult.insertId,
+                product_id: product.id,
+                product_name: product.name,
+                barcode: activeBarcode,
+                unit_type,
+                units_multiplier: multiplier,
+                quantity: qty,
+                cost_price: unitCostPrice,
+                total_cost_loss: totalCostLoss,
+                reason: reasonKey,
+                reason_label: reasonLabel,
+                timestamp: new Date().toISOString()
+            }
+        });
 
         // 6. Audit Log
         const unitText = isBox ? `کارتۆن (${multiplier} دانەیی)` : 'دانە';

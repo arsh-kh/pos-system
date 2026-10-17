@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { queueSyncEvent } = require('./sync');
 
 const safeBigInt = (val) => {
     const num = Math.round(Number(val) || 0);
@@ -138,6 +139,27 @@ exports.createPurchaseReturn = async (req, res) => {
         ]);
 
         await connection.commit();
+
+        // Queue Vendor Return (RTV) for Offline & Online Sync
+        await queueSyncEvent({
+            entity_type: 'VENDOR_RETURN',
+            entity_id: result.insertId,
+            action_type: 'CREATE',
+            payload: {
+                return_id: result.insertId,
+                supplier_id,
+                product_id,
+                unit_type,
+                units_multiplier: multiplier,
+                quantity: returnQty,
+                cost_price: returnCost,
+                total_refund: totalRefund,
+                refund_type,
+                reason,
+                representative_name: representative_name ? representative_name.trim() : null,
+                timestamp: new Date().toISOString()
+            }
+        });
 
         // 6. Audit Log
         const unitLabel = isBox ? `کارتۆن (${multiplier} دانەیی)` : 'دانە';

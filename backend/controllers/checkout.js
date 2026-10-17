@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { queueSyncEvent } = require('./sync');
 
 const safeBigInt = (val) => {
     const num = Math.round(Number(val) || 0);
@@ -283,6 +284,25 @@ exports.processCheckout = async (req, res) => {
         }
 
         await connection.commit();
+
+        // Queue Sale for Offline & Online Sync
+        await queueSyncEvent({
+            entity_type: 'SALE',
+            entity_id: saleId,
+            action_type: 'CREATE',
+            payload: {
+                saleId,
+                customer_id,
+                subtotal: subtotal.toString(),
+                discount: discountVal.toString(),
+                total: finalTotal.toString(),
+                paid_amount: finalPaidAmount.toString(),
+                debt_amount: finalDebtAmount.toString(),
+                payment_method: method,
+                items: processedItems,
+                timestamp: new Date().toISOString()
+            }
+        });
 
         // Audit log manual discount if applied
         if (discountVal > 0n) {

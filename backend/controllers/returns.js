@@ -1,5 +1,6 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { queueSyncEvent } = require('./sync');
 
 // Lookup a sale and calculate returnable quantities for each item
 exports.getSaleForReturn = async (req, res) => {
@@ -169,6 +170,23 @@ exports.processReturn = async (req, res) => {
         );
 
         await connection.commit();
+
+        // Queue Customer Return for Offline & Online Sync
+        await queueSyncEvent({
+            entity_type: 'RETURN',
+            entity_id: sale_id,
+            action_type: 'CREATE',
+            payload: {
+                sale_id,
+                product_id,
+                return_qty: returnQty,
+                refunded_amount: refundedAmount,
+                refund_method: finalRefundMethod,
+                customer_id: sale.customer_id || null,
+                reason: reason || 'گەڕاندنەوە لە کڕیار',
+                timestamp: new Date().toISOString()
+            }
+        });
 
         // Audit log
         const auditDetails = finalRefundMethod === 'DEBT'
