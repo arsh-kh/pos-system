@@ -279,7 +279,7 @@ const Purchases = () => {
         remaining_amount: totalRemaining,
         items: items.map(i => ({
           product_id: i.product_id,
-          quantity: Math.max(1, parseInt(i.quantity) || 1),
+          quantity: Math.max(0.001, parseFloat(i.quantity) || 1),
           cost_price: Math.max(0, Number(i.cost_price) || 0),
           selling_price: Math.max(0, Number(i.selling_price) || 0)
         }))

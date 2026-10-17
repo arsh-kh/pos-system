@@ -6,8 +6,21 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Global BigInt Serialization Guard for JSON responses
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+};
+
 app.use(cors());
 app.use(express.json());
+
+// Process guards against unexpected background worker crashes
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception thrown:', err);
+});
 
 // Basic health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -100,7 +113,15 @@ const syncRoutes = require('./routes/sync');
 app.use('/api/sync', syncRoutes);
 app.use('/api/cloud-sync', syncRoutes);
 
-app.listen(port, () => {
+// Global Express Error Handler Middleware
+app.use((err, req, res, next) => {
+    console.error('Global Express Error Caught:', err);
+    res.status(err.status || 500).json({
+        status: 'ERROR',
+        message: err.message || 'هەڵەیەکی چاوەڕواننەکراو لە باکئەند ڕوویدا'
+    });
+});
 
+app.listen(port, () => {
     console.log(`Backend server running on port ${port}`);
 });

@@ -4,102 +4,122 @@ const assert = require('assert');
 const API_BASE = 'http://localhost:3001/api/backup';
 
 async function runTests() {
-    console.log('=== دەستپێکردنی تاقیکردنەوەی باکئەپی تێلیگرام (Telegram Cloud Backup Tests) ===\n');
+    console.log('=== دەستپێکردنی تاقیکردنەوەی باکئەپی فرە-وەرگری تێلیگرام (Multi-Recipient Telegram Backup Tests) ===\n');
+
+    let createdRecipientId = null;
 
     try {
         // --- 1. Test GET /api/backup/telegram/settings ---
-        console.log('--- ١. پشکنینی وەرگرتنی ڕێکخستنەکان (GET Settings) ---');
+        console.log('--- ١. پشکنینی وەرگرتنی ڕێکخستنەکان و وەرگرەکان (GET Settings) ---');
         const getRes = await fetch(`${API_BASE}/telegram/settings`);
         assert.strictEqual(getRes.status, 200, 'GET settings must return 200');
         const getData = await getRes.json();
         assert.strictEqual(getData.status, 'SUCCESS', 'Status must be SUCCESS');
         assert(getData.data !== undefined, 'Settings data must exist');
-        console.log('✓ ڕێکخستنەکان بە سەرکەوتوویی خوێنرانەوە:', {
-            has_token: getData.data.has_token,
-            chat_id: getData.data.chat_id || 'بەتاڵ',
+        assert(Array.isArray(getData.data.recipients), 'Recipients must be an array');
+        console.log('✓ ڕێکخستنەکان خوێنرانەوە:', {
+            bot_username: getData.data.bot_username,
+            totalRecipients: getData.data.totalRecipients,
+            activeCount: getData.data.activeCount,
             auto_backup: getData.data.auto_backup_enabled
         });
 
-        // --- 2. Test POST /api/backup/telegram/settings ---
-        console.log('\n--- ٢. پشکنینی پاشەکەوتکردنی ڕێکخستنەکان (Update Settings) ---');
-        const updateRes = await fetch(`${API_BASE}/telegram/settings`, {
+        // --- 2. Test POST /api/backup/telegram/recipients (Add Recipient) ---
+        console.log('\n--- ٢. پشکنینی زیادکردنی وەرگری نوێ (Add Recipient) ---');
+        const testChatId = '999888777';
+        const testName = 'چاتی تاقیکاری ئەدمین';
+        const addRes = await fetch(`${API_BASE}/telegram/recipients`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                bot_token: '123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ',
-                chat_id: '987654321',
-                auto_backup_enabled: true,
-                backup_frequency: 'DAILY'
+                chat_id: testChatId,
+                recipient_name: testName
             })
         });
-        assert.strictEqual(updateRes.status, 200, 'Update settings must return 200');
-        const updateData = await updateRes.json();
-        assert.strictEqual(updateData.status, 'SUCCESS', 'Update status must be SUCCESS');
+        assert.strictEqual(addRes.status, 200, 'Add recipient must return 200');
+        const addData = await addRes.json();
+        assert.strictEqual(addData.status, 'SUCCESS', 'Add status must be SUCCESS');
+        console.log('✓ وەرگری تاقیکاری بە سەرکەوتوویی زیادکرا');
 
-        // Verify updated settings
+        // Verify recipient was added
         const verifyRes = await fetch(`${API_BASE}/telegram/settings`);
         const verifyData = await verifyRes.json();
-        assert.strictEqual(verifyData.data.chat_id, '987654321', 'Chat ID must match updated value');
-        assert.strictEqual(verifyData.data.auto_backup_enabled, true, 'Auto backup must be true');
-        assert.strictEqual(verifyData.data.has_token, true, 'has_token must be true');
-        assert(verifyData.data.masked_token.includes('••••••••'), 'Token must be safely masked');
-        console.log('✓ ڕێکخستنەکان پاشەکەوت کران و دڵنیابوونەوە لە شاردنەوەی تۆکن:', verifyData.data.masked_token);
+        const found = verifyData.data.recipients.find(r => r.chat_id === testChatId);
+        assert(found, 'Added recipient must exist in recipients list');
+        assert.strictEqual(found.recipient_name, testName, 'Recipient name must match');
+        assert.strictEqual(found.is_active, true, 'New recipient must be active by default');
+        createdRecipientId = found.id;
+        console.log('✓ دڵنیابوونەوە لە تۆمارکرانی وەرگر:', { id: found.id, name: found.recipient_name });
 
-        // --- 3. Test POST /api/backup/telegram/test (Validation & Network Gracefulness) ---
-        console.log('\n--- ٣. پشکنینی تاقیکردنەوەی پەیوەندی بە تێلیگرام (Test Connection) ---');
-        const testRes = await fetch(`${API_BASE}/telegram/test`, {
+        // --- 3. Test POST /api/backup/telegram/recipients/:id/toggle ---
+        console.log('\n--- ٣. پشکنینی گۆڕینی دۆخی وەرگر (Toggle Recipient) ---');
+        const toggleRes = await fetch(`${API_BASE}/telegram/recipients/${createdRecipientId}/toggle`, {
+            method: 'POST'
+        });
+        assert.strictEqual(toggleRes.status, 200, 'Toggle recipient must return 200');
+
+        // Verify it was toggled to inactive
+        const verifyToggleRes = await fetch(`${API_BASE}/telegram/settings`);
+        const verifyToggleData = await verifyToggleRes.json();
+        const toggledRecipient = verifyToggleData.data.recipients.find(r => r.id === createdRecipientId);
+        assert.strictEqual(toggledRecipient.is_active, false, 'Recipient should now be inactive');
+        console.log('✓ دۆخی وەرگر بە سەرکەوتوویی گۆڕدرا بۆ ناچالاک (is_active: false)');
+
+        // Toggle back to active
+        await fetch(`${API_BASE}/telegram/recipients/${createdRecipientId}/toggle`, { method: 'POST' });
+        const verifyToggleBackRes = await fetch(`${API_BASE}/telegram/settings`);
+        const verifyToggleBackData = await verifyToggleBackRes.json();
+        const toggledBackRecipient = verifyToggleBackData.data.recipients.find(r => r.id === createdRecipientId);
+        assert.strictEqual(toggledBackRecipient.is_active, true, 'Recipient should be active again');
+        console.log('✓ دۆخی وەرگر گەڕێندرایەوە بۆ چالاک (is_active: true)');
+
+        // --- 4. Test POST /api/backup/telegram/toggle-auto ---
+        console.log('\n--- ٤. پشکنینی گۆڕینی باکئەپی خۆکار (Toggle Auto Backup) ---');
+        const autoRes = await fetch(`${API_BASE}/telegram/toggle-auto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                bot_token: '123456789:INVALID_MOCK_TOKEN',
-                chat_id: '987654321'
-            })
+            body: JSON.stringify({ enabled: true })
         });
-        const testData = await testRes.json();
-        // Since mock token is invalid, it should return graceful error (400 or 500) without crashing the server
-        assert(testData.status === 'ERROR', 'Invalid token should return ERROR status gracefully');
-        assert(testData.message !== undefined, 'Error message must be present');
-        console.log('✓ سێرڤەر بە پارێزراوی وەڵامی تۆکنی نادروست یان بێ ئینتەرنێتی دایەوە بە زمانی کوردی:', testData.message);
+        assert.strictEqual(autoRes.status, 200, 'Toggle auto backup must return 200');
+        const autoData = await autoRes.json();
+        assert.strictEqual(autoData.status, 'SUCCESS', 'Toggle auto status must be SUCCESS');
+        console.log('✓ دۆخی باکئەپی خۆکار گۆڕدرا بە سەرکەوتوویی');
 
-        // --- 4. Test Missing Token/Chat ID Validation ---
-        console.log('\n--- ٤. پشکنینی پەیامی هەڵە لە نەبوونی تۆکن یان چات ئایدی ---');
-        const emptyTestRes = await fetch(`${API_BASE}/telegram/test`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bot_token: '', chat_id: '' })
-        });
-        const emptyData = await emptyTestRes.json();
-        assert.strictEqual(emptyTestRes.status, 400, 'Should return 400 for empty inputs');
-        assert(emptyData.message.includes('Bot Token'), 'Should prompt for Bot Token');
-        console.log('✓ پەیامی ئاگاداری دروست نیشاندرا:', emptyData.message);
-
-        // --- 5. Test Send Snapshot Validation (Non-existent snapshot) ---
-        console.log('\n--- ٥. پشکنینی ناردنی کۆپییەکی دیاریکراو بۆ تێلیگرام ---');
+        // --- 5. Test Non-existent Snapshot Handling ---
+        console.log('\n--- ٥. پشکنینی پارێزگاری لە نەبوونی فایلی سناپشات ---');
         const snapRes = await fetch(`${API_BASE}/telegram/send-snapshot/non_existent_file.json`, {
             method: 'POST'
         });
         assert.strictEqual(snapRes.status, 404, 'Non-existent snapshot should return 404');
         console.log('✓ نەبوونی فایل بە دروستی مامەڵەی لەگەڵدا کرا (404 Not Found)');
 
-        // --- 6. Clean up settings for fresh state ---
-        console.log('\n--- ٦. پاککردنەوە و ڕێکخستنی بنەڕەتی ---');
-        await fetch(`${API_BASE}/telegram/settings`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                bot_token: '',
-                chat_id: '',
-                auto_backup_enabled: false,
-                backup_frequency: 'DAILY'
-            })
+        // --- 6. Clean up: Delete Test Recipient ---
+        console.log('\n--- ٦. پاککردنەوە: سڕینەوەی وەرگری تاقیکاری (Delete Recipient) ---');
+        const delRes = await fetch(`${API_BASE}/telegram/recipients/${createdRecipientId}`, {
+            method: 'DELETE'
         });
-        console.log('✓ ڕێکخستنەکان گەڕێنرانەوە دۆخی دەستپێک');
+        assert.strictEqual(delRes.status, 200, 'Delete recipient must return 200');
+        const delData = await delRes.json();
+        assert.strictEqual(delData.status, 'SUCCESS', 'Delete status must be SUCCESS');
+
+        // Confirm deleted
+        const finalRes = await fetch(`${API_BASE}/telegram/settings`);
+        const finalData = await finalRes.json();
+        const stillExists = finalData.data.recipients.some(r => r.id === createdRecipientId);
+        assert(!stillExists, 'Deleted recipient must not exist in list');
+        console.log('✓ وەرگری تاقیکاری بە سەرکەوتوویی لە داتابەیس پاککرایەوە');
 
         console.log('\n================================================================');
-        console.log('🎉 هەموو تاقیکردنەوەکانی باکئەپی تێلیگرام بە سەرکەوتوویی تەواو بوون!');
+        console.log('🎉 هەموو تاقیکردنەوەکانی باکئەپی فرە-وەرگری تێلیگرام ١٠٠٪ سەرکەوتوون!');
         console.log('================================================================');
     } catch (err) {
         console.error('❌ تاقیکردنەوە سەرکەوتوو نەبوو:', err);
+        // Clean up if recipient was created
+        if (createdRecipientId) {
+            try {
+                await fetch(`${API_BASE}/telegram/recipients/${createdRecipientId}`, { method: 'DELETE' });
+            } catch (_) {}
+        }
         process.exit(1);
     }
 }

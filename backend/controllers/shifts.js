@@ -11,21 +11,22 @@ exports.getCurrentShift = async (req, res) => {
         const shift = rows[0];
         const openedAt = shift.opened_at;
 
-        // 1. Sales in this shift
+        // 1. Sales in this shift - exactly querying paid_amount (cash) and debt_amount
         const [salesRows] = await db.query(
-            "SELECT COALESCE(SUM(total_amount), 0) as total_sales, COUNT(id) as sale_count FROM Sales WHERE created_at >= ?",
+            "SELECT COALESCE(SUM(total_amount), 0) as total_sales, COALESCE(SUM(paid_amount), 0) as cash_sales, COALESCE(SUM(debt_amount), 0) as debt_sales, COUNT(id) as sale_count FROM Sales WHERE created_at >= ?",
             [openedAt]
         );
         const totalSales = Number(salesRows[0].total_sales) || 0;
+        const cashSales = Number(salesRows[0].cash_sales) || 0;
+        const debtSales = Number(salesRows[0].debt_sales) || 0;
         const saleCount = Number(salesRows[0].sale_count) || 0;
 
-        // 2. Debt sales in this shift
-        const [debtRows] = await db.query(
-            "SELECT COALESCE(SUM(amount), 0) as debt_sales FROM Customer_Debts WHERE transaction_type = 'ADD' AND created_at >= ?",
+        // 2. Debtor cash payments collected during this shift (Customer payments made in cash where sale_id IS NULL)
+        const [debtRepayRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as debt_repaid FROM Customer_Debts WHERE transaction_type = 'PAY' AND sale_id IS NULL AND created_at >= ?",
             [openedAt]
         );
-        const debtSales = Number(debtRows[0].debt_sales) || 0;
-        const cashSales = Math.max(0, totalSales - debtSales);
+        const debtRepaidCash = Number(debtRepayRows[0].debt_repaid) || 0;
 
         // 3. Cash refunds during this shift
         const [refundRows] = await db.query(
@@ -42,9 +43,9 @@ exports.getCurrentShift = async (req, res) => {
         );
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
 
-        // 5. Expected cash in register (Opening Cash + Cash Sales - Expenses - Cash Refunds)
+        // 5. Expected cash in register (Opening Cash + Cash Sales + Debtor Cash Payments - Expenses - Cash Refunds)
         const openingCash = Number(shift.opening_cash) || 0;
-        const expectedCash = openingCash + cashSales - expensesPaid - cashRefunds;
+        const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
 
         res.json({
             status: 'SUCCESS',
@@ -55,6 +56,7 @@ exports.getCurrentShift = async (req, res) => {
                     total_sales: totalSales,
                     cash_sales: cashSales,
                     debt_sales: debtSales,
+                    debt_repaid_cash: debtRepaidCash,
                     cash_refunds: cashRefunds,
                     expenses_paid: expensesPaid,
                     expected_cash: expectedCash,
@@ -121,17 +123,18 @@ exports.closeShift = async (req, res) => {
 
         // Calculate real-time stats
         const [salesRows] = await db.query(
-            "SELECT COALESCE(SUM(total_amount), 0) as total_sales FROM Sales WHERE created_at >= ?",
+            "SELECT COALESCE(SUM(total_amount), 0) as total_sales, COALESCE(SUM(paid_amount), 0) as cash_sales, COALESCE(SUM(debt_amount), 0) as debt_sales FROM Sales WHERE created_at >= ?",
             [openedAt]
         );
         const totalSales = Number(salesRows[0].total_sales) || 0;
+        const cashSales = Number(salesRows[0].cash_sales) || 0;
+        const debtSales = Number(salesRows[0].debt_sales) || 0;
 
-        const [debtRows] = await db.query(
-            "SELECT COALESCE(SUM(amount), 0) as debt_sales FROM Customer_Debts WHERE transaction_type = 'ADD' AND created_at >= ?",
+        const [debtRepayRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as debt_repaid FROM Customer_Debts WHERE transaction_type = 'PAY' AND sale_id IS NULL AND created_at >= ?",
             [openedAt]
         );
-        const debtSales = Number(debtRows[0].debt_sales) || 0;
-        const cashSales = Math.max(0, totalSales - debtSales);
+        const debtRepaidCash = Number(debtRepayRows[0].debt_repaid) || 0;
 
         const [refundRows] = await db.query(
             "SELECT COALESCE(SUM(refunded_amount), 0) as cash_refunds FROM Returns WHERE refund_method = 'CASH' AND created_at >= ?",
@@ -146,7 +149,7 @@ exports.closeShift = async (req, res) => {
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
 
         const openingCash = Number(shift.opening_cash) || 0;
-        const expectedCash = openingCash + cashSales - expensesPaid - cashRefunds;
+        const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
         const countedCash = Math.max(0, Math.round(Number(actual_cash) || 0));
         const diff = countedCash - expectedCash;
 

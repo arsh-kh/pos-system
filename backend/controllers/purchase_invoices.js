@@ -41,10 +41,12 @@ exports.createPurchaseInvoice = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // Calculate items subtotal from items safely
+        // Calculate items subtotal from items safely (supports fractional quantities like 1.5 kg)
         let items_subtotal = 0n;
         for (const item of items) {
-            items_subtotal += safeBigInt(item.cost_price) * safeBigInt(item.quantity);
+            const rawCostNum = Math.max(0, Math.round(Number(item.cost_price) || 0));
+            const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
+            items_subtotal += safeBigInt(Math.round(rawCostNum * itemQtyNum));
         }
 
         // Grand Total = Items Subtotal + Additional Cost (Delivery / Lifting / Transport)
@@ -81,9 +83,9 @@ exports.createPurchaseInvoice = async (req, res) => {
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const rawCost = safeBigInt(item.cost_price);
-            const itemQty = safeBigInt(item.quantity);
-            const itemSubtotal = rawCost * itemQty;
+            const rawCostNum = Math.max(0, Math.round(Number(item.cost_price) || 0));
+            const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
+            const itemSubtotal = safeBigInt(Math.round(rawCostNum * itemQtyNum));
 
             let allocatedCostForItem = 0n;
             if (additionalCostBigInt > 0n && items_subtotal > 0n) {
@@ -96,8 +98,8 @@ exports.createPurchaseInvoice = async (req, res) => {
                 }
             }
 
-            const additionalPerUnit = itemQty > 0n ? (allocatedCostForItem / itemQty) : 0n;
-            const landedUnitCost = rawCost + additionalPerUnit;
+            const additionalPerUnit = itemQtyNum > 0 ? Math.round(Number(allocatedCostForItem) / itemQtyNum) : 0;
+            const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
 
             // Record both raw supplier invoice cost and landed unit cost
             await connection.query(
@@ -105,8 +107,8 @@ exports.createPurchaseInvoice = async (req, res) => {
                 [
                     invoice_id, 
                     item.product_id, 
-                    item.quantity, 
-                    rawCost.toString(), 
+                    itemQtyNum, 
+                    safeBigInt(rawCostNum).toString(), 
                     landedUnitCost.toString(), 
                     item.selling_price ? safeBigInt(item.selling_price).toString() : null
                 ]
@@ -131,18 +133,19 @@ exports.createPurchaseInvoice = async (req, res) => {
                 item.product_id,
                 invoice_id,
                 batchNum,
-                item.quantity,
-                item.quantity,
+                itemQtyNum,
+                itemQtyNum,
                 landedUnitCost.toString(),
                 item.selling_price ? safeBigInt(item.selling_price).toString() : null,
                 item.expiry_date || null,
                 dateVal
             ]);
 
-            // Update Products stock and set catalog cost_price to landedUnitCost
+            // Update Products stock, update cost_price to landedUnitCost, and only update selling_price if provided
+            const newSellPrice = item.selling_price ? safeBigInt(item.selling_price).toString() : null;
             await connection.query(
-                'UPDATE Products SET stock = stock + ?, cost_price = ?, selling_price = ? WHERE id = ?',
-                [item.quantity, landedUnitCost.toString(), item.selling_price, item.product_id]
+                'UPDATE Products SET stock = stock + ?, cost_price = ?, selling_price = COALESCE(?, selling_price) WHERE id = ?',
+                [itemQtyNum, landedUnitCost.toString(), newSellPrice, item.product_id]
             );
         }
 

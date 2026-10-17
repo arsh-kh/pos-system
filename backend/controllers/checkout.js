@@ -160,7 +160,8 @@ exports.processCheckout = async (req, res) => {
         const subtotal = totalAmount;
         const discountVal = safeBigInt(discount_amount || 0);
         const finalTotal = subtotal > discountVal ? (subtotal - discountVal) : 0n;
-        const finalProfit = totalProfit > discountVal ? (totalProfit - discountVal) : 0n;
+        // True signed net profit: discounts below cost legitimately result in negative profit (loss)
+        const finalProfit = totalProfit - discountVal;
 
         // Determine Payment Mode and Breakdowns
         let method = (payment_method || '').toUpperCase();

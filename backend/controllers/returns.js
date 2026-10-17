@@ -125,7 +125,18 @@ exports.processReturn = async (req, res) => {
         }
 
         const priceAtSale = Number(saleItem.price_at_sale) || 0;
-        const refundedAmount = Math.round(priceAtSale * returnQty);
+        let refundedAmount = Math.round(priceAtSale * returnQty);
+
+        // Cap cumulative refunds to the actual net sale.total_amount if invoice had manual discount
+        const [totalRefundsForSale] = await connection.query(
+            'SELECT COALESCE(SUM(refunded_amount), 0) as already_refunded FROM Returns WHERE sale_id = ?',
+            [sale_id]
+        );
+        const alreadyRefundedTotal = Number(totalRefundsForSale[0].already_refunded) || 0;
+        const saleTotalAmount = Number(sale.total_amount) || 0;
+        if (alreadyRefundedTotal + refundedAmount > saleTotalAmount) {
+            refundedAmount = Math.max(0, saleTotalAmount - alreadyRefundedTotal);
+        }
 
         // Account for carton multiplier when restoring stock
         const isBox = saleItem.unit_type === 'BOX';
@@ -168,6 +179,46 @@ exports.processReturn = async (req, res) => {
             'UPDATE Products SET stock = stock + ? WHERE id = ?',
             [stockToAdd, product_id]
         );
+
+        // 4. Restore Product_Batches FIFO remaining quantity
+        let remStockToRestore = Number(stockToAdd);
+        const [saleBatches] = await connection.query(`
+            SELECT sib.batch_id, sib.quantity_deducted, pb.remaining_quantity
+            FROM Sale_Item_Batches sib
+            JOIN Product_Batches pb ON sib.batch_id = pb.id
+            WHERE sib.sale_id = ? AND sib.sale_item_id = ?
+            ORDER BY sib.id DESC
+        `, [sale_id, saleItem.id]);
+
+        if (saleBatches.length > 0) {
+            for (const sb of saleBatches) {
+                if (remStockToRestore <= 0) break;
+                const addBack = Math.min(remStockToRestore, Number(sb.quantity_deducted));
+                const newRem = Number(sb.remaining_quantity) + addBack;
+                await connection.query(
+                    "UPDATE Product_Batches SET remaining_quantity = ?, status = 'ACTIVE' WHERE id = ?",
+                    [newRem, sb.batch_id]
+                );
+                remStockToRestore -= addBack;
+            }
+        }
+
+        if (remStockToRestore > 0) {
+            const [latestBatches] = await connection.query(`
+                SELECT id, remaining_quantity FROM Product_Batches 
+                WHERE product_id = ? 
+                ORDER BY id DESC LIMIT 1
+            `, [product_id]);
+
+            if (latestBatches.length > 0) {
+                const lb = latestBatches[0];
+                const newRem = Number(lb.remaining_quantity) + remStockToRestore;
+                await connection.query(
+                    "UPDATE Product_Batches SET remaining_quantity = ?, status = 'ACTIVE' WHERE id = ?",
+                    [newRem, lb.id]
+                );
+            }
+        }
 
         await connection.commit();
 

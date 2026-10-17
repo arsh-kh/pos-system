@@ -16,6 +16,17 @@ exports.getDashboardStats = async (req, res) => {
             WHERE MONTH(expense_date) = MONTH(CURRENT_DATE()) AND YEAR(expense_date) = YEAR(CURRENT_DATE())
         `);
 
+        // This Month Customer Returns (گەڕێنراوەی کڕیار)
+        const [returnsMonth] = await db.query(`
+            SELECT 
+                COALESCE(SUM(r.refunded_amount), 0) as total_refunded,
+                COALESCE(SUM(r.refunded_amount - (r.quantity * r.units_multiplier * COALESCE(p.cost_price, 0))), 0) as returned_profit,
+                COUNT(r.id) as total_returns_count
+            FROM Returns r
+            LEFT JOIN Products p ON r.product_id = p.id
+            WHERE MONTH(r.created_at) = MONTH(CURRENT_DATE()) AND YEAR(r.created_at) = YEAR(CURRENT_DATE())
+        `);
+
         // This Month Wastage / Damages Loss (زیان و فەوتانی بێداهات)
         const [damagesMonth] = await db.query(`
             SELECT 
@@ -27,15 +38,25 @@ exports.getDashboardStats = async (req, res) => {
         `);
 
         const totalExpenses = Number(expensesMonth[0].total_expenses) || 0;
+        const totalRefunded = Number(returnsMonth[0].total_refunded) || 0;
+        const returnedProfit = Math.max(0, Number(returnsMonth[0].returned_profit) || 0);
+        const totalReturnsCount = Number(returnsMonth[0].total_returns_count) || 0;
+
         const totalDamagesLoss = Number(damagesMonth[0].total_damages_loss) || 0;
         const totalDamagesUnits = Number(damagesMonth[0].total_damages_units) || 0;
         const totalDamagesRecords = Number(damagesMonth[0].total_damages_records) || 0;
 
-        const grossProfit = Number(thisMonth[0].total_profit) || 0;
-        // True Net Profit (قازانجی ڕاستەقینە): Gross Profit - Store Expenses - Wastage Loss
-        const netProfit = grossProfit - totalExpenses - totalDamagesLoss;
+        const rawSales = Number(thisMonth[0].total_sales) || 0;
+        const rawGrossProfit = Number(thisMonth[0].total_profit) || 0;
 
-        // Daily Chart Data
+        // Net Sales after Customer Returns
+        const netSales = Math.max(0, rawSales - totalRefunded);
+        // Adjusted Gross Profit after returned items
+        const adjustedGrossProfit = rawGrossProfit - returnedProfit;
+        // True Net Profit: Adjusted Gross Profit - Store Expenses - Wastage Loss
+        const netProfit = adjustedGrossProfit - totalExpenses - totalDamagesLoss;
+
+        // Daily Chart Data (Sales net of returns)
         const [dailyStats] = await db.query(`
             SELECT DATE(created_at) as date, SUM(total_amount) as sales, SUM(total_profit) as profit 
             FROM Sales 
@@ -49,7 +70,12 @@ exports.getDashboardStats = async (req, res) => {
             data: { 
                 current_month: {
                     ...thisMonth[0],
-                    gross_profit: grossProfit,
+                    raw_sales: rawSales,
+                    total_sales: netSales,
+                    total_refunded: totalRefunded,
+                    total_returns_count: totalReturnsCount,
+                    raw_gross_profit: rawGrossProfit,
+                    gross_profit: adjustedGrossProfit,
                     total_expenses: totalExpenses,
                     total_damages_loss: totalDamagesLoss,
                     total_damages_units: totalDamagesUnits,

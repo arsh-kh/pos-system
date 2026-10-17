@@ -310,17 +310,23 @@ const Cashier = () => {
       return;
     }
     const name = scaleItemName.trim() || 'کاڵا بە کێش / تەرازوو';
+    const selectedProd = scaleSelectedProductId ? products.find(p => String(p.id) === String(scaleSelectedProductId)) : null;
+    const isCustomScale = !selectedProd;
+
     const scaleItem = {
-      id: `scale_${Date.now()}`,
-      name: `${name} (${weight} کگم)`,
-      barcode: `SCALE_${Date.now()}`,
+      id: selectedProd ? selectedProd.id : `scale_${Date.now()}`,
+      cartKey: selectedProd ? `${selectedProd.id}_PIECE` : `scale_${Date.now()}`,
+      name: selectedProd ? `${selectedProd.name} (${weight} کگم)` : `${name} (${weight} کگم)`,
+      barcode: selectedProd ? selectedProd.barcode : `SCALE_${Date.now()}`,
       price: pricePerKg,
       selling_price: pricePerKg,
-      stock: 999,
+      stock: selectedProd ? selectedProd.stock : 999,
       quantity: weight,
-      is_custom: true,
+      is_custom: isCustomScale,
       is_weighted: true,
-      unit: 'کگم'
+      unit: 'کگم',
+      unit_type: 'PIECE',
+      units_per_box: 1
     };
     setCart(prev => [scaleItem, ...prev]);
     setScaleItemName('');
