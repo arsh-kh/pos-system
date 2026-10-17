@@ -3,7 +3,7 @@ import {
   Moon, Sun, Database, Shield, CheckCircle2, AlertTriangle, 
   Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
   AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
-  Wifi, WifiOff, Cloud, Globe, Filter
+  Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -37,6 +37,19 @@ const Settings = () => {
   const [autoSyncToggle, setAutoSyncToggle] = useState(true);
   const [syncFilter, setSyncFilter] = useState('ALL'); // 'ALL', 'PENDING', 'SYNCED', 'FAILED'
 
+  // Telegram Cloud Backup State
+  const [telegramSettings, setTelegramSettings] = useState(null);
+  const [telegramTokenInput, setTelegramTokenInput] = useState('');
+  const [telegramChatIdInput, setTelegramChatIdInput] = useState('');
+  const [telegramAutoBackup, setTelegramAutoBackup] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramSaving, setTelegramSaving] = useState(false);
+  const [telegramSending, setTelegramSending] = useState(false);
+  const [telegramSendSnapLoading, setTelegramSendSnapLoading] = useState(null);
+  const [telegramNotice, setTelegramNotice] = useState(null);
+  const [showTelegramHelp, setShowTelegramHelp] = useState(false);
+
   // Restore Modal State
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [pendingBackupData, setPendingBackupData] = useState(null);
@@ -63,14 +76,16 @@ const Settings = () => {
   const fetchBackupData = async () => {
     setStatsLoading(true);
     try {
-      const [statsRes, snapsRes, syncRes] = await Promise.all([
+      const [statsRes, snapsRes, syncRes, tgRes] = await Promise.all([
         fetch('http://localhost:3001/api/backup/stats'),
         fetch('http://localhost:3001/api/backup/local-snapshots'),
-        fetch('http://localhost:3001/api/sync/status')
+        fetch('http://localhost:3001/api/sync/status'),
+        fetch('http://localhost:3001/api/backup/telegram/settings')
       ]);
       const statsJson = await statsRes.json();
       const snapsJson = await snapsRes.json();
       const syncJson = await syncRes.json();
+      const tgJson = await tgRes.json();
       if (statsJson.status === 'SUCCESS') setBackupStats(statsJson.data);
       if (snapsJson.status === 'SUCCESS') setLocalSnapshots(snapsJson.data);
       if (syncJson.status === 'SUCCESS') {
@@ -79,6 +94,12 @@ const Settings = () => {
           setCloudUrlInput(syncJson.data.settings.cloud_url || 'http://localhost:3001/api/cloud-sync');
           setAutoSyncToggle(syncJson.data.settings.auto_sync_enabled);
         }
+      }
+      if (tgJson.status === 'SUCCESS' && tgJson.data) {
+        setTelegramSettings(tgJson.data);
+        setTelegramTokenInput(tgJson.data.bot_token || '');
+        setTelegramChatIdInput(tgJson.data.chat_id || '');
+        setTelegramAutoBackup(Boolean(tgJson.data.auto_backup_enabled));
       }
     } catch (err) {
       console.error('Error fetching backup & sync info:', err);
@@ -263,6 +284,108 @@ const Settings = () => {
       fetchBackupData();
     } catch (err) {
       alert('هەڵە لە پاککردنەوە: ' + err.message);
+    }
+  };
+
+  // Handle Telegram Settings Save
+  const handleSaveTelegramSettings = async () => {
+    setTelegramSaving(true);
+    setTelegramNotice(null);
+    try {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bot_token: telegramTokenInput,
+          chat_id: telegramChatIdInput,
+          auto_backup_enabled: telegramAutoBackup,
+          backup_frequency: 'DAILY'
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        setTelegramNotice({ type: 'success', message: 'ڕێکخستنەکانی تێلیگرام بە سەرکەوتوویی پاشەکەوت کران' });
+        fetchBackupData();
+      } else {
+        setTelegramNotice({ type: 'error', message: data.message || 'هەڵە لە پاشەکەوتکردن' });
+      }
+    } catch (err) {
+      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
+    } finally {
+      setTelegramSaving(false);
+      setTimeout(() => setTelegramNotice(null), 6000);
+    }
+  };
+
+  // Handle Telegram Test Connection
+  const handleTestTelegramConnection = async () => {
+    setTelegramTesting(true);
+    setTelegramNotice(null);
+    try {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bot_token: telegramTokenInput,
+          chat_id: telegramChatIdInput
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        setTelegramNotice({ type: 'success', message: data.message });
+      } else {
+        setTelegramNotice({ type: 'error', message: data.message || 'پشکنین سەرکەوتوو نەبوو' });
+      }
+    } catch (err) {
+      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
+    } finally {
+      setTelegramTesting(false);
+    }
+  };
+
+  // Handle Manual Instant Backup Send to Telegram
+  const handleSendBackupToTelegram = async () => {
+    setTelegramSending(true);
+    setTelegramNotice(null);
+    try {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/send', {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        setTelegramNotice({ 
+          type: 'success', 
+          message: `باکئەپەکە بە سەرکەوتوویی بۆ تێلیگرام نێردرا! (${data.data.filename} - ${Math.round(data.data.sizeBytes / 1024)} KB)` 
+        });
+        fetchBackupData();
+      } else {
+        setTelegramNotice({ type: 'error', message: data.message || 'ناردن سەرکەوتوو نەبوو' });
+      }
+    } catch (err) {
+      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
+    } finally {
+      setTelegramSending(false);
+    }
+  };
+
+  // Handle Dispatch Specific Snapshot to Telegram
+  const handleSendSnapshotToTelegram = async (filename) => {
+    setTelegramSendSnapLoading(filename);
+    try {
+      const res = await fetch(`http://localhost:3001/api/backup/telegram/send-snapshot/${encodeURIComponent(filename)}`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        alert(data.message);
+        fetchBackupData();
+      } else {
+        alert('هەڵە لە ناردنی کۆپی بۆ تێلیگرام: ' + (data.message || 'نەزانراو'));
+      }
+    } catch (err) {
+      alert('پەیوەندی سەرکەوتوو نەبوو: ' + err.message);
+    } finally {
+      setTelegramSendSnapLoading(null);
     }
   };
 
@@ -550,6 +673,142 @@ const Settings = () => {
           </div>
         </div>
 
+        {/* Telegram Cloud Backup Card */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#229ED9' }}>
+              <Send size={24} /> باکئەپی کلاودی تێلیگرام
+            </h3>
+            <button
+              onClick={() => setShowTelegramHelp(!showTelegramHelp)}
+              style={{ background: 'rgba(34, 158, 217, 0.15)', border: '1px solid rgba(34, 158, 217, 0.3)', color: '#38bdf8', padding: '4px 10px', borderRadius: '10px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              <HelpCircle size={14} /> {showTelegramHelp ? 'شاردنەوەی ڕێنمایی' : 'چۆن کار دەکات؟'}
+            </button>
+          </div>
+
+          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.2rem', lineHeight: '1.5' }}>
+            ناردنی فایلی تەواوی باکئەپی داتابەیس بۆ ناو تێلیگرامی خاوەنکار. ئەگەر کۆمپیوتەر یان هارد دیسک بسووتێت، هەموو داتاکانت لەسەر مۆبایلەکەت پارێزراوە!
+          </p>
+
+          {/* Quick Help Box */}
+          {showTelegramHelp && (
+            <div style={{ padding: '1rem', background: 'rgba(34, 158, 217, 0.08)', borderRadius: '14px', border: '1px solid rgba(34, 158, 217, 0.25)', marginBottom: '1.2rem', fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.6' }}>
+              <div style={{ fontWeight: 'bold', color: '#38bdf8', marginBottom: '6px' }}>📌 ڕێنمایی بەدەستهێنانی تۆکن و Chat ID:</div>
+              <ol style={{ margin: 0, paddingRight: '1.2rem' }}>
+                <li>لە تێلیگرام بچۆ ناو <strong>@BotFather</strong> و فەرمانی <code>/newbot</code> لێبدە بۆ دروستکردنی بۆت و کۆپیکردنی Bot Token.</li>
+                <li>بچۆ ناو <strong>@userinfobot</strong> و فەرمانی <code>/start</code> لێبدە؛ ژمارەی <code>Id</code>ی خۆت کۆپی بکە بۆ خوارەوە.</li>
+                <li><strong>زۆر گرنگ:</strong> پێش ناردن، لەناو تێلیگرام نامەیەک بۆ بۆتەکەت بنێرە (یان Start لێبدە) تاوەکو بۆتەکە مۆڵەتی ناردنی نامەی بۆ تۆ هەبێت!</li>
+              </ol>
+            </div>
+          )}
+
+          {/* Status Alert if any */}
+          {telegramNotice && (
+            <div style={{ padding: '0.75rem 1rem', borderRadius: '12px', marginBottom: '1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', background: telegramNotice.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: telegramNotice.type === 'success' ? '#34d399' : '#f87171', border: `1px solid ${telegramNotice.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
+              {telegramNotice.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              <span>{telegramNotice.message}</span>
+            </div>
+          )}
+
+          {/* Last Sent Info */}
+          <div style={{ padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '1.2rem', fontSize: '0.82rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+            <div>
+              <span style={{ color: '#cbd5e1' }}>دواین باکئەپی تێلیگرام: </span>
+              {telegramSettings?.last_sent_at ? (
+                <span style={{ color: '#34d399', fontWeight: 'bold' }}>
+                  {new Date(telegramSettings.last_sent_at).toLocaleString('en-GB')}
+                </span>
+              ) : (
+                <span>هێشتا نەنێردراوە</span>
+              )}
+            </div>
+            {telegramSettings?.last_status && telegramSettings.last_status !== 'NONE' && (
+              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', background: telegramSettings.last_status === 'SUCCESS' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: telegramSettings.last_status === 'SUCCESS' ? '#34d399' : '#f87171' }}>
+                {telegramSettings.last_status === 'SUCCESS' ? 'سەرکەوتوو' : 'شکستهێناوە'}
+              </span>
+            )}
+          </div>
+
+          {/* Form Inputs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginBottom: '1.2rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                تۆکنی بۆتی تێلیگرام (Bot Token):
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showToken ? 'text' : 'password'}
+                  placeholder={telegramSettings?.masked_token || '123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ'}
+                  value={telegramTokenInput}
+                  onChange={e => setTelegramTokenInput(e.target.value)}
+                  style={{ width: '100%', padding: '9px 40px 9px 12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.88rem', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                  style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                >
+                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                ناسنامەی چات (Chat ID / Group ID):
+              </label>
+              <input
+                type="text"
+                placeholder="نموونە: 987654321 یان -100123456789"
+                value={telegramChatIdInput}
+                onChange={e => setTelegramChatIdInput(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.88rem', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#cbd5e1', marginTop: '2px' }}>
+              <input
+                type="checkbox"
+                checked={telegramAutoBackup}
+                onChange={e => setTelegramAutoBackup(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              ناردنی خۆکاری ڕۆژانەی باکئەپ بۆ تێلیگرام (لە کاتی باکئەپی سیستمدا)
+            </label>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <button
+              onClick={handleTestTelegramConnection}
+              disabled={telegramTesting}
+              style={{ flex: 1, padding: '9px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.35)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.88rem', cursor: telegramTesting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <RefreshCw size={15} className={telegramTesting ? 'animate-spin' : ''} />
+              {telegramTesting ? 'پشکنین دەکرێت...' : 'پشکنینی پەیوەندی'}
+            </button>
+            <button
+              onClick={handleSaveTelegramSettings}
+              disabled={telegramSaving}
+              style={{ flex: 1, padding: '9px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.88rem', cursor: telegramSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <Save size={15} />
+              {telegramSaving ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردن'}
+            </button>
+          </div>
+
+          {/* Big Instant Backup to Telegram button */}
+          <button
+            onClick={handleSendBackupToTelegram}
+            disabled={telegramSending}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: 'linear-gradient(135deg, #0284c7, #229ED9)', color: 'white', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: telegramSending ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(34, 158, 217, 0.3)' }}
+          >
+            <Send size={18} className={telegramSending ? 'animate-spin' : ''} />
+            {telegramSending ? 'باکئەپ کۆدەکرێتەوە و دەنێردرێت بۆ تێلیگرام...' : '📤 ناردنی باکئەپی تەواو بۆ تێلیگرام (دەستی)'}
+          </button>
+        </div>
+
       </div>
 
       {/* Local Server Snapshots Section */}
@@ -651,6 +910,15 @@ const Settings = () => {
                             style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', border: '1px solid rgba(192, 132, 252, 0.3)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold' }}
                           >
                             هێنانەوە
+                          </button>
+                          <button 
+                            onClick={() => handleSendSnapshotToTelegram(snap.filename)}
+                            disabled={telegramSendSnapLoading === snap.filename}
+                            title="ناردنی ئەم باکئەپە بۆ سەر تێلیگرامی خاوەنکار"
+                            style={{ padding: '6px 10px', borderRadius: '8px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', cursor: telegramSendSnapLoading === snap.filename ? 'not-allowed' : 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Send size={13} className={telegramSendSnapLoading === snap.filename ? 'animate-spin' : ''} />
+                            {telegramSendSnapLoading === snap.filename ? 'دەچێت...' : 'تێلیگرام'}
                           </button>
                           <button 
                             onClick={() => handleDeleteSnapshot(snap.filename)}

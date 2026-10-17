@@ -586,6 +586,14 @@ const performAutoSnapshot = async () => {
         fs.writeFileSync(localFilePath, safeJsonStringify(backupData), 'utf8');
         console.log(`✓ Automated daily backup snapshot created: ${filename}`);
 
+        // Automatically dispatch to Telegram if configured
+        try {
+            const { dispatchAutoTelegramBackup } = require('./telegram_backup');
+            dispatchAutoTelegramBackup(filename, localFilePath, backupData);
+        } catch (tgErr) {
+            console.warn('Auto Telegram dispatch notice:', tgErr.message);
+        }
+
         // Rotate: keep latest 14 snapshots
         const existingFiles = fs.readdirSync(BACKUPS_DIR)
             .filter(f => f.endsWith('.json'))
