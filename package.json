@@ -31,19 +31,24 @@
     "files": [
       "dist/**/*",
       "backend/**/*",
+      "build/icon.png",
       "main.cjs",
       "package.json"
     ],
     "win": {
       "target": "nsis",
+      "icon": "build/icon.ico",
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": "always",
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "سیستەمی مارکێت POS",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "uninstallDisplayName": "سیستەمی مارکێت POS - Market POS System",
       "runAfterFinish": true,
       "artifactName": "MarketPOS_Setup.${ext}",
       "deleteAppDataOnUninstall": false

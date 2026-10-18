@@ -1,8 +1,15 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, utilityProcess } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
+
+// Enforce single-instance lock to prevent port collisions and database locks
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log('Another instance of Market POS is already running. Quitting.');
+  app.quit();
+}
 
 let mainWindow = null;
 let backendProcess = null;
@@ -100,12 +107,22 @@ async function ensureBackendProcess() {
 }
 
 function createWindow() {
+  Menu.setApplicationMenu(null);
+
+  const iconCandidates = [
+    path.join(__dirname, 'build', 'icon.png'),
+    path.join(__dirname, 'public', 'icon.png'),
+    path.join(__dirname, 'build', 'icon.ico')
+  ];
+  const appIcon = iconCandidates.find(p => fs.existsSync(p));
+
   mainWindow = new BrowserWindow({
     width: 1366,
     height: 850,
     minWidth: 1024,
     minHeight: 700,
-    title: 'سیستەمی بەڕێوەبردنی مارکێت - Market POS',
+    title: 'سیستەمی مارکێت POS - Market POS System',
+    icon: appIcon,
     backgroundColor: '#0f172a',
     autoHideMenuBar: true,
     webPreferences: {
@@ -130,7 +147,15 @@ function createWindow() {
   }
 }
 
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 app.whenReady().then(async () => {
+  if (!gotTheLock) return;
   await ensureBackendProcess();
   createWindow();
 });
