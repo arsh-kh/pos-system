@@ -114,11 +114,19 @@ function createWindow() {
     }
   });
 
-  const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged;
+  const distPath = path.join(__dirname, 'dist', 'index.html');
+  const isDev = process.env.NODE_ENV === 'development';
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173').catch(() => {
+      if (fs.existsSync(distPath)) {
+        mainWindow.loadFile(distPath);
+      }
+    });
+  } else if (fs.existsSync(distPath)) {
+    mainWindow.loadFile(distPath);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    mainWindow.loadURL('http://localhost:5173');
   }
 }
 

@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 title دەستپێکردنی سیستەمی مارکێت - Market POS
 color 0b
 echo ========================================================
@@ -11,6 +12,7 @@ cd /d "%~dp0"
 start "POS Backend Server" /min cmd /c "cd backend && node server.js"
 
 :: 2. Launch Electron Desktop Window
+set NODE_ENV=production
 start "POS Desktop" cmd /c "npx electron ."
 
 exit
