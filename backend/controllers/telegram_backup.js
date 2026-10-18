@@ -3,6 +3,11 @@ const db = require('../db');
 const fs = require('fs');
 const path = require('path');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { 
+    handleIncomingBotCommand, 
+    sendNightlyBackupAndSummary, 
+    getDailyFinancialSummary 
+} = require('../services/telegramNightlyScheduler');
 
 const BACKUPS_DIR = path.resolve(__dirname, '../backups');
 
@@ -174,6 +179,15 @@ const pollTelegramUpdates = async () => {
                             })
                         });
                     } catch (_) {}
+                }
+
+                // Handle interactive two-way bot commands (/today, /backup, /status, /help)
+                if (msg.text && typeof msg.text === 'string') {
+                    try {
+                        await handleIncomingBotCommand(chatId, msg.text, senderName);
+                    } catch (cmdErr) {
+                        console.warn('Bot command processing error:', cmdErr.message);
+                    }
                 }
             }
         }
@@ -643,6 +657,48 @@ exports.autoDetectChatId = async (req, res) => {
         message: `لیستی وەرگران نوێکرایەوە (${recipients.length} وەرگر دۆزرایەوە)`,
         data: recipients
     });
+};
+
+/**
+ * Trigger Nightly Summary & Full Backup On-Demand (Admin / Automated Trigger)
+ * POST /api/backup/telegram/trigger-nightly
+ */
+exports.triggerNightlySummary = async (req, res) => {
+    try {
+        const result = await sendNightlyBackupAndSummary(true);
+        if (result.success) {
+            res.json({
+                status: 'SUCCESS',
+                message: `کورتەی ڕۆژانە و باکئەپی داتابەیس بە سەرکەوتوویی بۆ (${result.count}) وەرگر نێردرا!`,
+                data: result
+            });
+        } else {
+            res.status(400).json({
+                status: 'ERROR',
+                message: `نەتوانرا بنێردرێت: ${result.reason || result.error || 'هەڵەی نەزانراو'}`
+            });
+        }
+    } catch (error) {
+        console.error('triggerNightlySummary error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
+ * Get Daily Financial Summary JSON
+ * GET /api/backup/telegram/daily-summary
+ */
+exports.getDailySummary = async (req, res) => {
+    try {
+        const { date } = req.query;
+        const summary = await getDailyFinancialSummary(date || null);
+        res.json({
+            status: 'SUCCESS',
+            data: summary
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
 };
 
 module.exports = exports;

@@ -17,7 +17,7 @@ async function getBotToken() {
  */
 async function sendTelegramBroadcast(text, parseMode = 'Markdown') {
     try {
-        const [recipients] = await db.query('SELECT chat_id, name FROM Telegram_Recipients WHERE is_active = 1');
+        const [recipients] = await db.query('SELECT chat_id, recipient_name as name FROM Telegram_Recipients WHERE is_active = 1');
         if (!recipients || recipients.length === 0) {
             return { success: false, reason: 'NO_RECIPIENTS' };
         }

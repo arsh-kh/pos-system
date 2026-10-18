@@ -35,16 +35,30 @@ async function ensureBackendProcess() {
     return;
   }
 
-  const serverScript = path.resolve(__dirname, 'backend', 'server.js');
-  if (fs.existsSync(serverScript)) {
-    console.log('🚀 Spawning embedded backend service...');
+  const candidatePaths = [
+    path.resolve(__dirname, 'backend', 'server.js'),
+    path.join(process.resourcesPath || '', 'backend', 'server.js'),
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'backend', 'server.js'),
+    path.resolve(__dirname, '..', 'backend', 'server.js')
+  ];
+
+  const serverScript = candidatePaths.find(p => fs.existsSync(p));
+
+  if (serverScript) {
+    const backendCwd = path.dirname(serverScript);
+    console.log('🚀 Spawning embedded backend service:', serverScript);
     backendProcess = spawn(process.execPath, [serverScript], {
-      cwd: path.resolve(__dirname, 'backend'),
-      env: { ...process.env },
+      cwd: backendCwd,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1'
+      },
       stdio: 'ignore'
     });
     backendProcess.unref();
     console.log('✓ Embedded backend service started (PID: ' + backendProcess.pid + ')');
+  } else {
+    console.warn('⚠️ Backend server.js not found in candidate paths. Assuming external backend.');
   }
 }
 

@@ -35,3 +35,7 @@ backend/.env.*
 # Backups
 backend/backups/*.json
 !backend/backups/.gitkeep
+
+# Electron Installer Builds
+release/
+

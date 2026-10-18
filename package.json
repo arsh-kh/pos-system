@@ -1,7 +1,8 @@
 {
   "name": "pos-frontend",
-  "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "سیستەمی پێشکەوتووی مارکێت و فرۆشتن",
+  "author": "Arsh",
   "type": "module",
   "main": "main.cjs",
   "scripts": {
@@ -18,7 +19,7 @@
   },
   "build": {
     "appId": "com.marketpos.app",
-    "productName": "سیستەمی مارکێت POS",
+    "productName": "MarketPOS",
     "copyright": "Copyright © 2026",
     "directories": {
       "output": "release"

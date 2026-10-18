@@ -23,6 +23,8 @@ router.post('/telegram/toggle-auto', telegramBackupController.toggleAutoBackup);
 router.post('/telegram/send', telegramBackupController.sendBackupToTelegram);
 router.post('/telegram/send-snapshot/:filename', telegramBackupController.sendSnapshotToTelegram);
 router.post('/telegram/auto-detect', telegramBackupController.autoDetectChatId);
+router.post('/telegram/trigger-nightly', telegramBackupController.triggerNightlySummary);
+router.get('/telegram/daily-summary', telegramBackupController.getDailySummary);
 
 module.exports = router;
 

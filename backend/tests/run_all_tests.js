@@ -19,7 +19,8 @@ const testFiles = [
     'test_month_over_month_analytics.js',
     'test_auth_security.js',
     'test_hardware_escpos.js',
-    'test_z_report_and_telegram.js'
+    'test_z_report_and_telegram.js',
+    'test_telegram_nightly.js'
 ];
 
 async function runMasterSuite() {
