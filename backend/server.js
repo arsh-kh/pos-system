@@ -113,6 +113,10 @@ const syncRoutes = require('./routes/sync');
 app.use('/api/sync', syncRoutes);
 app.use('/api/cloud-sync', syncRoutes);
 
+// Cashier Permissions & Roles API (دەسەڵاتە هەڵبژێردراوەکانی کاشێر)
+const permissionsRoutes = require('./routes/permissions');
+app.use('/api/permissions', permissionsRoutes);
+
 // Global Express Error Handler Middleware
 app.use((err, req, res, next) => {
     console.error('Global Express Error Caught:', err);

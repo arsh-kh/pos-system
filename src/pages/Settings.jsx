@@ -19,9 +19,37 @@ if (typeof window !== 'undefined' && typeof window.require === 'function') {
 }
 
 const Settings = () => {
-  const { isAdmin, currentUser, changePassword, lockToCashier } = useAuth();
+  const { isAdmin, currentUser, changePassword, lockToCashier, cashierPermissions, updatePermissions } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [savedNotice, setSavedNotice] = useState(false);
+
+  // Cashier Selected Fields & Permissions State
+  const [permDraft, setPermDraft] = useState({});
+  const [permSaving, setPermSaving] = useState(false);
+  const [permNotice, setPermNotice] = useState('');
+
+  useEffect(() => {
+    if (cashierPermissions?.map) {
+      setPermDraft(cashierPermissions.map);
+    }
+  }, [cashierPermissions]);
+
+  const handleTogglePerm = (key) => {
+    setPermDraft(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleSavePermissions = async () => {
+    setPermSaving(true);
+    setPermNotice('');
+    const res = await updatePermissions(permDraft);
+    setPermSaving(false);
+    if (res?.success) {
+      setPermNotice('دەسەڵاتەکان بە سەرکەوتوویی پاشەکەوت کران ✔');
+      setTimeout(() => setPermNotice(''), 3000);
+    } else {
+      alert(res?.message || 'هەڵە لە نوێکردنەوەی دەسەڵاتەکان');
+    }
+  };
 
   // Admin Security & Password Change State
   const [oldPassword, setOldPassword] = useState('');
@@ -769,6 +797,206 @@ const Settings = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 1.5: Cashier Selected Fields & Permissions Management (دەسەڵاتەکانی کاشێر و دیاریکردنی خانەکان) */}
+      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Shield size={22} color="#10b981" /> دەسەڵاتەکانی کاشێر و دیاریکردنی خانەکان (Cashier Permissions & Fields)
+            </h2>
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+              وەک بەڕێوەبەر، دەتوانیت دیاری بکەیت کاشێر دەستی بە کام بەش و کام کردار و خانەی سیستەمەکە ڕابگات، بۆ ڕێگریکردن لە دەستکاری نەخوازراو.
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {permNotice && (
+              <span style={{ fontSize: '0.85rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>
+                {permNotice}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSavePermissions}
+              disabled={permSaving}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 20px', borderRadius: '12px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#ffffff', border: 'none', fontWeight: 'bold',
+                cursor: permSaving ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Save size={18} />
+              {permSaving ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردنی دەسەڵاتەکان'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', marginBottom: '2.5rem' }}>
+        {/* Sub-section A: POS Actions & Selected Fields inside Cashier Screen */}
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2563eb' }}></span>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+              کردار و خانەکانی ناو شاشەی فرۆشتن (POS Actions & Inputs)
+            </h3>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: 'auto' }}>
+              ڕێگەپێدان یان قفڵکردنی نرخ، داشکاندن و سڕینەوە بۆ کاشێر
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+            {[
+              { key: 'allow_manual_discount', label: 'داشکاندنی دەستی', desc: 'ڕێگەدان بە کاشێر داشکاندن لەسەر پسوولە بکات', color: '#f59e0b' },
+              { key: 'allow_custom_price', label: 'دەستکاری نرخی فرۆشتن', desc: 'ڕێگەدان بە کاشێر نرخی تاکەکەسی کاڵا لە سەبەتە بگۆڕێت', color: '#ef4444' },
+              { key: 'allow_delete_item', label: 'سڕینەوەی کاڵا لە سەبەتە', desc: 'ڕێگەدان بە کاشێر کاڵا لە سەبەتەی کڕین بسڕێتەوە', color: '#ec4899' },
+              { key: 'allow_clear_cart', label: 'بەتاڵکردنەوەی تەواوی سەبەتە', desc: 'ڕێگەدان بە کاشێر تەواوی پسوولەکە بە یەکجار بسڕێتەوە', color: '#f97316' },
+              { key: 'allow_debt_sale', label: 'فرۆشتن بە قەرز', desc: 'ڕێگەدان بە کاشێر پسوولەی قەرز لەسەر کڕیار تۆمار بکات', color: '#8b5cf6' },
+              { key: 'allow_split_payment', label: 'شێوازی پارەدانی فرەچەشن', desc: 'ڕێگەدان بە پارەدانی تێکەڵ (نەقد + قەرز یان کارت)', color: '#06b6d4' },
+              { key: 'allow_view_cost_price', label: 'پیشاندانی نرخی کڕین (تێچوو)', desc: 'کاشێر بتوانێت تێچووی کڕینی کاڵاکان لە کۆگا ببینێت', color: '#64748b' },
+            ].map(item => {
+              const enabled = !!permDraft[item.key];
+              return (
+                <div 
+                  key={item.key}
+                  onClick={() => handleTogglePerm(item.key)}
+                  style={{
+                    padding: '1.1rem',
+                    borderRadius: '16px',
+                    background: enabled ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
+                    border: `1.5px solid ${enabled ? item.color : 'var(--border-color)'}`,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: enabled ? `0 2px 10px ${item.color}22` : 'none'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.92rem', color: enabled ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {item.label}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {item.desc}
+                    </div>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <div style={{
+                    width: '46px',
+                    height: '26px',
+                    borderRadius: '14px',
+                    background: enabled ? item.color : 'rgba(148, 163, 184, 0.3)',
+                    position: 'relative',
+                    transition: 'background 0.2s ease',
+                    flexShrink: 0
+                  }}>
+                    <div style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      position: 'absolute',
+                      top: '3px',
+                      right: enabled ? '4px' : '22px',
+                      transition: 'right 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sub-section B: Modules Access Control (دەسەڵاتی بەشە سەرەکییەکان) */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></span>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+              دەسەڵاتی بەشە سەرەکییەکان (Main Modules & Pages)
+            </h3>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: 'auto' }}>
+              دیاریکردنی کام پەڕانە کاشێر بتوانێت لە داشبۆرد کلیکیان لەسەر بکات
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+            {[
+              { key: 'pos_cashier', label: 'فرۆشتن و کاشێر (POS)', desc: 'دەستڕاگەیشتن بە شاشەی سەرەکی فرۆشتن', color: '#2563eb' },
+              { key: 'pos_products', label: 'کۆگا و کاڵاکان', desc: 'بینین و گەڕان لە لیستی کاڵاکان', color: '#0284c7' },
+              { key: 'pos_returns', label: 'گەڕانەوەی کاڵا', desc: 'وەرگرتنەوەی پسوولە و کاڵای گەڕاوە', color: '#0d9488' },
+              { key: 'pos_cashdrawer', label: 'سندوقی پارە (قاسە)', desc: 'بینینی جووڵەی کاش و بەڵانس', color: '#10b981' },
+              { key: 'pos_owes', label: 'قەرز و کڕیاران', desc: 'بینینی لیستی قەرزارەکان و وەرگرتنەوە', color: '#d97706' },
+              { key: 'pos_expenses', label: 'خەرجییەکان', desc: 'تۆمارکردنی خەرجی ڕۆژانە', color: '#ea580c' },
+              { key: 'pos_damages', label: 'زیان و بەفیڕۆچوو', desc: 'تۆمارکردنی کاڵای بەسەرچوو یان شکاو', color: '#e11d48' },
+              { key: 'pos_purchases', label: 'کڕین و دابینکەران', desc: 'تۆمارکردنی پسوولەی کڕین لە مەندوب', color: '#7c3aed' },
+              { key: 'pos_reports', label: 'ڕاپۆرتە داراییەکان', desc: 'بینینی قازانج و ڕاپۆرتە گشتییەکان', color: '#6366f1' },
+              { key: 'pos_settings', label: 'ڕێکخستنەکان', desc: 'دەستکاریکردنی ڕێکخستنی سیستەم', color: '#64748b' }
+            ].map(item => {
+              const enabled = !!permDraft[item.key];
+              return (
+                <div 
+                  key={item.key}
+                  onClick={() => handleTogglePerm(item.key)}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '16px',
+                    background: enabled ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-tertiary)',
+                    border: `1.5px solid ${enabled ? item.color : 'var(--border-color)'}`,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: enabled ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      {item.label}
+                    </span>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      {item.desc}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    width: '42px',
+                    height: '24px',
+                    borderRadius: '12px',
+                    background: enabled ? item.color : 'rgba(148, 163, 184, 0.3)',
+                    position: 'relative',
+                    transition: 'background 0.2s ease',
+                    flexShrink: 0
+                  }}>
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      position: 'absolute',
+                      top: '3px',
+                      right: enabled ? '3px' : '21px',
+                      transition: 'right 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

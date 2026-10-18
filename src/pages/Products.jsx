@@ -58,7 +58,8 @@ const BarcodeSVG = ({ value, width = 220, height = 65 }) => {
 };
 
 const Products = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canCashier } = useAuth();
+  const canViewCost = isAdmin || (canCashier ? canCashier('allow_view_cost_price') : false);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -498,7 +499,7 @@ const Products = () => {
                     )}
                   </td>
                   <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>
-                    {Number(p.cost_price).toLocaleString()} دینار
+                    {canViewCost ? `${Number(p.cost_price || 0).toLocaleString()} دینار` : '••••••'}
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ color: '#10b981', fontWeight: 'bold' }}>{Number(p.selling_price).toLocaleString()} دینار</div>
@@ -1058,7 +1059,7 @@ const Products = () => {
                               {new Date(batch.created_at).toLocaleDateString('en-GB')}
                             </td>
                             <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#fbbf24' }}>
-                              {Number(batch.cost_price).toLocaleString()} د.ع
+                              {canViewCost ? `${Number(batch.cost_price).toLocaleString()} د.ع` : '••••••'}
                             </td>
                             <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>
                               {Number(batch.initial_quantity)} دانە

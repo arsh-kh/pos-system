@@ -30,29 +30,29 @@ import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Home.css';
 
 const allModules = [
-  // 1. فرۆشتن و کاشێر
-  { id: 'cashier', category: 'pos', path: '/cashier', label: 'کاشێر', icon: <ShoppingCart size={28} />, color: '#2563eb', desc: 'خاڵی فرۆشتن، سکانی بارکۆد و پسووڵە' },
-  { id: 'shifts', category: 'pos', path: '/shifts', label: 'قاسە و شیفت', icon: <Lock size={28} />, color: '#059669', desc: 'چاودێری باڵانسی قاسە و داخستنی شیفت' },
-  { id: 'owes', category: 'pos', path: '/owes', label: 'قەرزەکان', icon: <Users size={28} />, color: '#dc2626', desc: 'قەرزی کڕیاران و وەرگرتنەوەی قیست' },
-  { id: 'returns', category: 'pos', path: '/returns', label: 'گەڕاندنەوەی کاڵا', icon: <RotateCcw size={28} />, color: '#e11d48', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە' },
+  // 1. فرۆشتن و کاشێر (Category POS - Royal Blue #2563eb)
+  { id: 'cashier', permissionKey: 'pos_cashier', category: 'pos', path: '/cashier', label: 'شاشەی کاشێر و فرۆشتن', icon: <ShoppingCart size={28} />, color: '#2563eb', desc: 'خاڵی سەرەکی فرۆشتن، سکانی بارکۆد و پسووڵە' },
+  { id: 'shifts', permissionKey: 'pos_shifts', category: 'pos', path: '/shifts', label: 'قاسە و شیفتەکان', icon: <Lock size={28} />, color: '#2563eb', desc: 'چاودێری باڵانسی قاسە و داخستنی شیفت' },
+  { id: 'returns', permissionKey: 'pos_returns', category: 'pos', path: '/returns', label: 'گەڕاندنەوەی کاڵا', icon: <RotateCcw size={28} />, color: '#2563eb', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە' },
+  { id: 'owes', permissionKey: 'pos_owes', category: 'pos', path: '/owes', label: 'قەرزی کڕیاران', icon: <Users size={28} />, color: '#ea580c', desc: 'قەرزی کڕیاران و وەرگرتنەوەی قیست' },
 
-  // 2. کۆگا و کاڵاکان
-  { id: 'products', category: 'inventory', path: '/products', label: 'کاڵاکان', icon: <Package size={28} />, color: '#0284c7', desc: 'مەخزەن، نرخەکان و خوێندنەوەی بارکۆد' },
-  { id: 'promotions', category: 'inventory', path: '/promotions', label: 'ئۆفەر و داشکاندن', icon: <Tag size={28} />, color: '#d97706', desc: 'داشکاندن و ئۆفەری کاتی' },
-  { id: 'purchases', category: 'inventory', path: '/purchases', label: 'پسووڵەی کڕین', icon: <FileText size={28} />, color: '#ea580c', desc: 'تۆمارکردنی کڕین لە کۆمپانیا' },
-  { id: 'inventory-audit', category: 'inventory', path: '/inventory-audit', label: 'جەردکردنی کۆگا', icon: <ClipboardCheck size={28} />, color: '#0d9488', desc: 'پشکنینی مەخزەن و دۆزینەوەی نوقسانی' },
-  { id: 'needs', category: 'inventory', path: '/needs', label: 'پێداویستیەکان', icon: <ClipboardList size={28} />, color: '#d97706', desc: 'لیستی کاڵا کەمبووەوەکانی مارکێت' },
-  { id: 'wastage', category: 'inventory', path: '/wastage', label: 'زیان و فەوتان', icon: <PackageX size={28} />, color: '#b91c1c', desc: 'کاڵای بەسەرچوو و شکاو' },
-  { id: 'vendor-returns', category: 'inventory', path: '/vendor-returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', icon: <Truck size={28} />, color: '#0284c7', desc: 'گەڕاندنەوەی کاڵا بۆ مەندوب' },
+  // 2. کۆگا و کاڵاکان (Category Inventory - Sky Blue #0284c7)
+  { id: 'products', permissionKey: 'inv_products', category: 'inventory', path: '/products', label: 'کاڵاکان و مەخزەن', icon: <Package size={28} />, color: '#0284c7', desc: 'مەخزەن، نرخەکان و خوێندنەوەی بارکۆد' },
+  { id: 'needs', permissionKey: 'inv_needs', category: 'inventory', path: '/needs', label: 'پێداویستییە کەمبووەکان', icon: <ClipboardList size={28} />, color: '#0284c7', desc: 'لیستی کاڵا کەمبووەوەکانی مارکێت' },
+  { id: 'promotions', permissionKey: 'inv_promotions', category: 'inventory', path: '/promotions', label: 'ئۆفەر و داشکاندن', icon: <Tag size={28} />, color: '#0284c7', desc: 'داشکاندن و ئۆفەری کاتی بۆ فرۆشتن' },
+  { id: 'purchases', permissionKey: 'inv_purchases', category: 'inventory', path: '/purchases', label: 'پسووڵەی کڕین لە کۆمپانیا', icon: <FileText size={28} />, color: '#0284c7', desc: 'تۆمارکردنی کڕین لە دابینکەران' },
+  { id: 'inventory-audit', permissionKey: 'inv_audit', category: 'inventory', path: '/inventory-audit', label: 'جەردکردنی کۆگا', icon: <ClipboardCheck size={28} />, color: '#0284c7', desc: 'پشکنینی مەخزەن و دۆزینەوەی نوقسانی' },
+  { id: 'vendor-returns', permissionKey: 'inv_vendor_returns', category: 'inventory', path: '/vendor-returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', icon: <Truck size={28} />, color: '#0284c7', desc: 'گەڕاندنەوەی کاڵا بۆ مەندوب (RTV)' },
+  { id: 'wastage', permissionKey: 'inv_wastage', category: 'inventory', path: '/wastage', label: 'زیان و فەوتانی کاڵا', icon: <PackageX size={28} />, color: '#b91c1c', desc: 'تۆمارکردنی کاڵای بەسەرچوو و شکاو' },
 
-  // 3. بەڕێوەبردن و دارایی (تایبەت بە ئەدمین)
-  { id: 'financials', category: 'management', path: '/financials', label: 'کۆمپانیا و قازانج', icon: <Building2 size={28} />, color: '#0891b2', desc: 'حسابی دابینکەران و قازانجی پوخت', adminOnly: true },
-  { id: 'this-month', category: 'management', path: '/this-month', label: 'ئەم مانگە', icon: <TrendingUp size={28} />, color: '#16a34a', desc: 'ئامار و ڕاپۆرتی فرۆشتنی مانگانە', adminOnly: true },
-  { id: 'total-sales', category: 'management', path: '/total-sales', label: 'کۆی فرۆشتن', icon: <BarChart3 size={28} />, color: '#0f766e', desc: 'شیکاری فرۆشتنی ڕۆژانە', adminOnly: true },
-  { id: 'history', category: 'management', path: '/history', label: 'مێژووی فرۆشتن', icon: <History size={28} />, color: '#475569', desc: 'گەڕان بەدوای پسووڵەکانی پێشوو', adminOnly: true },
-  { id: 'expenses', category: 'management', path: '/expenses', label: 'خەرجییەکان', icon: <Wallet size={28} />, color: '#e11d48', desc: 'تێچوو و خەرجییەکانی مارکێت', adminOnly: true },
-  { id: 'settings', category: 'management', path: '/settings', label: 'ڕێکخستنەکان', icon: <SettingsIcon size={28} />, color: '#64748b', desc: 'ڕێکخستنی سیستەم و باکئەپ', adminOnly: true },
-  { id: 'audit-logs', category: 'management', path: '/audit-logs', label: 'چاودێری چالاکییەکان', icon: <ShieldCheck size={28} />, color: '#334155', desc: 'تۆماری دەستکاریی کارمەندان', adminOnly: true },
+  // 3. بەڕێوەبردن و دارایی (Category Management - Indigo #6366f1)
+  { id: 'financials', category: 'management', path: '/financials', label: 'کۆمپانیا و قازانجی پوخت', icon: <Building2 size={28} />, color: '#6366f1', desc: 'حسابی دابینکەران و قازانجی پوخت', adminOnly: true },
+  { id: 'this-month', category: 'management', path: '/this-month', label: 'ڕاپۆرتی ئەم مانگە', icon: <TrendingUp size={28} />, color: '#6366f1', desc: 'ئامار و ڕاپۆرتی فرۆشتنی مانگانە', adminOnly: true },
+  { id: 'total-sales', category: 'management', path: '/total-sales', label: 'کۆی فرۆشتنی گشتی', icon: <BarChart3 size={28} />, color: '#6366f1', desc: 'شیکاری فرۆشتنی ڕۆژانە بە ژمارە', adminOnly: true },
+  { id: 'history', permissionKey: 'mgmt_history', category: 'management', path: '/history', label: 'مێژووی فرۆشتنە کۆنەکان', icon: <History size={28} />, color: '#6366f1', desc: 'گەڕان بەدوای پسووڵەکانی پێشوو' },
+  { id: 'expenses', permissionKey: 'mgmt_expenses', category: 'management', path: '/expenses', label: 'خەرجییەکانی مارکێت', icon: <Wallet size={28} />, color: '#b91c1c', desc: 'تێچوو و خەرجییەکانی مارکێت' },
+  { id: 'settings', category: 'management', path: '/settings', label: 'ڕێکخستن و دەسەڵاتەکان', icon: <SettingsIcon size={28} />, color: '#6366f1', desc: 'دەسەڵاتی کاشێر و پاراستنی داتا', adminOnly: true },
+  { id: 'audit-logs', category: 'management', path: '/audit-logs', label: 'چاودێری چالاکییەکان', icon: <ShieldCheck size={28} />, color: '#6366f1', desc: 'تۆماری دەستکاریی کارمەندان', adminOnly: true },
 ];
 
 const categoryLabels = {
@@ -63,7 +63,7 @@ const categoryLabels = {
 
 const Home = () => {
   const navigate = useNavigate();
-  const { isAdmin, setIsSwitchModalOpen } = useAuth();
+  const { isAdmin, setIsSwitchModalOpen, canCashier } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -73,12 +73,19 @@ const Home = () => {
       setIsSwitchModalOpen(true);
       return;
     }
+    if (!isAdmin && mod.permissionKey && !canCashier(mod.permissionKey)) {
+      alert(`دەسەڵاتی بینینی بەشی «${mod.label}»ت نییە. پێویستە بەڕێوەبەر لە ڕێکخستنەکاندا ڕێگەت پێبدات.`);
+      return;
+    }
     navigate(mod.path);
   };
 
-  // Cashiers only see POS + Products (for stock/price lookup)
+  // Filter modules: Admin sees all, Cashier only sees permitted modules
   const visibleModules = allModules.filter(m => {
-    if (!isAdmin && m.category === 'management') return false;
+    if (!isAdmin) {
+      if (m.adminOnly) return false;
+      if (m.permissionKey && !canCashier(m.permissionKey)) return false;
+    }
     if (selectedCategory !== 'all' && m.category !== selectedCategory) return false;
     return true;
   });
@@ -90,64 +97,66 @@ const Home = () => {
   return (
     <div className="home-container">
       {/* Prominent Hero Cashier Launcher */}
-      <div 
-        onClick={() => navigate('/cashier')}
-        style={{
-          width: '100%',
-          maxWidth: '920px',
-          background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-          borderRadius: '24px',
-          padding: '1.5rem 2rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          color: '#ffffff',
-          cursor: 'pointer',
-          boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.4)',
-          marginBottom: '1.8rem',
-          transition: 'all 0.2s ease',
-          boxSizing: 'border-box'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+      {canCashier('pos_cashier') && (
+        <div 
+          onClick={() => navigate('/cashier')}
+          style={{
+            width: '100%',
+            maxWidth: '920px',
+            background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+            borderRadius: '24px',
+            padding: '1.5rem 2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            color: '#ffffff',
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.4)',
+            marginBottom: '1.8rem',
+            transition: 'all 0.2s ease',
+            boxSizing: 'border-box'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '18px',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ShoppingCart size={34} color="#ffffff" />
+            </div>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(255,255,255,0.2)', fontSize: '0.78rem', fontWeight: 'bold', marginBottom: '4px' }}>
+                <Sparkles size={13} /> دەستپێکردنی خێرا (POS)
+              </div>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>
+                کردنەوەی شاشەی کاشێر و فرۆشتن
+              </h2>
+              <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.9rem' }}>
+                سکانی بارکۆد بە کەرتە چرکەیەک، پڕکردنی سەلە، و دەرکردنی پسووڵەی کڕیار
+              </p>
+            </div>
+          </div>
           <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '18px',
-            background: 'rgba(255, 255, 255, 0.2)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            gap: '8px',
+            background: '#ffffff',
+            color: '#1e3a8a',
+            padding: '10px 18px',
+            borderRadius: '14px',
+            fontWeight: 'bold',
+            fontSize: '0.95rem'
           }}>
-            <ShoppingCart size={34} color="#ffffff" />
-          </div>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(255,255,255,0.2)', fontSize: '0.78rem', fontWeight: 'bold', marginBottom: '4px' }}>
-              <Sparkles size={13} /> دەستپێکردنی خێرا (POS)
-            </div>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>
-              کردنەوەی شاشەی کاشێر و فرۆشتن
-            </h2>
-            <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.9rem' }}>
-              سکانی بارکۆد بە کەرتە چرکەیەک، پڕکردنی سەلە، و دەرکردنی پسووڵەی کڕیار
-            </p>
+            <span>دەستپێکردن</span>
+            <ArrowLeft size={18} />
           </div>
         </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: '#ffffff',
-          color: '#1e3a8a',
-          padding: '10px 18px',
-          borderRadius: '14px',
-          fontWeight: 'bold',
-          fontSize: '0.95rem'
-        }}>
-          <span>دەستپێکردن</span>
-          <ArrowLeft size={18} />
-        </div>
-      </div>
+      )}
 
       {/* Instant Search Bar & Category Filter */}
       <div style={{ width: '100%', maxWidth: '920px', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.8rem' }}>

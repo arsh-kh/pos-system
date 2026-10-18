@@ -39,7 +39,8 @@ const UserBar = () => {
     setIsSwitchModalOpen,
     loginError,
     setLoginError,
-    isSubmitting
+    isSubmitting,
+    canCashier
   } = useAuth();
 
   const [usernameInput, setUsernameInput] = useState('');
@@ -220,24 +221,26 @@ const UserBar = () => {
         {/* Right / End: Actions, Cashier Quick Access, Connectivity & Theme */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Quick Cashier Button */}
-          <button
-            onClick={() => navigate('/cashier')}
-            title="کردنەوەی شاشەی کاشێر و فرۆشتن"
-            className="btn-primary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              fontSize: '0.84rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)'
-            }}
-          >
-            <ShoppingCart size={15} /> کاشێر
-          </button>
+          {canCashier('pos_cashier') && (
+            <button
+              onClick={() => navigate('/cashier')}
+              title="کردنەوەی شاشەی کاشێر و فرۆشتن"
+              className="btn-primary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                fontSize: '0.84rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)'
+              }}
+            >
+              <ShoppingCart size={15} /> کاشێر
+            </button>
+          )}
 
           {/* Calm Internet Connectivity Pill */}
           {syncData && (

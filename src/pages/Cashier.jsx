@@ -33,7 +33,17 @@ import './Dashboard.css';
 
 const Cashier = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin, canCashier } = useAuth();
+
+  // Permission Flags for Cashier
+  const allowManualDiscount = canCashier ? canCashier('allow_manual_discount') : true;
+  const allowCustomPrice = canCashier ? canCashier('allow_custom_price') : true;
+  const allowDeleteItem = canCashier ? canCashier('allow_delete_item') : true;
+  const allowClearCart = canCashier ? canCashier('allow_clear_cart') : true;
+  const allowDebtSale = canCashier ? canCashier('allow_debt_sale') : true;
+  const allowSplitPayment = canCashier ? canCashier('allow_split_payment') : true;
+  const allowViewCostPrice = canCashier ? canCashier('allow_view_cost_price') : false;
+
   // Multi-Cart State (Cart 1: Main, Cart 2: Quick-Sell)
   const [activeCartIndex, setActiveCartIndex] = useState(0);
   const [carts, setCarts] = useState([
@@ -311,6 +321,10 @@ const Cashier = () => {
     const qty = parseFloat(newQty);
     if (isNaN(qty)) return;
     if (qty <= 0) {
+      if (!allowDeleteItem) {
+        alert('بەڕێوەبەر سڕینەوەی کاڵای بۆ کاشێر قفڵ کردووە');
+        return;
+      }
       removeFromCart(key);
       return;
     }
@@ -319,10 +333,18 @@ const Cashier = () => {
   };
 
   const removeFromCart = (key) => {
+    if (!allowDeleteItem) {
+      alert('بەڕێوەبەر دەسەڵاتی سڕینەوەی کاڵای لە سەبەتە قفڵ کردووە');
+      return;
+    }
     setCart(prev => prev.filter(item => item.cartKey !== key && item.barcode !== key));
   };
 
   const clearCart = () => {
+    if (!allowClearCart) {
+      alert('بەڕێوەبەر بەتاڵکردنەوەی گشتی سەبەتەی قفڵ کردووە');
+      return;
+    }
     updateActiveCart({
       items: [],
       customerId: '',
@@ -1385,28 +1407,30 @@ const Cashier = () => {
                   <Scale size={13} /> تەرازوو (F3)
                 </button>
 
-                <button 
-                  type="button" 
-                  onClick={() => setIsQuickItemModalOpen(true)}
-                  title="کاڵای دەستی بێ بارکۆد (F2)"
-                  style={{ 
-                    padding: '4px 10px', 
-                    borderRadius: '6px', 
-                    background: 'var(--warning-light)', 
-                    color: '#b45309', 
-                    border: '1px solid rgba(245, 158, 11, 0.3)', 
-                    fontWeight: 700, 
-                    fontSize: '0.78rem', 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px' 
-                  }}
-                >
-                  <Zap size={13} /> دەستی (F2)
-                </button>
+                {allowCustomPrice && (
+                  <button 
+                    type="button" 
+                    onClick={() => setIsQuickItemModalOpen(true)}
+                    title="کاڵای دەستی بێ بارکۆد (F2)"
+                    style={{ 
+                      padding: '4px 10px', 
+                      borderRadius: '6px', 
+                      background: 'var(--warning-light)', 
+                      color: '#b45309', 
+                      border: '1px solid rgba(245, 158, 11, 0.3)', 
+                      fontWeight: 700, 
+                      fontSize: '0.78rem', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px' 
+                    }}
+                  >
+                    <Zap size={13} /> دەستی (F2)
+                  </button>
+                )}
 
-                {cart.length > 0 && (
+                {cart.length > 0 && allowClearCart && (
                   <button 
                     onClick={clearCart}
                     style={{ background: 'var(--danger-light)', border: '1px solid rgba(239, 68, 68, 0.25)', color: 'var(--danger-color)', cursor: 'pointer', fontSize: '0.78rem', padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}
@@ -1559,67 +1583,123 @@ const Cashier = () => {
                   <Banknote size={13} /> نەقد
                 </button>
 
-                <button
-                  type="button"
-                  disabled={!selectedCustomerId}
-                  onClick={() => {
-                    if (!selectedCustomerId) return;
-                    setPaymentMode('DEBT');
-                    setSplitCashAmount('');
-                  }}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    padding: '5px 6px',
-                    borderRadius: '6px',
-                    border: paymentMode === 'DEBT' ? '1px solid var(--danger-color)' : '1px solid var(--border-color)',
-                    background: paymentMode === 'DEBT' ? 'var(--danger-light)' : 'var(--bg-secondary)',
-                    color: !selectedCustomerId ? 'var(--text-muted)' : (paymentMode === 'DEBT' ? 'var(--danger-color)' : 'var(--text-secondary)'),
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
-                >
-                  <CreditCard size={13} /> قەرز
-                </button>
+                {allowDebtSale ? (
+                  <button
+                    type="button"
+                    disabled={!selectedCustomerId}
+                    onClick={() => {
+                      if (!selectedCustomerId) return;
+                      setPaymentMode('DEBT');
+                      setSplitCashAmount('');
+                    }}
+                    style={{
+                      width: '100%',
+                      minWidth: 0,
+                      padding: '5px 6px',
+                      borderRadius: '6px',
+                      border: paymentMode === 'DEBT' ? '1px solid var(--danger-color)' : '1px solid var(--border-color)',
+                      background: paymentMode === 'DEBT' ? 'var(--danger-light)' : 'var(--bg-secondary)',
+                      color: !selectedCustomerId ? 'var(--text-muted)' : (paymentMode === 'DEBT' ? 'var(--danger-color)' : 'var(--text-secondary)'),
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
+                  >
+                    <CreditCard size={13} /> قەرز
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={true}
+                    title="بەڕێوەبەر فرۆشتن بە قەرزی بۆ کاشێر قفڵ کردووە"
+                    style={{
+                      width: '100%',
+                      minWidth: 0,
+                      padding: '5px 6px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-muted)',
+                      fontWeight: 600,
+                      fontSize: '0.78rem',
+                      cursor: 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                      opacity: 0.6
+                    }}
+                  >
+                    <Lock size={12} /> قەرز
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  disabled={!selectedCustomerId}
-                  onClick={() => {
-                    if (!selectedCustomerId) return;
-                    setPaymentMode('SPLIT');
-                    if (!splitCashAmount) {
-                      setSplitCashAmount(String(Math.round(grandTotal / 2)));
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    padding: '5px 6px',
-                    borderRadius: '6px',
-                    border: paymentMode === 'SPLIT' ? '1px solid var(--warning-color)' : '1px solid var(--border-color)',
-                    background: paymentMode === 'SPLIT' ? 'var(--warning-light)' : 'var(--bg-secondary)',
-                    color: !selectedCustomerId ? 'var(--text-muted)' : (paymentMode === 'SPLIT' ? '#b45309' : 'var(--text-secondary)'),
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
-                >
-                  <Layers size={13} /> تێکەڵ
-                </button>
+                {allowSplitPayment ? (
+                  <button
+                    type="button"
+                    disabled={!selectedCustomerId}
+                    onClick={() => {
+                      if (!selectedCustomerId) return;
+                      setPaymentMode('SPLIT');
+                      if (!splitCashAmount) {
+                        setSplitCashAmount(String(Math.round(grandTotal / 2)));
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      minWidth: 0,
+                      padding: '5px 6px',
+                      borderRadius: '6px',
+                      border: paymentMode === 'SPLIT' ? '1px solid var(--warning-color)' : '1px solid var(--border-color)',
+                      background: paymentMode === 'SPLIT' ? 'var(--warning-light)' : 'var(--bg-secondary)',
+                      color: !selectedCustomerId ? 'var(--text-muted)' : (paymentMode === 'SPLIT' ? '#b45309' : 'var(--text-secondary)'),
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
+                  >
+                    <Layers size={13} /> تێکەڵ
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={true}
+                    title="بەڕێوەبەر پارەدانی تێکەڵی بۆ کاشێر قفڵ کردووە"
+                    style={{
+                      width: '100%',
+                      minWidth: 0,
+                      padding: '5px 6px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-muted)',
+                      fontWeight: 600,
+                      fontSize: '0.78rem',
+                      cursor: 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                      opacity: 0.6
+                    }}
+                  >
+                    <Lock size={12} /> تێکەڵ
+                  </button>
+                )}
               </div>
 
               {selectedCustomer && (
@@ -1786,13 +1866,15 @@ const Cashier = () => {
                           <div style={{ fontWeight: 800, color: item.unit_type === 'BOX' ? '#0284c7' : 'var(--accent-hover)', fontSize: '1.05rem' }}>
                             {lineTotal.toLocaleString()} دینار
                           </div>
-                          <button 
-                            onClick={() => removeFromCart(itemKey)}
-                            style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '2px', marginTop: '2px' }}
-                            title="سڕینەوە"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {allowDeleteItem && (
+                            <button 
+                              onClick={() => removeFromCart(itemKey)}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '2px', marginTop: '2px' }}
+                              title="سڕینەوە"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1904,27 +1986,29 @@ const Cashier = () => {
 
                         {/* Quick Presets Buttons with 0 to Clear easily */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => removeFromCart(itemKey)}
-                            title="سڕینەوەی خێرا لە سەبەتە (0)"
-                            style={{
-                              padding: '5px 9px',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(239, 68, 68, 0.35)',
-                              background: 'var(--danger-light)',
-                              color: 'var(--danger-color)',
-                              fontSize: '0.76rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '2px',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            <Trash2 size={11} /> 0
-                          </button>
+                          {allowDeleteItem && (
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(itemKey)}
+                              title="سڕینەوەی خێرا لە سەبەتە (0)"
+                              style={{
+                                padding: '5px 9px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(239, 68, 68, 0.35)',
+                                background: 'var(--danger-light)',
+                                color: 'var(--danger-color)',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Trash2 size={11} /> 0
+                            </button>
+                          )}
 
                           {(isKg ? [0.25, 0.5, 1, 2] : [1, 2, 5, 10, 20]).map(q => (
                             <button
@@ -1957,105 +2041,112 @@ const Cashier = () => {
             </div>
 
             {/* Discount Row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-tertiary)', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '6px', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#0284c7', fontWeight: 700 }}>
-                <Percent size={13} />
+            {!allowManualDiscount ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--bg-tertiary)', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '6px', color: 'var(--text-muted)', fontSize: '0.8rem', flexShrink: 0 }}>
+                <Lock size={14} color="#f59e0b" />
+                <span>داشکاندنی دەستی لەلایەن بەڕێوەبەرەوە قفڵ کراوە</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-tertiary)', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '6px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#0284c7', fontWeight: 700 }}>
+                  <Percent size={13} />
+                  <button
+                    type="button"
+                    onClick={() => setDiscountType(discountType === 'AMOUNT' ? 'PERCENT' : 'AMOUNT')}
+                    style={{
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(2, 132, 199, 0.35)',
+                      background: 'rgba(2, 132, 199, 0.1)',
+                      color: '#0284c7',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {discountType === 'AMOUNT' ? 'دینار' : '%'}
+                  </button>
+                </div>
+
+                {/* Stepper -250 / -5% */}
                 <button
                   type="button"
-                  onClick={() => setDiscountType(discountType === 'AMOUNT' ? 'PERCENT' : 'AMOUNT')}
+                  onClick={() => {
+                    if (discountType === 'AMOUNT') {
+                      const current = Math.max(0, parseInt(discountValue) || 0);
+                      const nextVal = Math.max(0, current - 250);
+                      setDiscountValue(nextVal === 0 ? '' : String(nextVal));
+                    } else {
+                      const current = Math.max(0, parseInt(discountValue) || 0);
+                      const nextVal = Math.max(0, current - 5);
+                      setDiscountValue(nextVal === 0 ? '' : String(nextVal));
+                    }
+                  }}
+                  title={discountType === 'AMOUNT' ? 'کەمکردنەوە بە ٢٥٠ دینار' : 'کەمکردنەوە بە ٥٪'}
                   style={{
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(2, 132, 199, 0.35)',
-                    background: 'rgba(2, 132, 199, 0.1)',
-                    color: '#0284c7',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    padding: '3px 7px',
+                    borderRadius: '6px',
+                    background: 'var(--danger-light)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: 'var(--danger-color)',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    flexShrink: 0
                   }}
                 >
-                  {discountType === 'AMOUNT' ? 'دینار' : '%'}
+                  <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '-250' : '-5%'}</span>
                 </button>
+
+                <input 
+                  ref={discountInputRef}
+                  type="number"
+                  min="0"
+                  max={discountType === 'PERCENT' ? "100" : (subtotal > 0 ? subtotal : undefined)}
+                  step={discountType === 'AMOUNT' ? '250' : '1'}
+                  placeholder={discountType === 'PERCENT' ? 'داشکاندن (%):' : 'داشکاندن (د.ع):'}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  style={{ flex: 1, minWidth: 0, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 700, textAlign: 'center', outline: 'none' }}
+                />
+
+                {/* Stepper +250 / +5% */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (discountType === 'AMOUNT') {
+                      const current = Math.max(0, parseInt(discountValue) || 0);
+                      const nextVal = subtotal > 0 ? Math.min(subtotal, current + 250) : current + 250;
+                      setDiscountValue(String(nextVal));
+                    } else {
+                      const current = Math.max(0, parseInt(discountValue) || 0);
+                      const nextVal = Math.min(100, current + 5);
+                      setDiscountValue(String(nextVal));
+                    }
+                  }}
+                  title={discountType === 'AMOUNT' ? 'زیادکردن بە ٢٥٠ دینار' : 'زیادکردن بە ٥٪'}
+                  style={{
+                    padding: '3px 7px',
+                    borderRadius: '6px',
+                    background: 'rgba(2, 132, 199, 0.1)',
+                    border: '1px solid rgba(2, 132, 199, 0.35)',
+                    color: '#0284c7',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '+250' : '+5%'}</span>
+                </button>
+
+                {calculatedDiscount > 0 && (
+                  <span style={{ color: 'var(--danger-color)', fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    -{calculatedDiscount.toLocaleString()} د.ع
+                  </span>
+                )}
               </div>
-
-              {/* Stepper -250 / -5% */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (discountType === 'AMOUNT') {
-                    const current = Math.max(0, parseInt(discountValue) || 0);
-                    const nextVal = Math.max(0, current - 250);
-                    setDiscountValue(nextVal === 0 ? '' : String(nextVal));
-                  } else {
-                    const current = Math.max(0, parseInt(discountValue) || 0);
-                    const nextVal = Math.max(0, current - 5);
-                    setDiscountValue(nextVal === 0 ? '' : String(nextVal));
-                  }
-                }}
-                title={discountType === 'AMOUNT' ? 'کەمکردنەوە بە ٢٥٠ دینار' : 'کەمکردنەوە بە ٥٪'}
-                style={{
-                  padding: '3px 7px',
-                  borderRadius: '6px',
-                  background: 'var(--danger-light)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: 'var(--danger-color)',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
-              >
-                <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '-250' : '-5%'}</span>
-              </button>
-
-              <input 
-                ref={discountInputRef}
-                type="number"
-                min="0"
-                max={discountType === 'PERCENT' ? "100" : (subtotal > 0 ? subtotal : undefined)}
-                step={discountType === 'AMOUNT' ? '250' : '1'}
-                placeholder={discountType === 'PERCENT' ? 'داشکاندن (%):' : 'داشکاندن (د.ع):'}
-                value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)}
-                style={{ flex: 1, minWidth: 0, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 700, textAlign: 'center', outline: 'none' }}
-              />
-
-              {/* Stepper +250 / +5% */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (discountType === 'AMOUNT') {
-                    const current = Math.max(0, parseInt(discountValue) || 0);
-                    const nextVal = subtotal > 0 ? Math.min(subtotal, current + 250) : current + 250;
-                    setDiscountValue(String(nextVal));
-                  } else {
-                    const current = Math.max(0, parseInt(discountValue) || 0);
-                    const nextVal = Math.min(100, current + 5);
-                    setDiscountValue(String(nextVal));
-                  }
-                }}
-                title={discountType === 'AMOUNT' ? 'زیادکردن بە ٢٥٠ دینار' : 'زیادکردن بە ٥٪'}
-                style={{
-                  padding: '3px 7px',
-                  borderRadius: '6px',
-                  background: 'rgba(2, 132, 199, 0.1)',
-                  border: '1px solid rgba(2, 132, 199, 0.35)',
-                  color: '#0284c7',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
-              >
-                <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '+250' : '+5%'}</span>
-              </button>
-
-              {calculatedDiscount > 0 && (
-                <span style={{ color: 'var(--danger-color)', fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  -{calculatedDiscount.toLocaleString()} د.ع
-                </span>
-              )}
-            </div>
+            )}
 
             {/* Cart Footer: Totals & Checkout Button */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '6px', flexShrink: 0 }}>

@@ -22,6 +22,32 @@ export const AuthProvider = ({ children }) => {
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dynamic Cashier Permissions State
+  const [cashierPermissions, setCashierPermissions] = useState({
+    permissions: [],
+    map: {}
+  });
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+
+  // Fetch cashier permissions from backend
+  const fetchPermissions = async () => {
+    try {
+      setPermissionsLoading(true);
+      const res = await axios.get('http://localhost:3001/api/permissions/cashier');
+      if (res.data?.status === 'SUCCESS' && res.data?.data) {
+        setCashierPermissions(res.data.data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch cashier permissions:', err.message);
+    } finally {
+      setPermissionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPermissions();
+  }, []);
+
   // Sync axios headers whenever currentUser changes
   useEffect(() => {
     if (currentUser) {
@@ -36,6 +62,32 @@ export const AuthProvider = ({ children }) => {
       }
     }
   }, [currentUser]);
+
+  // Update permissions handler (Admin only)
+  const updatePermissions = async (updates) => {
+    try {
+      const res = await axios.put('http://localhost:3001/api/permissions/cashier', { updates });
+      if (res.data?.status === 'SUCCESS' && res.data?.data) {
+        setCashierPermissions(res.data.data);
+        return { success: true, message: res.data.message };
+      }
+      return { success: false, message: res.data?.message || 'هەڵە لە نوێکردنەوە' };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'هەڵە لە نوێکردنەوەی دەسەڵاتەکان';
+      return { success: false, message: msg };
+    }
+  };
+
+  // Check if Cashier has permission for a specific key
+  // Admins always have permission for everything
+  const canCashier = (permissionKey) => {
+    if (currentUser?.role === 'ADMIN') return true;
+    if (!cashierPermissions?.map || Object.keys(cashierPermissions.map).length === 0) {
+      // Safe fallback while loading
+      return true;
+    }
+    return Boolean(cashierPermissions.map[permissionKey]);
+  };
 
   // Login handler
   const login = async (username, password) => {
@@ -126,7 +178,12 @@ export const AuthProvider = ({ children }) => {
         setIsSwitchModalOpen,
         loginError,
         setLoginError,
-        isSubmitting
+        isSubmitting,
+        cashierPermissions,
+        permissionsLoading,
+        fetchPermissions,
+        updatePermissions,
+        canCashier
       }}
     >
       {children}
