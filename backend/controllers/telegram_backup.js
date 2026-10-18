@@ -9,10 +9,18 @@ const {
     getDailyFinancialSummary 
 } = require('../services/telegramNightlyScheduler');
 
-const BACKUPS_DIR = path.resolve(__dirname, '../backups');
-
-if (!fs.existsSync(BACKUPS_DIR)) {
-    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+let BACKUPS_DIR = path.resolve(__dirname, '../backups');
+try {
+    if (!fs.existsSync(BACKUPS_DIR)) {
+        fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+    }
+} catch (err) {
+    if (process.env.APPDATA) {
+        BACKUPS_DIR = path.join(process.env.APPDATA, 'MarketPOS', 'backups');
+        if (!fs.existsSync(BACKUPS_DIR)) {
+            fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+        }
+    }
 }
 
 // Built-in Telegram Bot credentials (Zero configuration required by Admin)

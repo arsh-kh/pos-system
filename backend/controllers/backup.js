@@ -3,11 +3,18 @@ const fs = require('fs');
 const path = require('path');
 const { logAuditAction } = require('../middleware/auditLogger');
 
-const BACKUPS_DIR = path.resolve(__dirname, '../backups');
-
-// Ensure backups directory exists
-if (!fs.existsSync(BACKUPS_DIR)) {
-    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+let BACKUPS_DIR = path.resolve(__dirname, '../backups');
+try {
+    if (!fs.existsSync(BACKUPS_DIR)) {
+        fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+    }
+} catch (err) {
+    if (process.env.APPDATA) {
+        BACKUPS_DIR = path.join(process.env.APPDATA, 'MarketPOS', 'backups');
+        if (!fs.existsSync(BACKUPS_DIR)) {
+            fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+        }
+    }
 }
 
 // Helper to safely serialize BigInt and dates

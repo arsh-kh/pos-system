@@ -1,5 +1,4 @@
-DROP DATABASE IF EXISTS pos_db;
-CREATE DATABASE pos_db;
+CREATE DATABASE IF NOT EXISTS pos_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE pos_db;
 
 CREATE TABLE IF NOT EXISTS Users (
@@ -9,6 +8,10 @@ CREATE TABLE IF NOT EXISTS Users (
     role ENUM('ADMIN', 'CASHIER') NOT NULL DEFAULT 'CASHIER',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- Default initial Admin account (admin / admin123)
+INSERT IGNORE INTO Users (id, username, password, role) VALUES 
+(1, 'admin', '$2b$10$vkw4WL2ktnHR/gPSbJpjB.ZE9flixGkkvl5dQeY24jnrv/EQdHhl6', 'ADMIN');
 
 CREATE TABLE IF NOT EXISTS Categories (
     id INT AUTO_INCREMENT PRIMARY KEY,

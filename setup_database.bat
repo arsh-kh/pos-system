@@ -22,9 +22,9 @@ if %errorlevel% equ 0 (
 )
 
 echo.
-echo [2/3] جێبەجێکردنی هەموو خشتەکان و مەیگرەیشنەکان (Running Schema Migrations)...
+echo [2/3] جێبەجێکردنی هەموو خشتەکان و مەیگرەیشنەکان (Initializing Database & Migrations)...
 cd backend
-node run_all_migrations.js
+node init-db.js
 if %errorlevel% neq 0 (
     echo ❌ هەڵە لە دروستکردنی خشتەکان! تکایە پاسۆردی backend/.env بپشکنە.
     pause

@@ -122,6 +122,13 @@ app.use((err, req, res, next) => {
     });
 });
 
+const { initDb } = require('./init-db');
+
 app.listen(port, () => {
     console.log(`Backend server running on port ${port}`);
+    // Non-blocking auto-verification of schema and migrations
+    initDb({ noExit: true }).catch(err => {
+        console.warn('⚠️ Auto-init notice:', err.message);
+    });
 });
+
