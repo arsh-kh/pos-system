@@ -24,6 +24,10 @@
     "directories": {
       "output": "release"
     },
+    "asar": true,
+    "asarUnpack": [
+      "backend/**/*"
+    ],
     "files": [
       "dist/**/*",
       "backend/**/*",

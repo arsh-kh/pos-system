@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -36,9 +36,9 @@ async function ensureBackendProcess() {
   }
 
   const candidatePaths = [
-    path.resolve(__dirname, 'backend', 'server.js'),
-    path.join(process.resourcesPath || '', 'backend', 'server.js'),
     path.join(process.resourcesPath || '', 'app.asar.unpacked', 'backend', 'server.js'),
+    path.join(process.resourcesPath || '', 'backend', 'server.js'),
+    path.resolve(__dirname, 'backend', 'server.js'),
     path.resolve(__dirname, '..', 'backend', 'server.js')
   ];
 
@@ -47,16 +47,53 @@ async function ensureBackendProcess() {
   if (serverScript) {
     const backendCwd = path.dirname(serverScript);
     console.log('🚀 Spawning embedded backend service:', serverScript);
-    backendProcess = spawn(process.execPath, [serverScript], {
-      cwd: backendCwd,
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1'
-      },
-      stdio: 'ignore'
-    });
-    backendProcess.unref();
-    console.log('✓ Embedded backend service started (PID: ' + backendProcess.pid + ')');
+
+    // 1. Prefer Electron native utilityProcess (safe, embedded, avoids OS spawn ENOENT)
+    if (utilityProcess && typeof utilityProcess.fork === 'function') {
+      try {
+        backendProcess = utilityProcess.fork(serverScript, [], {
+          serviceName: 'pos-backend',
+          cwd: backendCwd,
+          env: { ...process.env }
+        });
+
+        backendProcess.on('spawn', () => {
+          console.log('✓ Embedded backend utilityProcess successfully started');
+        });
+
+        backendProcess.on('error', (err) => {
+          console.warn('⚠️ Embedded backend utilityProcess error:', err.message);
+        });
+
+        backendProcess.on('exit', (code) => {
+          console.log(`Backend process exited with code ${code}`);
+        });
+        return;
+      } catch (forkErr) {
+        console.warn('⚠️ utilityProcess.fork failed, falling back to spawn:', forkErr.message);
+      }
+    }
+
+    // 2. Fallback to child_process spawn with proper error trapping
+    try {
+      backendProcess = spawn(process.execPath, [serverScript], {
+        cwd: backendCwd,
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1'
+        },
+        stdio: 'ignore'
+      });
+
+      backendProcess.on('error', (err) => {
+        console.warn('⚠️ Spawn fallback error (trapped):', err.message);
+      });
+
+      backendProcess.unref();
+      console.log('✓ Embedded backend service started via spawn (PID: ' + backendProcess.pid + ')');
+    } catch (spawnErr) {
+      console.warn('⚠️ Could not spawn backend process:', spawnErr.message);
+    }
   } else {
     console.warn('⚠️ Backend server.js not found in candidate paths. Assuming external backend.');
   }
