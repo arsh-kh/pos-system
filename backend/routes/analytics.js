@@ -3,9 +3,10 @@ const router = express.Router();
 const analyticsController = require('../controllers/analytics');
 // const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware');
 
-// Dashboard & Hourly
+// Dashboard, Hourly & Universal Range Reports
 router.get('/dashboard', analyticsController.getDashboardStats);
 router.get('/hourly', analyticsController.getHourlyStats);
+router.get('/report', analyticsController.getPeriodReport);
 
 // Phase 8: Total Sales & Deep Analytics
 router.get('/overview', analyticsController.getOverview);

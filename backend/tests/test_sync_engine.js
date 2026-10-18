@@ -76,8 +76,14 @@ async function runSyncTests() {
         }
         console.log(`✓ ئەنجامی هاوکاتکردن: ${triggerRes.responseData.message}`);
 
-        // Verify status changed to SYNCED
-        const [syncedCheck] = await db.query('SELECT * FROM Sync_Queue WHERE sync_id = ?', [testSyncId]);
+        // Verify status changed to SYNCED (with micro-retry if queue worker is committing)
+        let syncedCheck;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const [rows] = await db.query('SELECT * FROM Sync_Queue WHERE sync_id = ?', [testSyncId]);
+            syncedCheck = rows;
+            if (syncedCheck[0]?.status === 'SYNCED' && syncedCheck[0]?.synced_at) break;
+            await new Promise(r => setTimeout(r, 60));
+        }
         if (syncedCheck[0].status !== 'SYNCED' || !syncedCheck[0].synced_at) {
             throw new Error('دۆخی تۆمارەکە نەگۆڕدرا بۆ SYNCED');
         }

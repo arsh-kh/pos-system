@@ -47,7 +47,7 @@ const allModules = [
 
   // 3. بەڕێوەبردن و دارایی (Category Management - Indigo #6366f1)
   { id: 'financials', category: 'management', path: '/financials', label: 'کۆمپانیا و قازانجی پوخت', icon: <Building2 size={28} />, color: '#6366f1', desc: 'حسابی دابینکەران و قازانجی پوخت', adminOnly: true },
-  { id: 'this-month', category: 'management', path: '/this-month', label: 'ڕاپۆرتی ئەم مانگە', icon: <TrendingUp size={28} />, color: '#6366f1', desc: 'ئامار و ڕاپۆرتی فرۆشتنی مانگانە', adminOnly: true },
+  { id: 'this-month', category: 'management', path: '/this-month', label: 'ڕاپۆرتە گشتییەکان (ڕۆژ، هەفتە، مانگ، ساڵ)', icon: <TrendingUp size={28} />, color: '#6366f1', desc: 'شیکاری فرۆشتن بەپێی ڕۆژ، هەفتە، مانگ، ساڵ و ماوەی دیاریکراو', adminOnly: true },
   { id: 'total-sales', category: 'management', path: '/total-sales', label: 'کۆی فرۆشتنی گشتی', icon: <BarChart3 size={28} />, color: '#6366f1', desc: 'شیکاری فرۆشتنی ڕۆژانە بە ژمارە', adminOnly: true },
   { id: 'history', permissionKey: 'mgmt_history', category: 'management', path: '/history', label: 'مێژووی فرۆشتنە کۆنەکان', icon: <History size={28} />, color: '#6366f1', desc: 'گەڕان بەدوای پسووڵەکانی پێشوو' },
   { id: 'expenses', permissionKey: 'mgmt_expenses', category: 'management', path: '/expenses', label: 'خەرجییەکانی مارکێت', icon: <Wallet size={28} />, color: '#b91c1c', desc: 'تێچوو و خەرجییەکانی مارکێت' },

@@ -70,6 +70,7 @@ function AppContent() {
         <Route path="/promotions" element={<Promotions />} />
         <Route path="/owes" element={<Owes />} />
         <Route path="/this-month" element={<ThisMonth />} />
+        <Route path="/reports" element={<ThisMonth />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/shifts" element={<CashDrawer />} />
         <Route path="/returns" element={<Returns />} />
