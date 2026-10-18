@@ -21,7 +21,8 @@ const testFiles = [
     'test_hardware_escpos.js',
     'test_z_report_and_telegram.js',
     'test_telegram_nightly.js',
-    'test_cashier_permissions.js'
+    'test_cashier_permissions.js',
+    'test_full_lifecycle_e2e.js'
 ];
 
 async function runMasterSuite() {
