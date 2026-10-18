@@ -15,7 +15,11 @@ const testFiles = [
     'test_split_payment.js',
     'test_sync_engine.js',
     'test_backup_restore.js',
-    'test_telegram_backup.js'
+    'test_telegram_backup.js',
+    'test_month_over_month_analytics.js',
+    'test_auth_security.js',
+    'test_hardware_escpos.js',
+    'test_z_report_and_telegram.js'
 ];
 
 async function runMasterSuite() {
@@ -55,7 +59,7 @@ async function runMasterSuite() {
     console.table(results);
 
     if (allPassed) {
-        console.log('\n🎉 پیرۆزە! هەموو ١٤ تاقیکردنەوەکە بە ڕێژەی ١٠٠٪ سەرکەوتوون!');
+        console.log(`\n🎉 پیرۆزە! هەموو ${testFiles.length} تاقیکردنەوەکە بە ڕێژەی ١٠٠٪ سەرکەوتوون!`);
         process.exit(0);
     } else {
         console.error('\n⚠️ هەندێک لە تاقیکردنەوەکان سەرکەوتوو نەبوون!');

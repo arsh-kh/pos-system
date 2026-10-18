@@ -1,15 +1,29 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
+const { sendShiftZReportTelegram } = require('../services/telegramNotification');
 
 exports.getCurrentShift = async (req, res) => {
     try {
         const [rows] = await db.query("SELECT * FROM Shifts WHERE status = 'OPEN' ORDER BY id DESC LIMIT 1");
-        if (rows.length === 0) {
-            return res.json({ status: 'SUCCESS', data: null });
-        }
+        let shift = rows[0];
+        let openedAt;
 
-        const shift = rows[0];
-        const openedAt = shift.opened_at;
+        if (!shift) {
+            // Auto day fallback: openedAt is today at 00:00:00 so dashboard is always active & restriction-free
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            openedAt = today;
+            shift = {
+                id: 'TODAY',
+                cashier_name: 'کاشێری سەرەکی',
+                opened_at: openedAt.toISOString(),
+                opening_cash: 0,
+                status: 'OPEN',
+                is_auto_day: true
+            };
+        } else {
+            openedAt = shift.opened_at;
+        }
 
         // 1. Sales in this shift - exactly querying paid_amount (cash) and debt_amount
         const [salesRows] = await db.query(
@@ -113,12 +127,29 @@ exports.closeShift = async (req, res) => {
     const { actual_cash, notes } = req.body;
 
     try {
-        const [rows] = await db.query("SELECT * FROM Shifts WHERE id = ? AND status = 'OPEN'", [id]);
-        if (rows.length === 0) {
-            return res.status(404).json({ status: 'ERROR', message: 'شیفتی کراوە نەدۆزرایەوە' });
+        let shift;
+        if (id === 'TODAY' || id === 'current') {
+            const [openRows] = await db.query("SELECT * FROM Shifts WHERE status = 'OPEN' ORDER BY id DESC LIMIT 1");
+            if (openRows.length > 0) {
+                shift = openRows[0];
+            } else {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const [createRes] = await db.query(
+                    "INSERT INTO Shifts (cashier_name, opened_at, opening_cash, status) VALUES ('کاشێری سەرەکی', ?, 0, 'OPEN')",
+                    [today]
+                );
+                const [newRows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [createRes.insertId]);
+                shift = newRows[0];
+            }
+        } else {
+            const [rows] = await db.query("SELECT * FROM Shifts WHERE id = ? AND status = 'OPEN'", [id]);
+            if (rows.length === 0) {
+                return res.status(404).json({ status: 'ERROR', message: 'شیفتی کراوە نەدۆزرایەوە' });
+            }
+            shift = rows[0];
         }
 
-        const shift = rows[0];
         const openedAt = shift.opened_at;
 
         // Calculate real-time stats
@@ -150,7 +181,9 @@ exports.closeShift = async (req, res) => {
 
         const openingCash = Number(shift.opening_cash) || 0;
         const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
-        const countedCash = Math.max(0, Math.round(Number(actual_cash) || 0));
+        const countedCash = (actual_cash !== undefined && actual_cash !== '' && actual_cash !== null)
+            ? Math.max(0, Math.round(Number(actual_cash) || 0))
+            : expectedCash;
         const diff = countedCash - expectedCash;
 
         await db.query(`
@@ -168,6 +201,7 @@ exports.closeShift = async (req, res) => {
         `, [cashSales, debtSales, expensesPaid, expectedCash, countedCash, diff, notes || null, id]);
 
         const [updatedRows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [id]);
+        const closedShift = updatedRows[0];
 
         // Audit log shift closing
         await logAuditAction({
@@ -179,13 +213,156 @@ exports.closeShift = async (req, res) => {
             details: `داخستنی شیفت #${id}: ژمێردراوی ڕاستەقینە ${countedCash.toLocaleString()} دینار، پێشبینیکراو ${expectedCash.toLocaleString()} دینار، جیاوازی: ${diff === 0 ? '٠ (تەواو)' : diff > 0 ? `+${diff.toLocaleString()} (زیادە)` : `${diff.toLocaleString()} (کورتهێنان)`}`
         });
 
+        const zReportData = {
+            shift_id: closedShift.id,
+            cashier_name: closedShift.cashier_name,
+            opened_at: closedShift.opened_at,
+            closed_at: closedShift.closed_at,
+            status: closedShift.status,
+            opening_cash: openingCash,
+            total_sales: totalSales,
+            cash_sales: cashSales,
+            debt_sales: debtSales,
+            cash_refunds: cashRefunds,
+            expenses_paid: expensesPaid,
+            expected_cash: expectedCash,
+            actual_cash: countedCash,
+            difference: diff,
+            notes: notes || closedShift.notes
+        };
+
+        // Auto dispatch Z-Report to Telegram in background
+        sendShiftZReportTelegram(zReportData).catch((err) => {
+            console.warn('Shift Telegram notification skipped/failed:', err.message);
+        });
+
         res.json({
             status: 'SUCCESS',
             message: 'شیفت بە سەرکەوتوویی داخرا و ڕاپۆرتی Z دەرچوو',
-            data: updatedRows[0]
+            data: zReportData
         });
     } catch (error) {
         console.error('Close Shift Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+exports.getZReport = async (req, res) => {
+    const { id } = req.params;
+    try {
+        let shift;
+        if (id === 'latest' || id === 'current') {
+            const [rows] = await db.query("SELECT * FROM Shifts ORDER BY id DESC LIMIT 1");
+            shift = rows[0];
+        } else {
+            const [rows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [id]);
+            shift = rows[0];
+        }
+
+        if (!shift) {
+            return res.status(404).json({ status: 'ERROR', message: 'شیفت نەدۆزرایەوە' });
+        }
+
+        const openedAt = shift.opened_at;
+        const closedAt = shift.closed_at || new Date();
+
+        const [salesRows] = await db.query(
+            "SELECT COALESCE(SUM(total_amount), 0) as total_sales, COALESCE(SUM(paid_amount), 0) as cash_sales, COALESCE(SUM(debt_amount), 0) as debt_sales, COUNT(id) as sale_count FROM Sales WHERE created_at >= ? AND created_at <= ?",
+            [openedAt, closedAt]
+        );
+
+        const [refundRows] = await db.query(
+            "SELECT COALESCE(SUM(refunded_amount), 0) as cash_refunds, COUNT(id) as refund_count FROM Returns WHERE refund_method = 'CASH' AND created_at >= ? AND created_at <= ?",
+            [openedAt, closedAt]
+        );
+
+        const [expenseRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as expenses_paid, COUNT(id) as expense_count FROM Expenses WHERE created_at >= ? AND created_at <= ?",
+            [openedAt, closedAt]
+        );
+
+        const [profitRows] = await db.query(
+            "SELECT COALESCE(SUM(total_profit), 0) as total_profit FROM Sales WHERE created_at >= ? AND created_at <= ?",
+            [openedAt, closedAt]
+        );
+
+        const openingCash = Number(shift.opening_cash) || 0;
+        const totalSales = Number(salesRows[0].total_sales) || 0;
+        const cashSales = Number(salesRows[0].cash_sales) || 0;
+        const debtSales = Number(salesRows[0].debt_sales) || 0;
+        const cashRefunds = Number(refundRows[0].cash_refunds) || 0;
+        const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
+        const grossProfit = Number(profitRows[0].total_profit) || 0;
+        const netProfit = grossProfit - expensesPaid;
+        const expectedCash = Number(shift.expected_cash) || (openingCash + cashSales - cashRefunds - expensesPaid);
+        const actualCash = Number(shift.actual_cash) || expectedCash;
+        const difference = Number(shift.difference) || (actualCash - expectedCash);
+
+        const zReportData = {
+            shift_id: shift.id,
+            cashier_name: shift.cashier_name,
+            opened_at: shift.opened_at,
+            closed_at: shift.closed_at,
+            status: shift.status,
+            opening_cash: openingCash,
+            total_sales: totalSales,
+            cash_sales: cashSales,
+            debt_sales: debtSales,
+            cash_refunds: cashRefunds,
+            expenses_paid: expensesPaid,
+            expected_cash: expectedCash,
+            actual_cash: actualCash,
+            difference: difference,
+            gross_profit: grossProfit,
+            net_profit: netProfit,
+            sale_count: Number(salesRows[0].sale_count) || 0,
+            refund_count: Number(refundRows[0].refund_count) || 0,
+            expense_count: Number(expenseRows[0].expense_count) || 0,
+            notes: shift.notes
+        };
+
+        res.json({
+            status: 'SUCCESS',
+            data: zReportData
+        });
+    } catch (error) {
+        console.error('getZReport Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+exports.sendZReportTelegram = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ status: 'ERROR', message: 'شیفت نەدۆزرایەوە' });
+        }
+        const shift = rows[0];
+        const zData = {
+            shift_id: shift.id,
+            cashier_name: shift.cashier_name,
+            opened_at: shift.opened_at,
+            closed_at: shift.closed_at,
+            opening_cash: shift.opening_cash,
+            cash_sales: shift.cash_sales,
+            debt_sales: shift.debt_sales,
+            total_sales: (Number(shift.cash_sales) || 0) + (Number(shift.debt_sales) || 0),
+            expenses_paid: shift.expenses_paid,
+            expected_cash: shift.expected_cash,
+            actual_cash: shift.actual_cash,
+            difference: shift.difference,
+            notes: shift.notes
+        };
+
+        const result = await sendShiftZReportTelegram(zData);
+        res.json({
+            status: 'SUCCESS',
+            message: 'ڕاپۆرتی Z بە سەرکەوتوویی بۆ تێلیگرام نێردرا',
+            data: result
+        });
+    } catch (error) {
+        console.error('sendZReportTelegram Error:', error);
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };

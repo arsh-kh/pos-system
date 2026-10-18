@@ -41,13 +41,13 @@ async function migrate() {
     }
 
     // 3. ڕێکخستنی فرۆشتنەکانی پێشوو بەپێی بەڵگەنامەکان
-    // ئەگەر وەسڵێکی پێشوو هەبێت کە paid_amount = 0 و debt_amount = 0 بێت:
+    // ئەگەر پسووڵەیەکی پێشوو هەبێت کە paid_amount = 0 و debt_amount = 0 بێت:
     await connection.query(`
       UPDATE Sales 
       SET paid_amount = total_amount, payment_method = 'CASH' 
       WHERE paid_amount = 0 AND debt_amount = 0 AND total_amount > 0
     `);
-    console.log('✓ داتای وەسڵەکانی پێشوو بە سەرکەوتوویی گونجێندران');
+    console.log('✓ داتای پسووڵەکانی پێشوو بە سەرکەوتوویی گونجێندران');
 
     await connection.commit();
     console.log('=== مەیگرەیشنەکە بە سەرکەوتوویی ١٠٠٪ تەواو بوو! ===');

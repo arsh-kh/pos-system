@@ -88,6 +88,14 @@ const ThisMonth = () => {
   const daysRecorded = processedDailyData.length;
   const averageDaily = daysRecorded > 0 ? Math.round(totalSales / daysRecorded) : 0;
 
+  const lastMonthSales = Number(current.last_month_sales || 0);
+
+  // Month-over-Month Delta (کۆی فرۆشتنی ئەم مانگە بەراورد بە مانگی پێشوو)
+  const monthOverMonthDelta = useMemo(() => {
+    if (lastMonthSales === 0) return null;
+    return (((totalSales - lastMonthSales) / lastMonthSales) * 100).toFixed(1);
+  }, [totalSales, lastMonthSales]);
+
   // Find highest single-day sales
   const maxDay = useMemo(() => {
     if (processedDailyData.length === 0) return { sales: 0, formattedDate: '-' };
@@ -139,10 +147,14 @@ const ThisMonth = () => {
         <div className="stat-card glass-panel" style={{ background: 'rgba(56, 189, 248, 0.08)', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
           <h3>کۆی فرۆشتنی ئەم مانگە</h3>
           <div className="value highlight" style={{ color: '#38bdf8' }}>{totalSales.toLocaleString()} دینار</div>
-          {latestDelta !== null && (
-            <div className="sub-text" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: Number(latestDelta) >= 0 ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
-              {Number(latestDelta) >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-              {Number(latestDelta) >= 0 ? `+${latestDelta}%` : `${latestDelta}%`} گۆڕانکاری لە چاو دوێنێ
+          {monthOverMonthDelta !== null ? (
+            <div className="sub-text" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: Number(monthOverMonthDelta) >= 0 ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
+              {Number(monthOverMonthDelta) >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+              {Number(monthOverMonthDelta) >= 0 ? `+${monthOverMonthDelta}%` : `${monthOverMonthDelta}%`} گۆڕانکاری لە چاو مانگی ڕابردوو
+            </div>
+          ) : (
+            <div className="sub-text" style={{ color: 'var(--text-secondary)' }}>
+              مانگی ڕابردوو: {lastMonthSales > 0 ? `${lastMonthSales.toLocaleString()} د.ع` : 'تۆمار نەکراوە'}
             </div>
           )}
         </div>
@@ -164,7 +176,7 @@ const ThisMonth = () => {
           </div>
           <div className="value" style={{ color: '#fb7185' }}>{totalExpenses.toLocaleString()} دینار</div>
           <div className="sub-text" style={{ color: '#fda4af' }}>
-            مەساریف و تێچووەکانی فرۆشگا
+            خەرجی و تێچووەکانی فرۆشگا
           </div>
         </div>
 
@@ -183,14 +195,14 @@ const ThisMonth = () => {
       </div>
 
       {/* True Profit & Loss Breakdown Banner */}
-      <div className="glass-panel mb-8" style={{ padding: '20px 24px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="glass-panel mb-8" style={{ padding: '20px 24px', borderRadius: '20px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <TrendingUp size={18} /> باڵانسی قازانجی ڕاستەقینەی ئەم مانگە (P&L Breakdown)
             </h4>
-            <div style={{ fontSize: '0.88rem', color: '#94a3b8' }}>
-              حیسابکردنی وردی داهات بە کەمکردنەوەی نرخی تێچووی کۆگا، مەساریف، و زیانی کاڵای بەسەرچوو و شکاو
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+              حیسابکردنی وردی داهات بە کەمکردنەوەی نرخی تێچووی کۆگا، خەرجییەکان، و زیانی کاڵای بەسەرچوو و شکاو
             </div>
           </div>
 
@@ -199,7 +211,7 @@ const ThisMonth = () => {
               قازانجی خاو: +{grossProfit.toLocaleString()} د.ع
             </div>
             <div style={{ padding: '8px 14px', borderRadius: '10px', background: 'rgba(244, 63, 94, 0.1)', color: '#fb7185' }}>
-              مەساریف: -{totalExpenses.toLocaleString()} د.ع
+              خەرجییەکان: -{totalExpenses.toLocaleString()} د.ع
             </div>
             <div style={{ padding: '8px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171' }}>
               زیانی فەوتان: -{totalDamagesLoss.toLocaleString()} د.ع
@@ -251,10 +263,10 @@ const ThisMonth = () => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
-                <XAxis dataKey="formattedDate" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
+                <XAxis dataKey="formattedDate" stroke="var(--text-secondary)" />
+                <YAxis stroke="var(--text-secondary)" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#f8fafc' }}
+                  contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', color: 'var(--text-primary)' }}
                   formatter={(val) => [`${Number(val).toLocaleString()} دینار`]}
                 />
                 <Area type="monotone" dataKey="sales" name="فرۆشتن" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorSalesMonth)" />
@@ -271,25 +283,25 @@ const ThisMonth = () => {
 
         <div style={{ padding: '1px', borderRadius: '14px', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-            <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+            <thead style={{ background: 'var(--bg-tertiary)' }}>
               <tr>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>بەروار</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>فرۆشتن (دینار)</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>قازانجی سافی (دینار)</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>ڕێژەی قازانج</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>گۆڕانکاری لە چاو ڕۆژی پێشوو</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>بەروار</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>فرۆشتن (دینار)</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>قازانجی سافی (دینار)</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>ڕێژەی قازانج</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>گۆڕانکاری لە چاو ڕۆژی پێشوو</th>
               </tr>
             </thead>
             <tbody>
               {processedDailyData.length === 0 ? (
-                <tr><td colSpan="5" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>هیچ داتایەک نییە</td></tr>
+                <tr><td colSpan="5" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>هیچ داتایەک نییە</td></tr>
               ) : (
                 processedDailyData.map((d, index) => {
                   const isUp = d.changePercent !== null && Number(d.changePercent) >= 0;
 
                   return (
-                    <tr key={index} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>{d.formattedDate}</td>
+                    <tr key={index} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{d.formattedDate}</td>
                       <td style={{ padding: '14px 18px', color: '#38bdf8', fontWeight: 'bold' }}>
                         {d.sales.toLocaleString()} دینار
                       </td>
@@ -301,7 +313,7 @@ const ThisMonth = () => {
                       </td>
                       <td style={{ padding: '14px 18px' }}>
                         {d.changePercent === null ? (
-                          <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Minus size={14} /> سەرەتا
                           </span>
                         ) : isUp ? (

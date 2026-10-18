@@ -38,6 +38,8 @@
     flex-direction: column;
     gap: 8px;
     padding: 0 15px;
+    overflow-y: auto;
+    flex: 1;
   }
   
   .nav-link {

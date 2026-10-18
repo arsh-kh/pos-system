@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { 
   Tag, 
   Plus, 
@@ -156,10 +157,7 @@ const Promotions = () => {
 
   // Filtered List
   const filteredPromotions = promotions.filter(p => {
-    const matchesSearch = 
-      p.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.notes && p.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = kurdishSearchMatch([p.product_name, p.barcode, p.notes], searchTerm);
 
     const matchesStatus = 
       statusFilter === 'ALL' || 
@@ -169,8 +167,7 @@ const Promotions = () => {
   });
 
   const filteredProductsForSelect = products.filter(p => 
-    p.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-    p.barcode?.toLowerCase().includes(productSearch.toLowerCase())
+    kurdishSearchMatch([p.name, p.barcode], productSearch)
   );
 
   return (
@@ -189,7 +186,8 @@ const Promotions = () => {
           <button 
             onClick={fetchData} 
             disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}
           >
             <RefreshCw size={18} className={loading ? 'spin' : ''} />
             نوێکردنەوە
@@ -197,7 +195,7 @@ const Promotions = () => {
 
           <button 
             onClick={() => setIsModalOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #d97706, #b45309)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(217, 119, 6, 0.35)' }}
           >
             <Plus size={20} /> ئۆفەری نوێ 🏷️
           </button>
@@ -206,9 +204,9 @@ const Promotions = () => {
 
       {/* KPI Cards Grid */}
       <div className="stats-grid mb-8">
-        <div className="stat-card glass-panel" style={{ background: 'rgba(139, 92, 246, 0.08)', borderColor: 'rgba(139, 92, 246, 0.25)' }}>
+        <div className="stat-card glass-panel" style={{ background: 'rgba(217, 119, 6, 0.08)', borderColor: 'rgba(217, 119, 6, 0.25)' }}>
           <h3>ئۆفەرە چالاکەکانی ئێستا</h3>
-          <div className="value" style={{ color: '#a78bfa' }}>
+          <div className="value" style={{ color: '#d97706' }}>
             {activeCount} ئۆفەری چالاک
           </div>
           <div className="sub-text">دەستبەجێ لە کاشێر جێبەجێ دەبن</div>
@@ -254,11 +252,11 @@ const Promotions = () => {
               style={{
                 padding: '8px 16px',
                 borderRadius: '10px',
-                border: 'none',
+                border: '1px solid ' + (statusFilter === tab.id ? 'transparent' : 'var(--border-color)'),
                 cursor: 'pointer',
                 fontWeight: statusFilter === tab.id ? 'bold' : 'normal',
-                background: statusFilter === tab.id ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                color: statusFilter === tab.id ? 'white' : '#94a3b8'
+                background: statusFilter === tab.id ? '#2563eb' : 'var(--bg-tertiary)',
+                color: statusFilter === tab.id ? 'white' : 'var(--text-secondary)'
               }}
             >
               {tab.label}
@@ -267,13 +265,13 @@ const Promotions = () => {
         </div>
 
         <div style={{ position: 'relative', width: '320px' }}>
-          <Search size={18} color="#94a3b8" style={{ position: 'absolute', right: '12px', top: '12px' }} />
+          <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', right: '12px', top: '12px' }} />
           <input 
             type="text" 
             placeholder="گەڕان بەپێی ناوی کاڵا یان بارکۆد..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '10px 40px 10px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+            style={{ width: '100%', padding: '10px 40px 10px 16px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
           />
         </div>
       </div>
@@ -281,21 +279,21 @@ const Promotions = () => {
       {/* Promotions Table */}
       <div className="glass-panel" style={{ padding: '1px', borderRadius: '16px', overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <thead style={{ background: 'var(--bg-tertiary)' }}>
             <tr>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کاڵا و بارکۆد</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی ئاسایی</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی ئۆفەر</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>سنووری بڕ (بۆ هەر کڕینێک)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ماوەی ئۆفەر</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>دۆخ</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کردارەکان</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کاڵا و بارکۆد</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی ئاسایی</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی ئۆفەر</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>سنووری بڕ (بۆ هەر کڕینێک)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ماوەی ئۆفەر</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>دۆخ</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کردارەکان</th>
             </tr>
           </thead>
           <tbody>
             {filteredPromotions.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                   هیچ ئۆفەرێک لەم بەشەدا نەدۆزرایەوە
                 </td>
               </tr>
@@ -313,29 +311,29 @@ const Promotions = () => {
                 const discountPercent = orig > 0 ? Math.round((discountAmount / orig) * 100) : 0;
 
                 return (
-                  <tr key={promo.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <tr key={promo.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     {/* Product Name & Barcode */}
                     <td style={{ padding: '16px 20px' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{promo.product_name}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{promo.barcode || '-'}</div>
+                      <div style={{ fontWeight: 'bold', fontSize: '1rem', color: 'var(--text-primary)' }}>{promo.product_name}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{promo.barcode || '-'}</div>
                     </td>
 
                     {/* Normal Price */}
-                    <td style={{ padding: '16px 20px', color: '#94a3b8' }}>
+                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
                       <span style={{ textDecoration: 'line-through' }}>{orig.toLocaleString()} د.ع</span>
                     </td>
 
                     {/* Promo Price & Discount Badge */}
                     <td style={{ padding: '16px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: '#a78bfa', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                        <span style={{ color: '#0284c7', fontWeight: 'bold', fontSize: '1.1rem' }}>
                           {promoPrice.toLocaleString()} د.ع
                         </span>
-                        <span style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#c084fc', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                        <span style={{ background: 'rgba(217, 119, 6, 0.15)', color: '#b45309', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
                           -{discountPercent}%
                         </span>
                       </div>
-                      <div style={{ color: '#34d399', fontSize: '0.8rem', marginTop: '2px' }}>
+                      <div style={{ color: '#10b981', fontSize: '0.8rem', marginTop: '2px' }}>
                         پاشەکەوت: {discountAmount.toLocaleString()} د.ع بۆ هەر {promo.unit || 'دانە'}
                       </div>
                     </td>
@@ -343,18 +341,18 @@ const Promotions = () => {
                     {/* Max Limit Per Sale */}
                     <td style={{ padding: '16px 20px' }}>
                       {promo.max_qty_per_sale ? (
-                        <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                        <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#0284c7', padding: '4px 10px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem' }}>
                           زۆرترین {promo.max_qty_per_sale} {promo.unit || 'دانە'}
                         </span>
                       ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>بێ سنوور (هەموو بڕێک)</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بێ سنوور (هەموو بڕێک)</span>
                       )}
                     </td>
 
                     {/* Promo Duration */}
-                    <td style={{ padding: '16px 20px', fontSize: '0.85rem', color: '#cbd5e1' }}>
+                    <td style={{ padding: '16px 20px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={14} color="#94a3b8" />
+                        <Calendar size={14} color="var(--text-secondary)" />
                         لە {new Date(promo.start_date).toLocaleDateString('ku-IQ')} تا {new Date(promo.end_date).toLocaleDateString('ku-IQ')}
                       </div>
                     </td>
@@ -362,22 +360,22 @@ const Promotions = () => {
                     {/* Status Badge */}
                     <td style={{ padding: '16px 20px' }}>
                       {promo.calculated_status === 'ACTIVE' && (
-                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', fontWeight: 'bold', fontSize: '0.8rem' }}>
                           چالاکە 🟢
                         </span>
                       )}
                       {promo.calculated_status === 'SCHEDULED' && (
-                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', fontWeight: 'bold', fontSize: '0.8rem' }}>
                           پلاندانراو 🟡
                         </span>
                       )}
                       {promo.calculated_status === 'EXPIRED' && (
-                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
                           بەسەرچوو 🔴
                         </span>
                       )}
                       {promo.calculated_status === 'INACTIVE' && (
-                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(148, 163, 184, 0.2)', color: '#94a3b8', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(148, 163, 184, 0.2)', color: 'var(--text-secondary)', fontWeight: 'bold', fontSize: '0.8rem' }}>
                           ناچالاککراو ⚪
                         </span>
                       )}
@@ -392,9 +390,9 @@ const Promotions = () => {
                           style={{
                             padding: '6px 12px',
                             borderRadius: '8px',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            background: promo.is_active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
-                            color: promo.is_active ? '#34d399' : '#94a3b8',
+                            border: '1px solid var(--border-color)',
+                            background: promo.is_active ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-tertiary)',
+                            color: promo.is_active ? '#10b981' : 'var(--text-secondary)',
                             cursor: 'pointer',
                             fontSize: '0.8rem',
                             fontWeight: 'bold'
@@ -410,7 +408,7 @@ const Promotions = () => {
                             borderRadius: '8px',
                             border: 'none',
                             background: 'rgba(239, 68, 68, 0.15)',
-                            color: '#f87171',
+                            color: '#ef4444',
                             cursor: 'pointer'
                           }}
                         >
@@ -428,21 +426,21 @@ const Promotions = () => {
 
       {/* Modal: Create Promotion */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '580px', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: 0, color: '#c084fc' }}>
-                <Sparkles size={24} /> دروستکردنی ئۆفەری نوێ
+        <div className="pos-modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', margin: 0, color: 'var(--text-primary)', fontWeight: 800 }}>
+                <Sparkles size={22} color="#d97706" /> دروستکردنی ئۆفەری نوێ
               </h2>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleCreatePromotion}>
               {/* Product Selector */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.9rem' }}>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
                   هەڵبژاردنی کاڵا بۆ ئۆفەرەکە *
                 </label>
                 <input 
@@ -450,14 +448,14 @@ const Promotions = () => {
                   placeholder="گەڕان بەپێی ناوی کاڵا بۆ هەڵبژاردن..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none', marginBottom: '8px' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', marginBottom: '8px' }}
                 />
                 
                 <select 
                   value={formData.product_id}
                   onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none', fontSize: '0.95rem' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.95rem' }}
                 >
                   <option value="">-- کاڵایەک دیاریبکە ({filteredProductsForSelect.length} کاڵا) --</option>
                   {filteredProductsForSelect.map(p => (
@@ -470,38 +468,38 @@ const Promotions = () => {
 
               {/* Selected Product Info Banner */}
               {selectedProduct && (
-                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '12px 16px', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(139, 92, 246, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ background: 'rgba(217, 119, 6, 0.08)', padding: '12px 16px', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(217, 119, 6, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>نرخی کڕین (تێچوو):</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>نرخی کڕین (تێچوو):</span>
                     <strong style={{ display: 'block', color: '#f87171' }}>{Number(selectedProduct.cost_price || 0).toLocaleString()} دینار</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>نرخی ئێستای فرۆشتن:</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>نرخی ئێستای فرۆشتن:</span>
                     <strong style={{ display: 'block', color: '#38bdf8' }}>{Number(selectedProduct.selling_price).toLocaleString()} دینار</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>مەوجودی کۆگا:</span>
-                    <strong style={{ display: 'block', color: '#34d399' }}>{selectedProduct.stock} {selectedProduct.unit || 'دانە'}</strong>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>مەوجودی کۆگا:</span>
+                    <strong style={{ display: 'block', color: '#10b981' }}>{selectedProduct.stock} {selectedProduct.unit || 'دانە'}</strong>
                   </div>
                 </div>
               )}
 
               {/* Discount Type Toggle */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>شێوازی داشکاندن:</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>شێوازی داشکاندن:</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, discount_type: 'FIXED_PRICE' })}
                     style={{
-                      flex: 1,
+                      flex: '1 1 140px',
                       padding: '10px',
                       borderRadius: '10px',
-                      border: 'none',
+                      border: '1px solid ' + (formData.discount_type === 'FIXED_PRICE' ? 'transparent' : 'var(--border-color)'),
                       cursor: 'pointer',
                       fontWeight: 'bold',
-                      background: formData.discount_type === 'FIXED_PRICE' ? '#8b5cf6' : 'rgba(255,255,255,0.06)',
-                      color: formData.discount_type === 'FIXED_PRICE' ? 'white' : '#94a3b8'
+                      background: formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--bg-tertiary)',
+                      color: formData.discount_type === 'FIXED_PRICE' ? 'white' : 'var(--text-secondary)'
                     }}
                   >
                     نرخی نوێی ئۆفەر (دینار)
@@ -510,14 +508,14 @@ const Promotions = () => {
                     type="button"
                     onClick={() => setFormData({ ...formData, discount_type: 'PERCENT' })}
                     style={{
-                      flex: 1,
+                      flex: '1 1 140px',
                       padding: '10px',
                       borderRadius: '10px',
-                      border: 'none',
+                      border: '1px solid ' + (formData.discount_type === 'PERCENT' ? 'transparent' : 'var(--border-color)'),
                       cursor: 'pointer',
                       fontWeight: 'bold',
-                      background: formData.discount_type === 'PERCENT' ? '#8b5cf6' : 'rgba(255,255,255,0.06)',
-                      color: formData.discount_type === 'PERCENT' ? 'white' : '#94a3b8'
+                      background: formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--bg-tertiary)',
+                      color: formData.discount_type === 'PERCENT' ? 'white' : 'var(--text-secondary)'
                     }}
                   >
                     ڕێژەی لەسەدا (%)
@@ -527,25 +525,68 @@ const Promotions = () => {
 
               {/* Discount Value Input */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.9rem' }}>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
                   {formData.discount_type === 'FIXED_PRICE' ? 'نرخی نوێی داشکێنراو (بە دینار) *' : 'ڕێژەی داشکاندن (لە ١٪ بۆ ٩٩٪) *'}
                 </label>
-                <input 
-                  type="number" 
-                  value={formData.discount_value} 
-                  onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
-                  placeholder={formData.discount_type === 'FIXED_PRICE' ? 'بۆ نموونە: 750' : 'بۆ نموونە: 25'}
-                  min="0"
-                  max={formData.discount_type === 'PERCENT' ? "99" : undefined}
-                  required
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none', fontSize: '1.1rem', fontWeight: 'bold' }}
-                />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const step = formData.discount_type === 'FIXED_PRICE' ? 250 : 5;
+                      const cur = Math.max(0, parseInt(formData.discount_value) || 0);
+                      const next = Math.max(0, cur - step);
+                      setFormData({ ...formData, discount_value: next === 0 ? '' : String(next) });
+                    }}
+                    style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    {formData.discount_type === 'FIXED_PRICE' ? '-٢٥٠' : '-٥٪'}
+                  </button>
+                  <input 
+                    type="number" 
+                    value={formData.discount_value} 
+                    onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
+                    placeholder={formData.discount_type === 'FIXED_PRICE' ? 'بۆ نموونە: 750' : 'بۆ نموونە: 25'}
+                    min="0"
+                    step={formData.discount_type === 'FIXED_PRICE' ? "250" : "1"}
+                    max={formData.discount_type === 'PERCENT' ? "99" : undefined}
+                    required
+                    style={{ flex: '1 1 120px', minWidth: '100px', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'center' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const step = formData.discount_type === 'FIXED_PRICE' ? 250 : 5;
+                      const cur = Math.max(0, parseInt(formData.discount_value) || 0);
+                      const maxVal = formData.discount_type === 'PERCENT' ? 99 : Infinity;
+                      const next = Math.min(maxVal, cur + step);
+                      setFormData({ ...formData, discount_value: String(next) });
+                    }}
+                    style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    {formData.discount_type === 'FIXED_PRICE' ? '+٢٥٠' : '+٥٪'}
+                  </button>
+                </div>
+
+                {formData.discount_type === 'FIXED_PRICE' && (
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    {[250, 500, 750, 1000, 1500, 2000, 2500, 5000].map(amt => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, discount_value: String(amt) })}
+                        style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {amt.toLocaleString()}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Calculation Summary Preview */}
                 {selectedProduct && formData.discount_value && (
-                  <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>نرخی نێو ئۆفەر دەبێتە:</span>
-                    <strong style={{ fontSize: '1.2rem', color: '#a78bfa' }}>{calculatedPromoPrice.toLocaleString()} دینار</strong>
+                  <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>نرخی نێو ئۆفەر دەبێتە:</span>
+                    <strong style={{ fontSize: '1.2rem', color: '#0284c7' }}>{calculatedPromoPrice.toLocaleString()} دینار</strong>
                   </div>
                 )}
 
@@ -560,7 +601,7 @@ const Promotions = () => {
 
               {/* Max Quantity Limit per Sale */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.9rem' }}>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
                   سنووری زۆرترین بڕ بۆ یەک کڕین (Max Limit Per Sale)
                 </label>
                 <input 
@@ -570,62 +611,63 @@ const Promotions = () => {
                   placeholder="نموونە: 2 (ئەگەر کڕیار لە 2 زیاتر بکڕێت، ئەوانی تر بە نرخی ئاسایی دەبن)"
                   min="0.1"
                   step="any"
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
                 />
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
                   بۆ بێ سنوور، دەتوانیت بە بەتاڵی جێی بهێڵیت.
                 </span>
               </div>
 
               {/* Date Pickers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              <div className="responsive-grid-2" style={{ marginBottom: '20px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.9rem' }}>بەرواری دەستپێک *</label>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>بەرواری دەستپێک *</label>
                   <input 
                     type="date" 
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none' }}
+                    style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.9rem' }}>بەرواری کۆتایی *</label>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>بەرواری کۆتایی *</label>
                   <input 
                     type="date" 
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none' }}
+                    style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
                   />
                 </div>
               </div>
 
               {/* Notes */}
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.9rem' }}>تێبینی و هۆکاری ئۆفەر (ئارەزوومەندانە)</label>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>تێبینی و هۆکاری ئۆفەر (ئارەزوومەندانە)</label>
                 <input 
                   type="text" 
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="بۆ نموونە: ئۆفەری جەژن، داشکاندنی بەرواری نزیک..."
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
                 />
               </div>
 
               {/* Submit Buttons */}
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
+                  style={{ flex: 1, minWidth: '160px', padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #d97706, #b45309)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 4px 15px rgba(217, 119, 6, 0.35)' }}
                 >
                   {isSubmitting ? 'کەمێک بوەستە...' : 'تۆمارکردنی ئۆفەر 🚀'}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: 'none', cursor: 'pointer' }}
+                  className="btn-secondary"
+                  style={{ padding: '14px 20px' }}
                 >
                   پاشگەزبوونەوە
                 </button>

@@ -52,7 +52,7 @@ exports.createPurchaseReturn = async (req, res) => {
         const totalRefund = Math.round(returnCost * totalUnitsDeducted);
 
         // 2. Fetch & Verify Supplier (if provided)
-        let supplierName = 'کڕینی لۆکاڵی / بێ کۆمپانیا';
+        let supplierName = 'کڕینی ناوخۆیی / بێ کۆمپانیا';
         let supplierPhone = null;
         let prevRemainingDebt = 0;
         let newRemainingDebt = 0;
@@ -231,7 +231,7 @@ exports.getAllPurchaseReturns = async (req, res) => {
 
         let query = `
             SELECT pr.*, 
-                   COALESCE(s.name, 'کڕینی لۆکاڵی / بێ کۆمپانیا') as supplier_name,
+                   COALESCE(s.name, 'کڕینی ناوخۆیی / بێ کۆمپانیا') as supplier_name,
                    s.phone as supplier_phone,
                    s.total_remaining as supplier_current_debt,
                    p.name as product_name,
@@ -320,7 +320,7 @@ exports.getPurchaseReturnsStats = async (req, res) => {
         const [topSuppliers] = await db.query(`
             SELECT 
                 pr.supplier_id,
-                COALESCE(s.name, 'کڕینی لۆکاڵی') as supplier_name,
+                COALESCE(s.name, 'کڕینی ناوخۆیی') as supplier_name,
                 COUNT(pr.id) as return_count,
                 COALESCE(SUM(pr.total_refund), 0) as total_amount_refunded
             FROM Purchase_Returns pr

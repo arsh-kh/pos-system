@@ -13,6 +13,7 @@ import {
   X,
   FileText
 } from 'lucide-react';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const REASON_OPTIONS = [
@@ -166,10 +167,7 @@ const Returns = () => {
     .reduce((sum, r) => sum + (Number(r.refunded_amount) || 0), 0);
 
   const filteredHistory = returnsHistory.filter(r => 
-    r.product_name?.toLowerCase().includes(historySearch.toLowerCase()) ||
-    r.barcode?.toLowerCase().includes(historySearch.toLowerCase()) ||
-    r.sale_id?.toString().includes(historySearch) ||
-    r.customer_name?.toLowerCase().includes(historySearch.toLowerCase())
+    kurdishSearchMatch([r.product_name, r.barcode, r.sale_id, r.customer_name, r.reason], historySearch)
   );
 
   return (
@@ -233,12 +231,12 @@ const Returns = () => {
             placeholder="ژمارەی پسووڵە بنووسە (نموونە: 9)..."
             value={saleIdInput}
             onChange={(e) => setSaleIdInput(e.target.value)}
-            style={{ flex: 1, padding: '12px 18px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: '1rem', outline: 'none' }}
+            style={{ flex: 1, padding: '12px 18px', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none' }}
           />
           <button 
             type="submit" 
             disabled={isSearchingSale}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'var(--accent-color)', color: '#ffffff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
           >
             <Search size={18} /> {isSearchingSale ? 'دەگەڕێت...' : 'دۆزینەوەی پسووڵە'}
           </button>
@@ -282,8 +280,8 @@ const Returns = () => {
                     {searchedSale.payment_method === 'DEBT' ? 'فرۆشراو بە قەرز 💳' : (searchedSale.payment_method === 'SPLIT' ? 'فرۆشراو بە تێکەڵ ⚖️' : 'فرۆشراو بە نەقد 💵')}
                   </span>
                 </div>
-                <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '6px' }}>
-                  کڕیار: <strong style={{ color: 'white' }}>{searchedSale.customer_name}</strong> {searchedSale.customer_phone ? `(${searchedSale.customer_phone})` : ''}
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '6px' }}>
+                  کڕیار: <strong style={{ color: 'var(--text-primary)' }}>{searchedSale.customer_name}</strong> {searchedSale.customer_phone ? `(${searchedSale.customer_phone})` : ''}
                   {searchedSale.customer_id && (
                     <span style={{ marginRight: '10px', color: '#f59e0b', fontWeight: 'bold' }}>
                       (قەرزی ئێستای کڕیار: {Number(searchedSale.customer_total_debt || 0).toLocaleString()} د.ع)
@@ -293,8 +291,8 @@ const Returns = () => {
               </div>
 
               {/* Settlement Mode Selector & Notice */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start', background: 'var(--bg-tertiary)', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>
                   شێوازی دانەوەی پارەی گەڕاوە:
                 </div>
                 {searchedSale.payment_method === 'SPLIT' ? (
@@ -308,9 +306,9 @@ const Returns = () => {
                         fontSize: '0.8rem',
                         fontWeight: 'bold',
                         cursor: 'pointer',
-                        border: refundMethod === 'DEBT' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
-                        background: refundMethod === 'DEBT' ? '#ef4444' : 'rgba(255,255,255,0.05)',
-                        color: 'white'
+                        border: refundMethod === 'DEBT' ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                        background: refundMethod === 'DEBT' ? '#ef4444' : 'var(--bg-tertiary)',
+                        color: refundMethod === 'DEBT' ? 'white' : 'var(--text-secondary)'
                       }}
                     >
                       💳 کەمکردنەوە لە قەرز (پێشنیارکراو)
@@ -324,9 +322,9 @@ const Returns = () => {
                         fontSize: '0.8rem',
                         fontWeight: 'bold',
                         cursor: 'pointer',
-                        border: refundMethod === 'CASH' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
-                        background: refundMethod === 'CASH' ? '#10b981' : 'rgba(255,255,255,0.05)',
-                        color: 'white'
+                        border: refundMethod === 'CASH' ? '1px solid #10b981' : '1px solid var(--border-color)',
+                        background: refundMethod === 'CASH' ? '#10b981' : 'var(--bg-tertiary)',
+                        color: refundMethod === 'CASH' ? 'white' : 'var(--text-secondary)'
                       }}
                     >
                       💵 دانەوە بە نەقد لە سندوق
@@ -357,7 +355,7 @@ const Returns = () => {
                 </div>
 
                 <div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>کۆی وەسڵ:</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>کۆی پسووڵە:</div>
                   <div style={{ color: '#34d399', fontSize: '1.2rem', fontWeight: 'bold' }}>
                     {Number(searchedSale.total_amount || 0).toLocaleString()} دینار
                   </div>
@@ -366,20 +364,20 @@ const Returns = () => {
             </div>
 
             {/* Sale Items Table for Returns */}
-            <h3 style={{ fontSize: '1.05rem', marginBottom: '12px', color: '#cbd5e1' }}>لیستی کاڵاکانی پسووڵە بۆ گەڕاندنەوە:</h3>
+            <h3 style={{ fontSize: '1.05rem', marginBottom: '12px', color: 'var(--text-primary)' }}>لیستی کاڵاکانی پسووڵە بۆ گەڕاندنەوە:</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+                <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
                   <tr>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>ناوی کاڵا</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>بارکۆد</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>نرخی فرۆشتن</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>کڕدراو</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>گەڕێنراوە</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>ماوە بۆ گەڕاندنەوە</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>بڕی گەڕاندنەوە</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>هۆکار</th>
-                    <th style={{ padding: '12px 16px', color: '#94a3b8' }}>کردار</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>ناوی کاڵا</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>بارکۆد</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>نرخی فرۆشتن</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>کڕدراو</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>گەڕێنراوە</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>ماوە بۆ گەڕاندنەوە</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>بڕی گەڕاندنەوە</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>هۆکار</th>
+                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>کردار</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -388,15 +386,15 @@ const Returns = () => {
                     const isProcessing = processingItemId === item.product_id;
 
                     return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: isFullyReturned ? 0.6 : 1 }}>
-                        <td style={{ padding: '14px 16px', fontWeight: 'bold' }}>{item.product_name}</td>
-                        <td style={{ padding: '14px 16px', color: '#94a3b8', fontSize: '0.9rem' }}>{item.barcode || '-'}</td>
-                        <td style={{ padding: '14px 16px', color: '#38bdf8' }}>{Number(item.price_at_sale).toLocaleString()} د.ع</td>
-                        <td style={{ padding: '14px 16px' }}>{item.quantity} {item.unit || 'دانە'}</td>
-                        <td style={{ padding: '14px 16px', color: item.already_returned > 0 ? '#f87171' : '#94a3b8' }}>
+                      <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: isFullyReturned ? 0.6 : 1 }}>
+                        <td style={{ padding: '14px 16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.product_name}</td>
+                        <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{item.barcode || '-'}</td>
+                        <td style={{ padding: '14px 16px', color: 'var(--accent-color)', fontWeight: 'bold' }}>{Number(item.price_at_sale).toLocaleString()} د.ع</td>
+                        <td style={{ padding: '14px 16px', color: 'var(--text-primary)' }}>{item.quantity} {item.unit || 'دانە'}</td>
+                        <td style={{ padding: '14px 16px', color: item.already_returned > 0 ? '#ef4444' : 'var(--text-secondary)' }}>
                           {item.already_returned} {item.unit || 'دانە'}
                         </td>
-                        <td style={{ padding: '14px 16px', fontWeight: 'bold', color: item.returnable_qty > 0 ? '#34d399' : '#94a3b8' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: 'bold', color: item.returnable_qty > 0 ? '#059669' : 'var(--text-secondary)' }}>
                           {item.returnable_qty} {item.unit || 'دانە'}
                         </td>
 
@@ -410,10 +408,10 @@ const Returns = () => {
                               step="any"
                               value={returnQtys[item.product_id] ?? 1}
                               onChange={(e) => setReturnQtys({ ...returnQtys, [item.product_id]: e.target.value })}
-                              style={{ width: '80px', padding: '6px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', textAlign: 'center', outline: 'none' }}
+                              style={{ width: '80px', padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', textAlign: 'center', outline: 'none', fontWeight: 'bold' }}
                             />
                           ) : (
-                            <span style={{ color: '#94a3b8' }}>تەواو گەڕاوەتەوە</span>
+                            <span style={{ color: 'var(--text-muted)' }}>تەواو گەڕاوەتەوە</span>
                           )}
                         </td>
 
@@ -423,14 +421,14 @@ const Returns = () => {
                             <select 
                               value={returnReasons[item.product_id] || REASON_OPTIONS[0]}
                               onChange={(e) => setReturnReasons({ ...returnReasons, [item.product_id]: e.target.value })}
-                              style={{ padding: '6px 10px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none', fontSize: '0.85rem' }}
+                              style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.85rem' }}
                             >
                               {REASON_OPTIONS.map((opt, i) => (
-                                <option key={i} value={opt} style={{ background: '#0f172a' }}>{opt}</option>
+                                <option key={i} value={opt} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{opt}</option>
                               ))}
                             </select>
                           ) : (
-                            <span style={{ color: '#94a3b8' }}>-</span>
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
                         </td>
 
@@ -440,12 +438,12 @@ const Returns = () => {
                             <button 
                               onClick={() => handleProcessReturn(item)}
                               disabled={isProcessing}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: '#dc2626', color: '#ffffff', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
                             >
                               <RotateCcw size={16} /> {isProcessing ? 'دەگەڕێتەوە...' : 'گەڕاندنەوە ↩️'}
                             </button>
                           ) : (
-                            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>بێ ماوە</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>بێ ماوە</span>
                           )}
                         </td>
                       </tr>
@@ -471,42 +469,42 @@ const Returns = () => {
             placeholder="گەڕان بەپێی کاڵا، بارکۆد یان پسووڵە..."
             value={historySearch}
             onChange={(e) => setHistorySearch(e.target.value)}
-            style={{ padding: '10px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', width: '300px', outline: 'none' }}
+            style={{ padding: '10px 16px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', width: '300px', outline: 'none' }}
           />
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-            <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+            <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
               <tr>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>#</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>بەروار</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>پسووڵە</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>شێوازی دانەوە</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>ناوی کاڵا</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>بارکۆد</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کڕیار</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>بڕی گەڕاوە</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>پارەی دراوەتەوە</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>هۆکار</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>پسووڵە</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>#</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>بەروار</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>پسووڵە</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>شێوازی دانەوە</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>ناوی کاڵا</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>بارکۆد</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>کڕیار</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>بڕی گەڕاوە</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>پارەی دراوەتەوە</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>هۆکار</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>پسووڵە</th>
               </tr>
             </thead>
             <tbody>
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="11" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                  <td colSpan="11" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
                     هیچ کاڵایەکی گەڕێنراوە لە سیستەمدا نەدۆزرایەوە
                   </td>
                 </tr>
               ) : (
                 filteredHistory.map((ret) => (
-                  <tr key={ret.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>#{ret.id}</td>
-                    <td style={{ padding: '14px 18px', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                  <tr key={ret.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>#{ret.id}</td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                       {new Date(ret.created_at).toLocaleDateString('ku-IQ')} {new Date(ret.created_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#38bdf8', fontWeight: 'bold' }}>
+                    <td style={{ padding: '14px 18px', color: 'var(--accent-color)', fontWeight: 'bold' }}>
                       #{ret.sale_id}
                     </td>
                     <td style={{ padding: '14px 18px' }}>
@@ -520,16 +518,16 @@ const Returns = () => {
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>{ret.product_name}</td>
-                    <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '0.9rem' }}>{ret.barcode || '-'}</td>
-                    <td style={{ padding: '14px 18px' }}>{ret.customer_name}</td>
-                    <td style={{ padding: '14px 18px', color: '#f87171', fontWeight: 'bold' }}>
+                    <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{ret.product_name}</td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{ret.barcode || '-'}</td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-primary)' }}>{ret.customer_name}</td>
+                    <td style={{ padding: '14px 18px', color: '#ef4444', fontWeight: 'bold' }}>
                       {ret.quantity} {ret.unit || 'دانە'}
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#f87171', fontWeight: 'bold' }}>
+                    <td style={{ padding: '14px 18px', color: '#ef4444', fontWeight: 'bold' }}>
                       {Number(ret.refunded_amount || 0).toLocaleString()} د.ع
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#94a3b8', fontSize: '0.85rem' }}>{ret.reason || 'گەڕاندنەوە'}</td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{ret.reason || 'گەڕاندنەوە'}</td>
                     <td style={{ padding: '14px 18px' }}>
                       <button 
                         onClick={() => setSelectedReceipt({
@@ -544,7 +542,7 @@ const Returns = () => {
                           reason: ret.reason,
                           created_at: ret.created_at
                         })}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', fontSize: '0.8rem' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
                       >
                         <Printer size={14} /> چاپ
                       </button>
@@ -559,14 +557,14 @@ const Returns = () => {
 
       {/* Modal: Refund Receipt Preview & Print */}
       {selectedReceipt && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)' }}>
+        <div className="pos-modal-overlay" onClick={() => setSelectedReceipt(null)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', margin: 0, color: '#f87171' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', margin: 0, color: '#f87171', fontWeight: 800 }}>
                 <Receipt size={20} /> پسووڵەی گەڕاندنەوەی کاڵا
               </h2>
-              <button onClick={() => setSelectedReceipt(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
+              <button onClick={() => setSelectedReceipt(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
@@ -657,22 +655,29 @@ const Returns = () => {
       {/* Global Print CSS for Refund Receipt */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           #refund-receipt-printable-area, #refund-receipt-printable-area * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #refund-receipt-printable-area {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 80mm;
-            margin: 0;
-            padding: 10px;
-            font-size: 12px;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+            font-size: 12px !important;
             color: #000 !important;
             background: #fff !important;
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: monospace, Tahoma, sans-serif !important;
           }
         }
       `}</style>

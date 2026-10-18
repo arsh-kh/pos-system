@@ -67,7 +67,7 @@ const purchaseReturnsRoutes = require('./routes/purchase_returns');
 app.use('/api/purchase-returns', purchaseReturnsRoutes);
 app.use('/api/rtv', purchaseReturnsRoutes);
 
-// Expenses API (Store Expenses / مەساریف)
+// Expenses API (Store Expenses / خەرجییەکان)
 const expensesRoutes = require('./routes/expenses');
 app.use('/api/expenses', expensesRoutes);
 

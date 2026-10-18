@@ -17,6 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const InventoryAudit = () => {
@@ -79,26 +80,19 @@ const InventoryAudit = () => {
     fetchData();
   }, [timeFilter, statusFilter]);
 
-  // Autocomplete products
+  // Autocomplete products with Kurdish search
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return [];
-    const q = productSearch.toLowerCase();
     return products.filter(p => 
-      p.name?.toLowerCase().includes(q) ||
-      p.barcode?.toLowerCase().includes(q) ||
-      p.box_barcode?.toLowerCase().includes(q)
+      kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch)
     ).slice(0, 10);
   }, [products, productSearch]);
 
-  // Filter history live
+  // Filter history live with Kurdish search
   const filteredHistory = useMemo(() => {
     if (!searchQuery.trim()) return auditList;
-    const q = searchQuery.toLowerCase();
     return auditList.filter(a => 
-      a.product_name?.toLowerCase().includes(q) ||
-      a.barcode?.toLowerCase().includes(q) ||
-      a.notes?.toLowerCase().includes(q) ||
-      a.audited_by_username?.toLowerCase().includes(q)
+      kurdishSearchMatch([a.product_name, a.barcode, a.notes, a.audited_by_username], searchQuery)
     );
   }, [auditList, searchQuery]);
 
@@ -263,123 +257,108 @@ const InventoryAudit = () => {
   };
 
   return (
-    <div className="dashboard-page p-8" dir="rtl">
+    <div className="dashboard-page" style={{ padding: '12px 18px', maxWidth: '100%', boxSizing: 'border-box' }} dir="rtl">
       {/* Header */}
-      <div className="page-header mb-8" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0 0 6px 0' }}>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: 0, color: '#10b981' }}>
-              <ClipboardCheck size={34} color="#10b981" />
-              جەردکردنی زیرەکی کۆگا و ڕەفەکان (Smart Inventory Audit)
-            </h1>
-            <span style={{ 
-              background: 'rgba(16, 185, 129, 0.15)', 
-              color: '#10b981', 
-              border: '1px solid rgba(16, 185, 129, 0.4)', 
-              padding: '4px 12px', 
-              borderRadius: '20px', 
-              fontSize: '0.8rem', 
-              fontWeight: 'bold',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <Scan size={14} /> دۆخی پێداچوونەوە و ڕاستکردنەوەی کۆگا
-            </span>
-          </div>
-          <p className="text-secondary" style={{ margin: 0, fontSize: '0.95rem' }}>
-            سکانی بارکۆدی ڕەفەکان، بینینی ژمارەی حیسابکراوی سیستەم، ژماردنی بە چاو، و تۆمارکردنی خۆکاری نوقسانییەکان لەسەر لیستی زیانەکانی کۆتایی مانگ
-          </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: '#10b981', fontSize: '1.25rem', fontWeight: 800 }}>
+            <ClipboardCheck size={22} color="#10b981" />
+            جەردکردنی زیرەکی کۆگا و ڕەفەکان
+          </h1>
+          <span style={{ 
+            background: 'var(--success-light)', 
+            color: 'var(--success-color)', 
+            border: '1px solid rgba(16, 185, 129, 0.3)', 
+            padding: '2px 8px', 
+            borderRadius: '6px', 
+            fontSize: '0.74rem', 
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <Scan size={12} /> پشکنین و چاککردنی خێرا
+          </span>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="stats-grid mb-8">
+      {/* Slim KPI Metric Bar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginBottom: '10px' }}>
         {/* Total Audits */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>کۆی جەردکراوەکانی ئەم مانگە</h3>
-            <ClipboardCheck size={22} color="#10b981" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>جەردکراوی ئەم مانگە</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#10b981' }}>{stats.this_month?.total_audits || 0} کاڵا</div>
           </div>
-          <div className="value highlight" style={{ color: '#10b981' }}>
-            {stats.this_month?.total_audits || 0} کاڵا
-          </div>
-          <div className="sub-text" style={{ color: '#a7f3d0' }}>
-            پشکنین و جەردکراو لەسەر ڕەفەکان
-          </div>
+          <ClipboardCheck size={20} color="#10b981" />
         </div>
 
         {/* Shortage Loss */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.25)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>زیانی نوقسانی و ونبوون (ئەم مانگە)</h3>
-            <TrendingDown size={22} color="#ef4444" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>زیانی نوقسانی و ونبوون</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--danger-color)' }}>
+              {Number(stats.this_month?.total_shortage_loss || 0).toLocaleString()} د.ع <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>({stats.this_month?.shortages_count || 0})</span>
+            </div>
           </div>
-          <div className="value" style={{ color: '#f87171' }}>
-            {Number(stats.this_month?.total_shortage_loss || 0).toLocaleString()} دینار
-          </div>
-          <div className="sub-text" style={{ color: '#fca5a5' }}>
-            {stats.this_month?.shortages_count || 0} کاڵا نوقسانی هەبووە و لە قازانج دەرهێنراوە
-          </div>
+          <TrendingDown size={20} color="var(--danger-color)" />
         </div>
 
         {/* Matches Count */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(56, 189, 248, 0.08)', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>کاڵا هاوتاکان (١٠٠٪ تەواو)</h3>
-            <CheckCircle2 size={22} color="#38bdf8" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>هاوتا و تەواو (١٠٠٪)</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--accent-hover)' }}>{stats.this_month?.matches_count || 0} کاڵا</div>
           </div>
-          <div className="value" style={{ color: '#38bdf8' }}>
-            {stats.this_month?.matches_count || 0} کاڵا
-          </div>
-          <div className="sub-text" style={{ color: '#bae6fd' }}>
-            ژمارەی مەخزەن و ڕەفەکان تەواو یەک بوون
-          </div>
+          <CheckCircle2 size={20} color="var(--accent-color)" />
         </div>
 
         {/* Surpluses */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.25)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>زیادەی دۆزراوە لە کۆگا</h3>
-            <TrendingUp size={22} color="#f59e0b" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>زیادەی دۆزراوە لە کۆگا</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--warning-color)' }}>
+              +{Number(stats.this_month?.total_surplus_value || 0).toLocaleString()} د.ع <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>({stats.this_month?.surpluses_count || 0})</span>
+            </div>
           </div>
-          <div className="value" style={{ color: '#fbbf24' }}>
-            {stats.this_month?.surpluses_count || 0} کاڵا
-          </div>
-          <div className="sub-text" style={{ color: '#fde68a' }}>
-            بڕی {Number(stats.this_month?.total_surplus_value || 0).toLocaleString()} د.ع زیادە
-          </div>
+          <TrendingUp size={20} color="var(--warning-color)" />
         </div>
       </div>
 
       {/* Main Console: Fast Stock Count Terminal */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
         
         {/* Audit Form Card */}
-        <div className="glass-panel" style={{ padding: '26px', borderRadius: '24px', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(10, 15, 30, 0.95) 100%)', boxShadow: '0 10px 30px rgba(0,0,0,0.4)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.3rem', margin: 0, color: '#34d399' }}>
-              <Scan size={24} color="#10b981" />
+        <div style={{ 
+          background: 'var(--bg-secondary)', 
+          border: '1px solid var(--border-color)', 
+          borderRadius: '12px', 
+          padding: '12px 16px', 
+          boxShadow: 'var(--card-shadow)' 
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem', margin: 0, color: '#10b981', fontWeight: 800 }}>
+              <Scan size={18} color="#10b981" />
               سکانەری خێرای جەردکردن
             </h2>
-            <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-              💡 تێبینی: بە سکانکردنی بارکۆد سیستەم یەکسەر فۆکەس دەکاتە سەر خانەی ژمارەی ڕاستەقینە
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+              💡 بە سکانکردنی بارکۆد سیستەم یەکسەر فۆکەس دەکاتە سەر خانەی ژمارەی ڕاستەقینە
             </div>
           </div>
 
           <form onSubmit={handleReconcile}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '18px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '8px', marginBottom: '10px' }}>
               
               {/* Barcode / Product Search */}
               <div style={{ position: 'relative' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 700 }}>
                   بارکۆدی ڕەفە یان ناوی کاڵا:
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="بارکۆد سکان بکە یان ناوی کاڵا بنووسە..."
+                    placeholder="بارکۆد سکان بکە یان بنووسە..."
                     value={productSearch}
                     onChange={(e) => {
                       setProductSearch(e.target.value);
@@ -390,18 +369,18 @@ const InventoryAudit = () => {
                     onKeyDown={handleProductSearchKeyDown}
                     style={{
                       width: '100%',
-                      padding: '14px 18px',
-                      paddingLeft: '40px',
-                      borderRadius: '14px',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: selectedProduct ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.18)',
-                      color: 'white',
-                      fontSize: '1.05rem',
+                      padding: '7px 10px',
+                      paddingLeft: '32px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-tertiary)',
+                      border: selectedProduct ? '1.5px solid #10b981' : '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.86rem',
                       outline: 'none',
                       boxSizing: 'border-box'
                     }}
                   />
-                  <Search size={20} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 </div>
 
                 {/* Dropdown Results */}
@@ -411,13 +390,13 @@ const InventoryAudit = () => {
                     top: '100%',
                     right: 0,
                     left: 0,
-                    marginTop: '6px',
-                    background: '#1e293b',
-                    borderRadius: '14px',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                    marginTop: '4px',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-color)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
                     zIndex: 100,
-                    maxHeight: '260px',
+                    maxHeight: '220px',
                     overflowY: 'auto'
                   }}>
                     {filteredProducts.map((p) => (
@@ -425,26 +404,26 @@ const InventoryAudit = () => {
                         key={p.id}
                         onClick={() => handleSelectProduct(p)}
                         style={{
-                          padding: '12px 16px',
-                          borderBottom: '1px solid rgba(255,255,255,0.08)',
+                          padding: '8px 12px',
+                          borderBottom: '1px solid var(--border-color)',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           transition: 'background 0.15s'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
                         <div>
-                          <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.86rem' }}>{p.name}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                             بارکۆد: {p.barcode || '-'} {p.box_barcode ? `| کارتۆن: ${p.box_barcode}` : ''}
                           </div>
                         </div>
-                        <div style={{ textAlign: 'left', fontSize: '0.9rem' }}>
-                          <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>مەخزەن: {p.stock} دانە</span>
-                          <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>تێچوون: {Number(p.cost_price || 0).toLocaleString()} د.ع</div>
+                        <div style={{ textAlign: 'left', fontSize: '0.8rem' }}>
+                          <span style={{ color: 'var(--accent-hover)', fontWeight: 700 }}>مەخزەن: {p.stock} دانە</span>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>تێچوون: {Number(p.cost_price || 0).toLocaleString()} د.ع</div>
                         </div>
                       </div>
                     ))}
@@ -454,69 +433,69 @@ const InventoryAudit = () => {
 
               {/* Unit Type Selection */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 700 }}>
                   جۆری یەکە بۆ ژماردن:
                 </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => setUnitType('PIECE')}
                     style={{
                       flex: 1,
-                      padding: '13px',
-                      borderRadius: '12px',
-                      border: unitType === 'PIECE' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.12)',
-                      background: unitType === 'PIECE' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.04)',
-                      color: unitType === 'PIECE' ? '#38bdf8' : '#94a3b8',
+                      padding: '6px 8px',
+                      borderRadius: '8px',
+                      border: unitType === 'PIECE' ? '1.5px solid var(--accent-color)' : '1px solid var(--border-color)',
+                      background: unitType === 'PIECE' ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                      color: unitType === 'PIECE' ? 'var(--accent-color)' : 'var(--text-secondary)',
                       cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '0.95rem'
+                      fontWeight: 700,
+                      fontSize: '0.82rem'
                     }}
                   >
-                    📦 دانە (Piece)
+                    📦 دانە
                   </button>
                   <button
                     type="button"
                     onClick={() => setUnitType('BOX')}
                     style={{
                       flex: 1,
-                      padding: '13px',
-                      borderRadius: '12px',
-                      border: unitType === 'BOX' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.12)',
-                      background: unitType === 'BOX' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.04)',
-                      color: unitType === 'BOX' ? '#f59e0b' : '#94a3b8',
+                      padding: '6px 8px',
+                      borderRadius: '8px',
+                      border: unitType === 'BOX' ? '1.5px solid #0284c7' : '1px solid var(--border-color)',
+                      background: unitType === 'BOX' ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-tertiary)',
+                      color: unitType === 'BOX' ? '#0284c7' : 'var(--text-secondary)',
                       cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '0.95rem'
+                      fontWeight: 700,
+                      fontSize: '0.82rem'
                     }}
                   >
-                    📦 کارتۆن {selectedProduct?.units_per_box > 1 ? `(${selectedProduct.units_per_box} دانەیی)` : ''}
+                    📦 کارتۆن {selectedProduct?.units_per_box > 1 ? `(${selectedProduct.units_per_box})` : ''}
                   </button>
                 </div>
               </div>
 
-              {/* Physical Counted Input (ژماردنی ڕاستەقینە) */}
+              {/* Physical Counted Input */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
-                  ژماردنی ڕاستەقینە (ئەوەی لەسەر ڕەفەکە بینیوتە):
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                  ژماردنی ڕاستەقینەی سەر ڕەفە:
                 </label>
                 <input
                   ref={countInputRef}
                   type="number"
                   step="any"
                   min="0"
-                  placeholder="ژمارەی بینراو بنووسە..."
+                  placeholder="ژمارە..."
                   value={countedCount}
                   onChange={(e) => setCountedCount(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '14px 18px',
-                    borderRadius: '14px',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '2px solid #38bdf8',
-                    color: '#38bdf8',
-                    fontSize: '1.25rem',
-                    fontWeight: 'bold',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1.5px solid #10b981',
+                    color: '#10b981',
+                    fontSize: '1rem',
+                    fontWeight: 800,
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -525,22 +504,22 @@ const InventoryAudit = () => {
 
               {/* Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
-                  تێبینی جەرد (ئارەزوومەندانە):
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                  تێبینی (ئارەزوومەندانە):
                 </label>
                 <input
                   type="text"
-                  placeholder="نموونە: ساردکەرەوەی بەشی وزەبەخشەکان..."
+                  placeholder="نموونە: ڕەفەی دووەم..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '14px 18px',
-                    borderRadius: '14px',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'white',
-                    fontSize: '0.95rem',
+                    padding: '7px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.86rem',
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -553,55 +532,52 @@ const InventoryAudit = () => {
             {selectedProduct && (
               <div style={{
                 background: comparison.status === 'SHORTAGE' 
-                  ? 'rgba(239, 68, 68, 0.12)' 
-                  : (comparison.status === 'SURPLUS' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)'),
-                border: `1.5px solid ${comparison.status === 'SHORTAGE' ? 'rgba(239, 68, 68, 0.4)' : (comparison.status === 'SURPLUS' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)')}`,
-                borderRadius: '18px',
-                padding: '20px 24px',
-                marginBottom: '10px',
+                  ? 'var(--danger-light)' 
+                  : (comparison.status === 'SURPLUS' ? 'var(--warning-light)' : 'var(--success-light)'),
+                border: `1px solid ${comparison.status === 'SHORTAGE' ? 'rgba(239, 68, 68, 0.35)' : (comparison.status === 'SURPLUS' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.35)')}`,
+                borderRadius: '10px',
+                padding: '10px 14px',
+                marginBottom: '8px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: '16px'
+                gap: '10px'
               }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white' }}>{selectedProduct.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.96rem', fontWeight: 800, color: 'var(--text-primary)' }}>{selectedProduct.name}</span>
                     <span style={{ 
-                      padding: '4px 12px', 
-                      borderRadius: '10px', 
-                      background: 'rgba(56, 189, 248, 0.2)', 
-                      color: '#38bdf8', 
-                      fontSize: '0.88rem', 
-                      fontWeight: 'bold',
-                      border: '1px solid rgba(56, 189, 248, 0.35)'
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      background: 'var(--bg-secondary)', 
+                      color: 'var(--accent-hover)', 
+                      fontSize: '0.76rem', 
+                      fontWeight: 700,
+                      border: '1px solid var(--border-color)'
                     }}>
-                      ژمارەی ناو سیستەم: {comparison.systemUnits} دانە
+                      سیستەم: {comparison.systemUnits} دانە
                     </span>
                   </div>
 
-                  <div style={{ marginTop: '10px', fontSize: '0.95rem' }}>
+                  <div style={{ marginTop: '4px', fontSize: '0.82rem' }}>
                     {countedCount === '' ? (
-                      <span style={{ color: '#94a3b8' }}>
-                        👈 تکایە ژمارەی ڕاستەقینەی ناو ساردکەرەوە یان ڕەفەکە بنووسە لە خانەی سەرەوە.
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        👈 تکایە ژمارەی بینراوی ڕاستەقینە بنووسە لە خانەکەی سەرەوە.
                       </span>
                     ) : comparison.status === 'MATCH' ? (
-                      <div style={{ color: '#10b981', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CheckCircle2 size={18} /> هاوتا و ڕێک: هەردووکیان {comparison.countedUnits} دانەن. هیچ کەم و کوڕییەک نییە!
+                      <div style={{ color: 'var(--success-color)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={15} /> هاوتا و تەواو: هەردووکیان {comparison.countedUnits} دانەن.
                       </div>
                     ) : comparison.status === 'SHORTAGE' ? (
                       <div>
-                        <div style={{ color: '#f87171', fontWeight: 'bold', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <AlertTriangle size={20} /> نوقسانی دۆزرایەوە: {Math.abs(comparison.differenceUnits)} دانە کەمە لە سیستەم!
-                        </div>
-                        <div style={{ color: '#cbd5e1', fontSize: '0.88rem', marginTop: '4px' }}>
-                          زەرەری دارایی: <strong style={{ color: '#f87171' }}>{Math.abs(comparison.discrepancyValue).toLocaleString()} دینار</strong> (ڕاستەوخۆ دەخرێتە سەر لیستی زیانەکانی ئەم مانگە بۆ دەرکردن لە قازانجی ڕاستەقینە).
+                        <div style={{ color: 'var(--danger-color)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertTriangle size={15} /> نوقسانی: {Math.abs(comparison.differenceUnits)} دانە کەمە | زیان: {Math.abs(comparison.discrepancyValue).toLocaleString()} د.ع
                         </div>
                       </div>
                     ) : (
-                      <div style={{ color: '#fbbf24', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <TrendingUp size={18} /> زیادە: +{comparison.differenceUnits} دانە زیاترە لە سیستەم | مەخزەن زیاد دەکرێت بۆ {comparison.countedUnits} دانە.
+                      <div style={{ color: 'var(--warning-color)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <TrendingUp size={15} /> زیادە: +{comparison.differenceUnits} دانە زیاترە لە سیستەم
                       </div>
                     )}
                   </div>
@@ -611,25 +587,24 @@ const InventoryAudit = () => {
                   type="submit"
                   disabled={submitting || countedCount === ''}
                   style={{
-                    padding: '14px 32px',
-                    borderRadius: '14px',
+                    padding: '8px 18px',
+                    borderRadius: '8px',
                     background: comparison.status === 'SHORTAGE'
-                      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-                      : 'linear-gradient(135deg, #10b981, #059669)',
-                    color: 'white',
+                      ? 'var(--danger-color)'
+                      : '#10b981',
+                    color: '#ffffff',
                     border: 'none',
                     cursor: countedCount === '' ? 'not-allowed' : 'pointer',
                     opacity: countedCount === '' ? 0.6 : 1,
-                    fontWeight: 'bold',
-                    fontSize: '1.05rem',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: '0 6px 20px rgba(0,0,0,0.3)'
+                    gap: '6px'
                   }}
                 >
-                  <ClipboardCheck size={22} />
-                  {submitting ? 'پەسەند دەکرێت...' : 'پەسەندکردن و چاککردنی کۆگا'}
+                  <ClipboardCheck size={16} />
+                  {submitting ? '...' : 'پەسەندکردن و چاککردنی کۆگا'}
                 </button>
               </div>
             )}
@@ -637,25 +612,25 @@ const InventoryAudit = () => {
         </div>
 
         {/* History Table & Filters */}
-        <div className="glass-panel" style={{ padding: '24px', borderRadius: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: 0 }}>
-              <Filter size={22} color="#10b981" /> مێژووی جەردە ئەنجامدراوەکانی کۆگا
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '12px 16px', boxShadow: 'var(--card-shadow)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', margin: 0, color: 'var(--text-primary)', fontWeight: 800 }}>
+              <Filter size={16} color="#10b981" /> مێژووی جەردەکانی کۆگا
             </h2>
 
             {/* Filter Tabs & Search */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setTimeFilter('THIS_MONTH')}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: timeFilter === 'THIS_MONTH' ? '#10b981' : 'rgba(255,255,255,0.06)',
-                  color: timeFilter === 'THIS_MONTH' ? '#0f172a' : 'white',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: timeFilter === 'THIS_MONTH' ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  background: timeFilter === 'THIS_MONTH' ? 'var(--primary-color)' : 'var(--bg-tertiary)',
+                  color: timeFilter === 'THIS_MONTH' ? '#ffffff' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
+                  fontWeight: 700,
+                  fontSize: '0.78rem'
                 }}
               >
                 ئەم مانگە
@@ -663,14 +638,14 @@ const InventoryAudit = () => {
               <button
                 onClick={() => setTimeFilter('TODAY')}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: timeFilter === 'TODAY' ? '#10b981' : 'rgba(255,255,255,0.06)',
-                  color: timeFilter === 'TODAY' ? '#0f172a' : 'white',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: timeFilter === 'TODAY' ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  background: timeFilter === 'TODAY' ? 'var(--primary-color)' : 'var(--bg-tertiary)',
+                  color: timeFilter === 'TODAY' ? '#ffffff' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
+                  fontWeight: 700,
+                  fontSize: '0.78rem'
                 }}
               >
                 ئەمڕۆ
@@ -678,14 +653,14 @@ const InventoryAudit = () => {
               <button
                 onClick={() => setTimeFilter('ALL')}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: timeFilter === 'ALL' ? '#10b981' : 'rgba(255,255,255,0.06)',
-                  color: timeFilter === 'ALL' ? '#0f172a' : 'white',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: timeFilter === 'ALL' ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                  background: timeFilter === 'ALL' ? 'var(--primary-color)' : 'var(--bg-tertiary)',
+                  color: timeFilter === 'ALL' ? '#ffffff' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
+                  fontWeight: 700,
+                  fontSize: '0.78rem'
                 }}
               >
                 هەمووی
@@ -696,20 +671,20 @@ const InventoryAudit = () => {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: 'white',
-                  fontSize: '0.85rem',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.78rem',
                   outline: 'none',
                   cursor: 'pointer'
                 }}
               >
                 <option value="ALL">هەموو دۆخەکان</option>
-                <option value="SHORTAGE">⚠️ تەنها نوقسانییەکان</option>
-                <option value="MATCH">✅ تەنها هاوتاکان</option>
-                <option value="SURPLUS">📈 تەنها زیادەکان</option>
+                <option value="SHORTAGE">⚠️ تەنها نوقسانی</option>
+                <option value="MATCH">✅ تەنها هاوتا</option>
+                <option value="SURPLUS">📈 تەنها زیادە</option>
               </select>
 
               {/* Search Bar */}
@@ -719,14 +694,14 @@ const InventoryAudit = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: 'white',
-                  fontSize: '0.85rem',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.78rem',
                   outline: 'none',
-                  minWidth: '180px'
+                  minWidth: '150px'
                 }}
               />
             </div>
@@ -736,24 +711,24 @@ const InventoryAudit = () => {
           <div className="table-responsive">
             <table className="data-table" style={{ width: '100%', textAlign: 'right', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}>
-                  <th style={{ padding: '12px' }}>#</th>
-                  <th style={{ padding: '12px' }}>بەروار و کات</th>
-                  <th style={{ padding: '12px' }}>ناوی کاڵا</th>
-                  <th style={{ padding: '12px' }}>بارکۆد</th>
-                  <th style={{ padding: '12px' }}>ژمارەی سیستەم</th>
-                  <th style={{ padding: '12px' }}>ژماردنی ڕاستەقینە</th>
-                  <th style={{ padding: '12px' }}>جیاوازی</th>
-                  <th style={{ padding: '12px' }}>زەرەر / بەهای جیاوازی</th>
-                  <th style={{ padding: '12px' }}>دۆخ</th>
-                  <th style={{ padding: '12px' }}>جەردکەر و تێبینی</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>کردار</th>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                  <th style={{ padding: '8px 10px' }}>#</th>
+                  <th style={{ padding: '8px 10px' }}>بەروار و کات</th>
+                  <th style={{ padding: '8px 10px' }}>ناوی کاڵا</th>
+                  <th style={{ padding: '8px 10px' }}>بارکۆد</th>
+                  <th style={{ padding: '8px 10px' }}>مەخزەنی پێشوو</th>
+                  <th style={{ padding: '8px 10px' }}>ژماردنی بینراو</th>
+                  <th style={{ padding: '8px 10px' }}>جیاوازی</th>
+                  <th style={{ padding: '8px 10px' }}>زەرەر / بەهای جیاوازی</th>
+                  <th style={{ padding: '8px 10px' }}>دۆخ</th>
+                  <th style={{ padding: '8px 10px' }}>جەردکەر و تێبینی</th>
+                  <th style={{ padding: '8px 10px', textAlign: 'center' }}>کردار</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="11" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                       هیچ تۆمارێکی جەردکردن نەدۆزرایەوە لەم بەروارەدا.
                     </td>
                   </tr>
@@ -764,88 +739,90 @@ const InventoryAudit = () => {
                     const isMatch = item.status === 'MATCH';
 
                     return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '12px', color: '#64748b' }}>{idx + 1}</td>
-                        <td style={{ padding: '12px', fontSize: '0.85rem' }}>
+                      <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.84rem' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                        <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                           {new Date(item.created_at).toLocaleString('ku-IQ')}
                         </td>
-                        <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {item.product_name}
                         </td>
-                        <td style={{ padding: '12px', color: '#94a3b8', fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                           {item.barcode || '-'}
                         </td>
-                        <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 'bold' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--accent-hover)', fontWeight: 700 }}>
                           {Number(item.system_stock)} دانە
                         </td>
-                        <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {Number(item.counted_stock)} دانە
                         </td>
-                        <td style={{ padding: '12px', fontWeight: 'bold', color: isShortage ? '#f87171' : (isSurplus ? '#fbbf24' : '#10b981') }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: isShortage ? 'var(--danger-color)' : (isSurplus ? 'var(--warning-color)' : 'var(--success-color)') }}>
                           {Number(item.difference_qty) > 0 ? `+${Number(item.difference_qty)}` : Number(item.difference_qty)} دانە
                         </td>
-                        <td style={{ padding: '12px', fontWeight: 'bold', color: isShortage ? '#f87171' : (isSurplus ? '#fbbf24' : '#94a3b8') }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: isShortage ? 'var(--danger-color)' : (isSurplus ? 'var(--warning-color)' : 'var(--text-secondary)') }}>
                           {isShortage ? `-${Number(Math.abs(item.total_cost_discrepancy)).toLocaleString()} د.ع` : (isSurplus ? `+${Number(item.total_cost_discrepancy).toLocaleString()} د.ع` : '٠ د.ع')}
                         </td>
-                        <td style={{ padding: '12px' }}>
+                        <td style={{ padding: '8px 10px' }}>
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            background: isShortage ? 'rgba(239, 68, 68, 0.15)' : (isSurplus ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
-                            color: isShortage ? '#f87171' : (isSurplus ? '#fbbf24' : '#10b981'),
+                            gap: '3px',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            background: isShortage ? 'var(--danger-light)' : (isSurplus ? 'var(--warning-light)' : 'var(--success-light)'),
+                            color: isShortage ? 'var(--danger-color)' : (isSurplus ? 'var(--warning-color)' : 'var(--success-color)'),
                             border: `1px solid ${isShortage ? 'rgba(239, 68, 68, 0.3)' : (isSurplus ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)')}`
                           }}>
                             {isShortage ? '⚠️ نوقسانی' : (isSurplus ? '📈 زیادە' : '✅ هاوتا')}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                           <div>{item.notes || '-'}</div>
-                          <small style={{ color: '#64748b' }}>جەردکەر: {item.audited_by_username || 'خاوەنکار'}</small>
+                          <small style={{ color: 'var(--text-muted)' }}>جەردکەر: {item.audited_by_username || 'خاوەنکار'}</small>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                             <button
                               onClick={() => setSelectedVoucher(item)}
                               style={{
-                                padding: '6px 10px',
-                                borderRadius: '8px',
-                                background: 'rgba(255,255,255,0.06)',
-                                border: '1px solid rgba(255,255,255,0.12)',
-                                color: '#10b981',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                background: 'var(--success-light)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                color: 'var(--success-color)',
                                 cursor: 'pointer',
-                                fontSize: '0.8rem',
+                                fontSize: '0.74rem',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px'
+                                gap: '3px',
+                                fontWeight: 700
                               }}
                               title="چاپکردنی پسووڵەی جەرد"
                             >
-                              <Printer size={14} /> پسووڵە
+                              <Printer size={12} /> پسووڵە
                             </button>
 
                             {isAdmin && (
                               <button
                                 onClick={() => handleRevertAudit(item.id, item.product_name, item.system_stock)}
                                 style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '8px',
-                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  background: 'var(--danger-light)',
                                   border: '1px solid rgba(239, 68, 68, 0.3)',
-                                  color: '#f87171',
+                                  color: 'var(--danger-color)',
                                   cursor: 'pointer',
-                                  fontSize: '0.8rem',
+                                  fontSize: '0.74rem',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '4px'
+                                  gap: '3px',
+                                  fontWeight: 700
                                 }}
                                 title="هەڵوەشاندنەوە و گەڕاندنەوەی مەخزەن"
                               >
-                                <RotateCcw size={14} /> هەڵوەشاندنەوە
+                                <RotateCcw size={12} /> گەڕاندنەوە
                               </button>
                             )}
                           </div>
@@ -863,14 +840,14 @@ const InventoryAudit = () => {
 
       {/* Modal: Printable Inventory Audit Voucher */}
       {selectedVoucher && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', margin: 0, color: '#10b981' }}>
+        <div className="pos-modal-overlay" onClick={() => setSelectedVoucher(null)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.05rem', margin: 0, color: '#10b981', fontWeight: 800 }}>
                 <ClipboardCheck size={20} /> پسووڵەی جەردی کۆگا
               </h2>
-              <button onClick={() => setSelectedVoucher(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
+              <button onClick={() => setSelectedVoucher(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
@@ -962,7 +939,8 @@ const InventoryAudit = () => {
               </button>
               <button 
                 onClick={() => setSelectedVoucher(null)}
-                style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: 'none', cursor: 'pointer' }}
+                className="btn-secondary"
+                style={{ padding: '12px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 داخستن
               </button>
@@ -974,19 +952,29 @@ const InventoryAudit = () => {
       {/* Print CSS */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           #audit-voucher-printable-area, #audit-voucher-printable-area * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #audit-voucher-printable-area {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 80mm;
-            margin: 0;
-            padding: 10px;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+            font-size: 12px !important;
+            color: #000 !important;
+            background: #fff !important;
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
           }
         }
       `}</style>

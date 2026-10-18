@@ -9,6 +9,15 @@ exports.getDashboardStats = async (req, res) => {
             WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())
         `);
 
+        // Last Month Sales (بۆ بەراوردی مانگانە Month-over-Month)
+        const [lastMonth] = await db.query(`
+            SELECT COALESCE(SUM(total_amount), 0) as total_sales 
+            FROM Sales 
+            WHERE MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) 
+              AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))
+        `);
+        const lastMonthSales = Number(lastMonth[0]?.total_sales) || 0;
+
         // This Month Expenses
         const [expensesMonth] = await db.query(`
             SELECT COALESCE(SUM(amount), 0) as total_expenses 
@@ -72,6 +81,7 @@ exports.getDashboardStats = async (req, res) => {
                     ...thisMonth[0],
                     raw_sales: rawSales,
                     total_sales: netSales,
+                    last_month_sales: lastMonthSales,
                     total_refunded: totalRefunded,
                     total_returns_count: totalReturnsCount,
                     raw_gross_profit: rawGrossProfit,

@@ -8,6 +8,7 @@ import {
   X 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const CATEGORIES = [
@@ -105,9 +106,7 @@ const Expenses = () => {
   // Filtered Expenses
   const filteredExpenses = useMemo(() => {
     return expenses.filter(exp => {
-      const matchesSearch = 
-        exp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (exp.notes && exp.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesSearch = kurdishSearchMatch([exp.title, exp.category, exp.notes], searchTerm);
 
       const matchesCat = 
         selectedCategory === 'ALL' || exp.category === selectedCategory;
@@ -129,23 +128,23 @@ const Expenses = () => {
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Wallet color="#f43f5e" size={32} />
-            بەشی خەرجییەکان (مەساریف)
+            بەشی خەرجییەکان و تێچووەکان
           </h1>
           <p className="text-secondary">تۆمارکردن و بەڕێوەبردنی خەرجییەکانی مارکێت و دەرکەوتنی قازانجی ڕاستەقینە</p>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-box glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1rem', borderRadius: '12px' }}>
-            <Search size={20} color="#94a3b8" />
+            <Search size={20} color="var(--text-secondary)" />
             <input 
               type="text" 
               placeholder="گەڕان بە ناوی خەرجی یان تێبینی..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'white', marginRight: '10px', outline: 'none', width: '220px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '10px', outline: 'none', width: '220px' }}
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
             )}
@@ -178,7 +177,7 @@ const Expenses = () => {
           <div className="value" style={{ color: '#fbbf24' }}>
             {Number(summary?.today?.today_expenses || 0).toLocaleString()} دینار
           </div>
-          <div className="sub-text" style={{ color: '#94a3b8' }}>
+          <div className="sub-text" style={{ color: 'var(--text-secondary)' }}>
             {summary?.today?.today_count || 0} خەرجی تۆمارکراوی ئەمڕۆ
           </div>
         </div>
@@ -188,17 +187,17 @@ const Expenses = () => {
           <div className="value" style={{ color: '#a5b4fc', fontSize: '1.4rem' }}>
             {topCategory}
           </div>
-          <div className="sub-text" style={{ color: '#94a3b8' }}>
+          <div className="sub-text" style={{ color: 'var(--text-secondary)' }}>
             گەورەترین بەشی تێچووی مانگ
           </div>
         </div>
 
         <div className="stat-card glass-panel" style={{ background: 'rgba(148, 163, 184, 0.08)', borderColor: 'rgba(148, 163, 184, 0.25)' }}>
           <h3>کۆی گشتی خەرجییەکان (هەموو کات)</h3>
-          <div className="value" style={{ color: '#f8fafc' }}>
+          <div className="value" style={{ color: 'var(--text-primary)' }}>
             {Number(summary?.lifetime?.lifetime_expenses || 0).toLocaleString()} دینار
           </div>
-          <div className="sub-text" style={{ color: '#94a3b8' }}>
+          <div className="sub-text" style={{ color: 'var(--text-secondary)' }}>
             {summary?.lifetime?.lifetime_count || 0} کۆی هەموو خەرجییەکان
           </div>
         </div>
@@ -222,8 +221,8 @@ const Expenses = () => {
                 border: 'none',
                 cursor: 'pointer',
                 fontWeight: isActive ? 'bold' : 'normal',
-                background: isActive ? '#f43f5e' : 'rgba(255,255,255,0.05)',
-                color: isActive ? 'white' : '#94a3b8',
+                background: isActive ? '#f43f5e' : 'var(--bg-tertiary)',
+                color: isActive ? 'white' : 'var(--text-secondary)',
                 transition: 'all 0.2s',
                 whiteSpace: 'nowrap',
                 fontSize: '0.9rem'
@@ -238,31 +237,31 @@ const Expenses = () => {
       {/* Expenses Table */}
       <div className="glass-panel" style={{ padding: '1px', borderRadius: '16px', overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <thead style={{ background: 'var(--bg-tertiary)' }}>
             <tr>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بەروار</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ناوی خەرجی</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>جۆری خەرجی</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بڕی پارە (دینار)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>تێبینی</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کردارەکان</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>بەروار</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ناوی خەرجی</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>جۆری خەرجی</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>بڕی پارە (دینار)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>تێبینی</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کردارەکان</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>باردەکرێت...</td></tr>
+              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>باردەکرێت...</td></tr>
             ) : filteredExpenses.length === 0 ? (
-              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ خەرجییەک نەدۆزرایەوە</td></tr>
+              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>هیچ خەرجییەک نەدۆزرایەوە</td></tr>
             ) : (
               filteredExpenses.map(exp => {
                 const catObj = CATEGORIES.find(c => c.id === exp.category);
                 const badgeColor = catObj ? catObj.color : '#94a3b8';
                 return (
-                  <tr key={exp.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding: '16px 20px', color: '#94a3b8', fontSize: '0.9rem' }}>
+                  <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
+                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                       {exp.expense_date ? new Date(exp.expense_date).toLocaleDateString('en-GB') : '-'}
                     </td>
-                    <td style={{ padding: '16px 20px', fontWeight: 'bold', color: '#f8fafc' }}>
+                    <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                       {exp.title}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
@@ -280,7 +279,7 @@ const Expenses = () => {
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', color: '#fb7185', fontSize: '1.05rem' }}>
                       {Number(exp.amount).toLocaleString()} دینار
                     </td>
-                    <td style={{ padding: '16px 20px', color: '#cbd5e1', fontSize: '0.9rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <td style={{ padding: '16px 20px', color: 'var(--text-primary)', fontSize: '0.9rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {exp.notes || '-'}
                     </td>
                     <td style={{ padding: '16px 20px' }}>
@@ -304,97 +303,152 @@ const Expenses = () => {
 
       {/* Add Expense Modal */}
       {isAddModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#f43f5e' }}>
-                <Wallet color="#f43f5e" size={24} /> تۆمارکردنی خەرجی نوێ
+        <div className="pos-modal-overlay" onClick={() => setIsAddModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#f43f5e', fontSize: '1.2rem', fontWeight: 800 }}>
+                <Wallet color="#f43f5e" size={22} /> تۆمارکردنی خەرجی نوێ
               </h2>
-              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={24}/>
+              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18}/>
               </button>
             </div>
 
             <form onSubmit={handleCreateExpense} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
                   ناوی خەرجی <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input 
                   type="text" 
-                  required
+                  required 
                   autoFocus
                   placeholder="بۆ نموونە: کرێی مانگی ١٠، پارەی مۆلیدە..."
                   value={formData.title} 
                   onChange={e => setFormData({ ...formData, title: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} 
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>
-                  جۆری خەرجی <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <select 
-                  value={formData.category} 
-                  onChange={e => setFormData({ ...formData, category: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
-                >
-                  {CATEGORIES.filter(c => c.id !== 'ALL').map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="responsive-grid-2">
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.4rem', color: '#fb7185', fontWeight: 'bold' }}>
-                    بڕی پارە (دینار) <span style={{ color: '#ef4444' }}>*</span>
+                  <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
+                    جۆری خەرجی <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <input 
-                    type="number" 
-                    required
-                    placeholder="بۆ نموونە: ٥٠٠٠٠"
-                    value={formData.amount} 
-                    onChange={e => setFormData({ ...formData, amount: e.target.value })} 
-                    style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.3)', color: '#fb7185', fontWeight: 'bold', fontSize: '1.1rem' }} 
-                  />
+                  <select 
+                    value={formData.category} 
+                    onChange={e => setFormData({ ...formData, category: e.target.value })} 
+                    style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    {CATEGORIES.filter(c => c.id !== 'ALL').map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>بەروار</label>
+                  <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>بەروار</label>
                   <input 
                     type="date" 
                     value={formData.expense_date} 
                     onChange={e => setFormData({ ...formData, expense_date: e.target.value })} 
-                    style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                    style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} 
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>تێبینی زیاتر (ئارەزوومەندانە)</label>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#fb7185', fontWeight: 'bold' }}>
+                  بڕی پارە (دینار) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = Math.max(0, parseInt(formData.amount) || 0);
+                      const nextVal = Math.max(0, current - 250);
+                      setFormData({ ...formData, amount: nextVal === 0 ? '' : String(nextVal) });
+                    }}
+                    title="کەمکردنەوە بە ٢٥٠ دینار"
+                    style={{ width: '48px', height: '46px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    -٢٥٠
+                  </button>
+
+                  <input 
+                    type="number" 
+                    required
+                    step="250"
+                    min="0"
+                    placeholder="بۆ نموونە: ٥٠٠٠٠"
+                    value={formData.amount} 
+                    onChange={e => setFormData({ ...formData, amount: e.target.value })} 
+                    style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.3)', color: '#fb7185', fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center' }} 
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = Math.max(0, parseInt(formData.amount) || 0);
+                      const nextVal = current + 250;
+                      setFormData({ ...formData, amount: String(nextVal) });
+                    }}
+                    title="زیادکردن بە ٢٥٠ دینار"
+                    style={{ width: '48px', height: '46px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
+
+                {/* Iraqi Currency Denominations Pills */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, amount: '' })}
+                    style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.35)', background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    0 ✕
+                  </button>
+                  {[250, 500, 1000, 5000, 10000, 25000, 50000].map(amt => (
+                    <button
+                      type="button"
+                      key={amt}
+                      onClick={() => {
+                        const current = Math.max(0, parseInt(formData.amount) || 0);
+                        setFormData({ ...formData, amount: String(current + amt) });
+                      }}
+                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      +{amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>تێبینی زیاتر (ئارەزوومەندانە)</label>
                 <textarea 
                   rows="2"
                   placeholder="هەر ڕوونکردنەوەیەک سەبارەت بەم مەسروفە..."
                   value={formData.notes} 
                   onChange={e => setFormData({ ...formData, notes: e.target.value })} 
-                  style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', resize: 'none' }} 
+                  style={{ width: '100%', padding: '10px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', resize: 'none' }} 
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1.05rem', cursor: isSubmitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 15px rgba(244, 63, 94, 0.4)' }}
+                  style={{ flex: 1, minWidth: '160px', padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1.05rem', cursor: isSubmitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 15px rgba(244, 63, 94, 0.4)' }}
                 >
                   {isSubmitting ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردنی خەرجی'}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsAddModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                  className="btn-secondary"
+                  style={{ padding: '14px 20px' }}
                 >
                   داخستن
                 </button>

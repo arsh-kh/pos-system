@@ -4,17 +4,18 @@ import axios from 'axios';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Default user state stored in localStorage
+  // Default user state stored in localStorage; defaults safely to CASHIER
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('pos_user');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.role) return parsed;
       } catch {
-        return { username: 'admin', role: 'ADMIN' };
+        return { username: 'کاشێری گشتی', role: 'CASHIER' };
       }
     }
-    return { username: 'admin', role: 'ADMIN' };
+    return { username: 'کاشێری گشتی', role: 'CASHIER' };
   });
 
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
@@ -30,6 +31,8 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('token');
       if (token) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } else {
+        delete axios.defaults.headers.common['Authorization'];
       }
     }
   }, [currentUser]);
@@ -60,18 +63,49 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Quick switch role (e.g. for testing or fast cashier shift switch)
+  // Change Password handler
+  const changePassword = async (oldPassword, newPassword) => {
+    setIsSubmitting(true);
+    setLoginError('');
+    try {
+      const res = await axios.post('http://localhost:3001/api/auth/change-password', {
+        username: currentUser?.username || 'admin',
+        oldPassword,
+        newPassword
+      });
+      return { success: res.data?.status === 'SUCCESS', message: res.data?.message };
+    } catch (err) {
+      const msg = err.response?.data?.message || 'هەڵە لە کاتی گۆڕینی وشەی نهێنی';
+      return { success: false, message: msg };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Switch role: only CASHIER shifts can switch fast without password
   const switchUserFast = (role, customName = null) => {
-    const newName = customName || (role === 'ADMIN' ? 'admin' : 'کاشێری سەرەکی');
-    const newUser = { username: newName, role };
+    if (role === 'ADMIN') {
+      setIsSwitchModalOpen(true);
+      return;
+    }
+    const newName = customName || 'کاشێری سەرەکی';
+    const newUser = { username: newName, role: 'CASHIER' };
     setCurrentUser(newUser);
     localStorage.setItem('pos_user', JSON.stringify(newUser));
     setIsSwitchModalOpen(false);
   };
 
-  const logout = () => {
+  // Lock admin session and revert to cashier
+  const lockToCashier = () => {
     localStorage.removeItem('token');
-    switchUserFast('CASHIER', 'کاشێری گشتی');
+    const cashierUser = { username: 'کاشێری گشتی', role: 'CASHIER' };
+    setCurrentUser(cashierUser);
+    localStorage.setItem('pos_user', JSON.stringify(cashierUser));
+    setIsSwitchModalOpen(false);
+  };
+
+  const logout = () => {
+    lockToCashier();
   };
 
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -85,6 +119,8 @@ export const AuthProvider = ({ children }) => {
         isCashier,
         login,
         logout,
+        lockToCashier,
+        changePassword,
         switchUserFast,
         isSwitchModalOpen,
         setIsSwitchModalOpen,

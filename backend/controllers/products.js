@@ -203,7 +203,7 @@ exports.getProductBatches = async (req, res) => {
         const [batches] = await db.query(`
             SELECT b.*, 
                    pi.invoice_number, 
-                   COALESCE(s.name, 'مەخزەنی سەرەتایی / کڕینی لۆکاڵی') as supplier_name
+                   COALESCE(s.name, 'مەخزەنی سەرەتایی / کڕینی ناوخۆیی') as supplier_name
             FROM Product_Batches b
             LEFT JOIN Purchase_Invoices pi ON b.purchase_invoice_id = pi.id
             LEFT JOIN Suppliers s ON pi.supplier_id = s.id

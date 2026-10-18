@@ -264,9 +264,8 @@ const TotalSales = () => {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           {level !== 'all_months' && (
             <button 
-              className="glass-panel"
               onClick={level === 'day_hours' ? handleBackToDays : handleBackToMonths}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 'bold' }}
             >
               <ArrowRight size={18} /> گەڕانەوە بۆ ئاستی پێشوو
             </button>
@@ -318,7 +317,7 @@ const TotalSales = () => {
                 {/* Recorded Months Count */}
                 <div className="stat-card glass-panel">
                   <h3>ژمارەی مانگە تۆمارکراوەکان</h3>
-                  <div className="value" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0' }}>
+                  <div className="value" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
                     <Calendar size={24} color="#f59e0b" />
                     {overviewData.total_months_count} مانگ
                   </div>
@@ -339,7 +338,7 @@ const TotalSales = () => {
                 {/* Average Monthly Sales */}
                 <div className="stat-card glass-panel">
                   <h3>تێکڕای (ناوەندی) فرۆشتنی مانگانە</h3>
-                  <div className="value" style={{ color: '#a855f7' }}>
+                  <div className="value" style={{ color: '#0284c7' }}>
                     {overviewData.average_month_sales.toLocaleString()} دینار
                   </div>
                   <div className="sub-text" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#94a3b8' }}>
@@ -401,14 +400,14 @@ const TotalSales = () => {
                 </div>
 
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-                  <thead style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
                     <tr>
-                      <th style={{ padding: '14px 18px', color: '#94a3b8' }}>مانگ و ساڵ</th>
-                      <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کۆی فرۆشتن (دینار)</th>
-                      <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کۆی قازانج (دینار)</th>
-                      <th style={{ padding: '14px 18px', color: '#94a3b8' }}>ڕێژەی قازانج</th>
-                      <th style={{ padding: '14px 18px', color: '#94a3b8' }}>ژمارەی پسووڵە</th>
-                      <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کردار</th>
+                      <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>مانگ و ساڵ</th>
+                      <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>کۆی فرۆشتن (دینار)</th>
+                      <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>کۆی قازانج (دینار)</th>
+                      <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>ڕێژەی قازانج</th>
+                      <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>ژمارەی پسووڵە</th>
+                      <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 700 }}>کردار</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -804,25 +803,25 @@ const TotalSales = () => {
 
       {/* ================= MODAL: MANUAL SALE FOR A SPECIFIC DATE ================= */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', borderRadius: '20px', padding: '28px', border: '1px solid rgba(236,72,153,0.3)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', background: '#111827' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem' }}>
-                <PlusCircle color="#ec4899" size={24} />
+        <div className="pos-modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <PlusCircle color="#ec4899" size={22} />
                 زیادکردنی فرۆشتن بۆ ڕۆژێکی دیاریکراو
               </h2>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
+                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleManualSaleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="responsive-grid-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                     بەروار *
                   </label>
                   <input 
@@ -830,57 +829,118 @@ const TotalSales = () => {
                     required
                     value={manualForm.date}
                     onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.95rem' }}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.95rem' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                     کاتژمێر
                   </label>
                   <input 
                     type="time"
                     value={manualForm.time}
                     onChange={(e) => setManualForm({ ...manualForm, time: e.target.value })}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.95rem' }}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.95rem' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   کۆی بڕی فرۆشتن (دینار) *
                 </label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    type="number"
-                    min="1"
-                    required
-                    placeholder="بۆ نموونە: 25000"
-                    value={manualForm.total_amount}
-                    onChange={(e) => setManualForm({ ...manualForm, total_amount: e.target.value })}
-                    style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', fontSize: '1.1rem', fontWeight: 'bold' }}
-                  />
-                  <Coins size={18} color="#38bdf8" style={{ position: 'absolute', left: '12px', top: '14px' }} />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(manualForm.total_amount) || 0);
+                      const next = Math.max(0, cur - 250);
+                      setManualForm({ ...manualForm, total_amount: next === 0 ? '' : String(next) });
+                    }}
+                    style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    -٢٥٠
+                  </button>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="250"
+                      required
+                      placeholder="بۆ نموونە: 25000"
+                      value={manualForm.total_amount}
+                      onChange={(e) => setManualForm({ ...manualForm, total_amount: e.target.value })}
+                      style={{ width: '100%', padding: '12px 14px 12px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid rgba(56, 189, 248, 0.4)', color: 'var(--accent-color)', fontSize: '1.1rem', fontWeight: 'bold', boxSizing: 'border-box' }}
+                    />
+                    <Coins size={18} color="var(--accent-color)" style={{ position: 'absolute', left: '12px', top: '14px' }} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(manualForm.total_amount) || 0);
+                      setManualForm({ ...manualForm, total_amount: String(cur + 250) });
+                    }}
+                    style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
+                {/* Fast Dinar Presets */}
+                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {[250, 500, 1000, 5000, 10000, 25000, 50000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, total_amount: String(amt) })}
+                      style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {amt.toLocaleString()}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   قازانجی خاوێن (دینار)
                 </label>
-                <input 
-                  type="number"
-                  min="0"
-                  placeholder="بۆ نموونە: 5000 (ئارەزوومەندانە)"
-                  value={manualForm.total_profit}
-                  onChange={(e) => setManualForm({ ...manualForm, total_profit: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#10b981', fontSize: '1rem', fontWeight: 'bold' }}
-                />
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(manualForm.total_profit) || 0);
+                      const next = Math.max(0, cur - 250);
+                      setManualForm({ ...manualForm, total_profit: next === 0 ? '' : String(next) });
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    -٢٥٠
+                  </button>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="250"
+                    placeholder="بۆ نموونە: 5000 (ئارەزوومەندانە)"
+                    value={manualForm.total_profit}
+                    onChange={(e) => setManualForm({ ...manualForm, total_profit: e.target.value })}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: '#10b981', fontSize: '1rem', fontWeight: 'bold' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(manualForm.total_profit) || 0);
+                      setManualForm({ ...manualForm, total_profit: String(cur + 250) });
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   تێبینی
                 </label>
                 <input 
@@ -888,22 +948,23 @@ const TotalSales = () => {
                   placeholder="هۆکار یان تێبینی فرۆشتنی دەستی"
                   value={manualForm.note}
                   onChange={(e) => setManualForm({ ...manualForm, note: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.9rem' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
                 <button 
                   type="submit"
                   disabled={submitting}
-                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', boxShadow: '0 4px 14px rgba(236,72,153,0.39)' }}
+                  style={{ flex: 1, minWidth: '160px', padding: '12px', borderRadius: '10px', background: 'linear-gradient(135deg, #2563eb, #0284c7)', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}
                 >
                   {submitting ? 'خەریکی تۆمارکردنە...' : 'تۆمارکردنی فرۆشتن ✓'}
                 </button>
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  style={{ padding: '12px 20px', borderRadius: '10px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', fontSize: '0.95rem' }}
+                  className="btn-secondary"
+                  style={{ padding: '12px 20px', borderRadius: '10px' }}
                 >
                   پاشگەزبوونەوە
                 </button>

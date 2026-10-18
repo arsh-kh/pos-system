@@ -11,6 +11,7 @@ import {
   X, 
   Sparkles
 } from 'lucide-react';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const Needs = () => {
@@ -127,11 +128,8 @@ const Needs = () => {
   // Filtered Needs
   const filteredNeeds = useMemo(() => {
     return needs.filter(n => {
-      // Search
-      const matchesSearch = 
-        n.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (n.category_name && n.category_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (n.notes && n.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+      // Search with flawless Kurdish & Arabic matching
+      const matchesSearch = kurdishSearchMatch([n.item_name, n.category_name, n.notes], searchTerm);
 
       if (!matchesSearch) return false;
 
@@ -170,37 +168,37 @@ const Needs = () => {
         {/* Quick Search & Status Filter */}
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-box glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1rem', borderRadius: '12px' }}>
-            <Search size={18} color="#94a3b8" />
+            <Search size={18} color="var(--text-secondary)" />
             <input 
               type="text" 
               placeholder="گەڕان لە پێداویستیەکان..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'white', marginRight: '8px', outline: 'none', width: '200px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '8px', outline: 'none', width: '200px' }}
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', padding: '4px', borderRadius: '12px' }}>
             <button
               onClick={() => setStatusFilter('ALL')}
-              style={{ padding: '8px 14px', borderRadius: '8px', background: statusFilter === 'ALL' ? 'var(--accent-color)' : 'transparent', color: statusFilter === 'ALL' ? 'white' : '#94a3b8', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ padding: '8px 14px', borderRadius: '8px', background: statusFilter === 'ALL' ? 'var(--accent-color)' : 'transparent', color: statusFilter === 'ALL' ? 'white' : 'var(--text-secondary)', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
             >
               هەموو ({needs.length})
             </button>
             <button
               onClick={() => setStatusFilter('PENDING')}
-              style={{ padding: '8px 14px', borderRadius: '8px', background: statusFilter === 'PENDING' ? '#f59e0b' : 'transparent', color: statusFilter === 'PENDING' ? 'black' : '#94a3b8', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ padding: '8px 14px', borderRadius: '8px', background: statusFilter === 'PENDING' ? '#f59e0b' : 'transparent', color: statusFilter === 'PENDING' ? 'black' : 'var(--text-secondary)', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
             >
               پێویستە ({pendingCount})
             </button>
             <button
               onClick={() => setStatusFilter('FULFILLED')}
-              style={{ padding: '8px 14px', borderRadius: '8px', background: statusFilter === 'FULFILLED' ? '#10b981' : 'transparent', color: statusFilter === 'FULFILLED' ? 'white' : '#94a3b8', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ padding: '8px 14px', borderRadius: '8px', background: statusFilter === 'FULFILLED' ? '#10b981' : 'transparent', color: statusFilter === 'FULFILLED' ? 'white' : 'var(--text-secondary)', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
             >
               کڕدراوە ({fulfilledCount})
             </button>
@@ -215,11 +213,11 @@ const Needs = () => {
           style={{
             padding: '8px 16px',
             borderRadius: '10px',
-            border: 'none',
+            border: '1px solid ' + (selectedCategoryFilter === 'ALL' ? 'transparent' : 'var(--border-color)'),
             cursor: 'pointer',
             fontWeight: selectedCategoryFilter === 'ALL' ? 'bold' : 'normal',
-            background: selectedCategoryFilter === 'ALL' ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-            color: selectedCategoryFilter === 'ALL' ? '#ffffff' : '#94a3b8',
+            background: selectedCategoryFilter === 'ALL' ? '#3b82f6' : 'var(--bg-tertiary)',
+            color: selectedCategoryFilter === 'ALL' ? '#ffffff' : 'var(--text-secondary)',
             transition: 'all 0.2s',
             whiteSpace: 'nowrap'
           }}
@@ -259,11 +257,11 @@ const Needs = () => {
               style={{
                 padding: '8px 16px',
                 borderRadius: '10px',
-                border: 'none',
+                border: '1px solid ' + (isActive ? 'transparent' : 'var(--border-color)'),
                 cursor: 'pointer',
                 fontWeight: isActive ? 'bold' : 'normal',
-                background: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                color: isActive ? '#ffffff' : '#94a3b8',
+                background: isActive ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                color: isActive ? '#ffffff' : 'var(--text-secondary)',
                 transition: 'all 0.2s',
                 whiteSpace: 'nowrap'
               }}
@@ -281,7 +279,7 @@ const Needs = () => {
             borderRadius: '10px',
             border: '1px dashed rgba(255,255,255,0.2)',
             background: 'transparent',
-            color: '#a78bfa',
+            color: 'var(--accent-hover)',
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
@@ -308,21 +306,21 @@ const Needs = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           {/* Item Name */}
           <div>
-            <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8', fontSize: '0.9rem' }}>ناوی کاڵا <span style={{ color: '#ef4444' }}>*</span></label>
+            <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ناوی کاڵا <span style={{ color: '#ef4444' }}>*</span></label>
             <input 
               type="text" 
               required
               placeholder="ناوی ئەو کاڵایەی کە کەمە یان پێویستە..."
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
 
           {/* Department Selector with Custom Department Option */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-              <label style={{ color: '#94a3b8', fontSize: '0.9rem' }}>بەش / کەتەگۆری</label>
+              <label style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>بەش / کەتەگۆری</label>
               <button 
                 type="button" 
                 onClick={() => setIsAddCatModalOpen(true)}
@@ -334,7 +332,7 @@ const Needs = () => {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none', cursor: 'pointer' }}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -344,7 +342,7 @@ const Needs = () => {
 
           {/* Priority Selector (پەلە / گرنگ / ئاسایی) */}
           <div>
-            <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8', fontSize: '0.9rem' }}>ئاستی پێویستی (Priority)</label>
+            <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ئاستی پێویستی (Priority)</label>
             <div style={{ display: 'flex', gap: '6px' }}>
               {[
                 { id: 'HIGH', label: '🔴 پەلە', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
@@ -359,9 +357,9 @@ const Needs = () => {
                     flex: 1,
                     padding: '10px 8px',
                     borderRadius: '8px',
-                    border: `1px solid ${priority === p.id ? p.color : 'rgba(255,255,255,0.1)'}`,
-                    background: priority === p.id ? p.bg : 'rgba(0,0,0,0.2)',
-                    color: priority === p.id ? p.color : '#94a3b8',
+                    border: `1px solid ${priority === p.id ? p.color : 'var(--border-color)'}`,
+                    background: priority === p.id ? p.bg : 'var(--bg-tertiary)',
+                    color: priority === p.id ? p.color : 'var(--text-secondary)',
                     cursor: 'pointer',
                     fontWeight: priority === p.id ? 'bold' : 'normal',
                     fontSize: '0.85rem'
@@ -375,19 +373,19 @@ const Needs = () => {
 
           {/* Notes / Quantity */}
           <div>
-            <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8', fontSize: '0.9rem' }}>تێبینی (بڕ یان ناوی کڕیار)</label>
+            <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>تێبینی (بڕ یان ناوی کڕیار)</label>
             <input 
               type="text" 
               placeholder="نموونە: ٥ کارتۆن، کڕیار کاک ئاراس..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
         </div>
 
         {/* Customer Request Checkbox & Submit */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
             <input 
               type="checkbox"
@@ -395,8 +393,8 @@ const Needs = () => {
               onChange={(e) => setIsCustomerRequest(e.target.checked)}
               style={{ width: '18px', height: '18px', accentColor: '#ec4899', cursor: 'pointer' }}
             />
-            <span style={{ color: isCustomerRequest ? '#f472b6' : '#94a3b8', fontWeight: isCustomerRequest ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={16} color={isCustomerRequest ? '#f472b6' : '#94a3b8'} />
+            <span style={{ color: isCustomerRequest ? '#f472b6' : 'var(--text-secondary)', fontWeight: isCustomerRequest ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={16} color={isCustomerRequest ? '#f472b6' : 'var(--text-secondary)'} />
               ئەم کاڵایە داواکاری کڕیارە (کاڵای نەبوو لە مارکێت)
             </span>
           </label>
@@ -414,9 +412,9 @@ const Needs = () => {
       {/* Needs Items List */}
       <div className="glass-panel" style={{ borderRadius: '20px', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8' }}>چاوەڕوان بە، باردەکرێت...</div>
+          <div style={{ padding: '50px', textAlign: 'center', color: 'var(--text-secondary)' }}>چاوەڕوان بە، باردەکرێت...</div>
         ) : filteredNeeds.length === 0 ? (
-          <div style={{ padding: '50px', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div style={{ padding: '50px', textAlign: 'center', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
             <ClipboardList size={48} style={{ opacity: 0.3 }} />
             <p style={{ margin: 0, fontSize: '1.1rem' }}>هیچ پێداویستیەک بەپێی ئەم فلتەرە نەدۆزرایەوە</p>
           </div>
@@ -434,7 +432,7 @@ const Needs = () => {
                     alignItems: 'center', 
                     justifyContent: 'space-between', 
                     padding: '16px 22px', 
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    borderBottom: '1px solid var(--border-color)',
                     background: n.is_fulfilled ? 'rgba(16, 185, 129, 0.03)' : (isHigh ? 'rgba(239, 68, 68, 0.04)' : 'transparent'),
                     transition: 'background 0.2s'
                   }}
@@ -443,7 +441,7 @@ const Needs = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
                     <button 
                       onClick={() => handleToggleFulfilled(n.id)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: n.is_fulfilled ? '#10b981' : '#94a3b8', display: 'flex', alignItems: 'center' }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: n.is_fulfilled ? '#10b981' : 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
                       title={n.is_fulfilled ? 'هەڵوەشاندنەوەی کڕین' : 'تەواوکردنی کڕین'}
                     >
                       {n.is_fulfilled ? <CheckCircle size={26} color="#10b981" /> : <Circle size={26} />}
@@ -451,7 +449,7 @@ const Needs = () => {
 
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.1rem', textDecoration: n.is_fulfilled ? 'line-through' : 'none', color: n.is_fulfilled ? '#64748b' : '#f8fafc', fontWeight: 'bold' }}>
+                        <span style={{ fontSize: '1.1rem', textDecoration: n.is_fulfilled ? 'line-through' : 'none', color: n.is_fulfilled ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: 'bold' }}>
                           {n.item_name}
                         </span>
 
@@ -482,7 +480,7 @@ const Needs = () => {
 
                       {/* Notes / Details */}
                       {n.notes && (
-                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '4px' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                           تێبینی: {n.notes}
                         </div>
                       )}
@@ -512,41 +510,42 @@ const Needs = () => {
 
       {/* Custom Category Creation Modal */}
       {isAddCatModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FolderPlus color="#8b5cf6" /> دروستکردنی بەشی نوێ
+        <div className="pos-modal-overlay" onClick={() => setIsAddCatModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <FolderPlus color="var(--accent-color)" /> دروستکردنی بەشی نوێ
               </h2>
-              <button onClick={() => setIsAddCatModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={24}/>
+              <button onClick={() => setIsAddCatModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18}/>
               </button>
             </div>
 
             <form onSubmit={handleAddCategory} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>ناوی بەش / پۆلێن <span style={{ color: '#ef4444' }}>*</span></label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ناوی بەش / پۆلێن <span style={{ color: '#ef4444' }}>*</span></label>
                 <input 
                   type="text" 
                   required
                   placeholder="نموونە: بەشی گۆشت و مریشک..."
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: '#8b5cf6', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                  style={{ flex: 1, minWidth: '140px', padding: '14px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                   پاشەکەوتکردن
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsAddCatModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                  className="btn-secondary"
+                  style={{ padding: '14px 20px' }}
                 >
                   داخستن
                 </button>

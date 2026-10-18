@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, 
@@ -14,15 +14,25 @@ import {
   WifiOff,
   Cloud,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Sun,
+  Moon,
+  LogOut,
+  Store,
+  ArrowRight,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const UserBar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { 
     currentUser, 
     isAdmin, 
     login, 
+    logout,
     switchUserFast, 
     isSwitchModalOpen, 
     setIsSwitchModalOpen,
@@ -31,9 +41,10 @@ const UserBar = () => {
     isSubmitting
   } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('QUICK'); // 'QUICK' or 'LOGIN'
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('pos_theme') || 'light');
 
   // Live Sync & Connectivity State
   const [syncData, setSyncData] = useState(null);
@@ -56,6 +67,20 @@ const UserBar = () => {
     const interval = setInterval(fetchSyncStatus, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+    setCurrentTheme(nextTheme);
+    localStorage.setItem('pos_theme', nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    if (nextTheme === 'light') {
+      document.body.classList.add('theme-light');
+      document.body.classList.remove('theme-dark');
+    } else {
+      document.body.classList.add('theme-dark');
+      document.body.classList.remove('theme-light');
+    }
+  };
 
   const handleTriggerSyncNow = async () => {
     setSyncLoading(true);
@@ -83,77 +108,157 @@ const UserBar = () => {
     if (res?.success) {
       setUsernameInput('');
       setPasswordInput('');
+      setShowPassword(false);
+      setIsSwitchModalOpen(false);
+    }
+  };
+
+  const handleLogoutToCashier = () => {
+    if (logout) {
+      logout();
+    } else {
+      switchUserFast('CASHIER', 'کاشێری سەرەکی');
     }
   };
 
   return (
     <>
       {/* Top Floating User Status Bar */}
-      <div 
+      <header 
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '8px 24px',
-          fontSize: '0.88rem',
+          flexWrap: 'wrap',
+          gap: '8px',
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-color)',
+          padding: '6px 14px',
+          fontSize: '0.86rem',
           zIndex: 999,
           position: 'sticky',
-          top: 0
+          top: 0,
+          boxShadow: 'var(--card-shadow)'
         }}
       >
+        {/* Left / Start: Brand & Active User Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>بەکارهێنەری چالاک:</span>
+          {location.pathname !== '/' && (
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 12px',
+                borderRadius: '8px',
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                transition: 'all 0.15s ease'
+              }}
+              title="گەڕانەوە بۆ پەڕەی سەرەکی"
+            >
+              <ArrowRight size={14} />
+              <span>سەرەکی</span>
+            </button>
+          )}
+
+          <div 
+            onClick={() => navigate('/')}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              cursor: 'pointer',
+              padding: '2px 8px',
+              borderRadius: '8px',
+              transition: 'background 0.2s'
+            }}
+          >
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '8px',
+              background: 'var(--primary-color)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Store size={16} />
+            </div>
+            <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+              مارکێتی سەرەکی
+            </span>
+          </div>
+
+          <div style={{ height: '18px', width: '1px', background: 'var(--border-color)' }} />
+
+          {/* User Badge */}
           <div 
             style={{ 
               display: 'inline-flex', 
               alignItems: 'center', 
               gap: '6px', 
               padding: '4px 12px', 
-              borderRadius: '20px', 
-              background: isAdmin ? 'rgba(168, 85, 247, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-              border: isAdmin ? '1px solid rgba(168, 85, 247, 0.35)' : '1px solid rgba(16, 185, 129, 0.35)',
-              color: isAdmin ? '#c084fc' : '#34d399',
-              fontWeight: 'bold',
-              fontSize: '0.85rem'
+              borderRadius: '8px', 
+              background: isAdmin ? 'rgba(37, 99, 235, 0.12)' : 'var(--accent-light)',
+              border: isAdmin ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid rgba(14, 165, 233, 0.3)',
+              color: isAdmin ? '#1d4ed8' : 'var(--accent-color)',
+              fontWeight: 700,
+              fontSize: '0.8rem'
             }}
           >
-            {isAdmin ? <Crown size={15} /> : <User size={15} />}
-            <span>{isAdmin ? 'بەڕێوەبەر (Admin)' : 'کاشێر (Cashier)'}:</span>
-            <span style={{ color: 'white' }}>{currentUser?.username || 'کاشێری سەرەکی'}</span>
+            {isAdmin ? <Crown size={14} /> : <User size={14} />}
+            <span>{isAdmin ? 'بەڕێوەبەر' : 'کاشێر'}:</span>
+            <span style={{ color: 'var(--text-primary)' }}>{currentUser?.username || 'کاشێری سەرەکی'}</span>
           </div>
 
           {!isAdmin && (
-            <span style={{ color: '#f59e0b', fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 8px', borderRadius: '6px' }}>
-              🔒 دەسەڵاتی کاشێر (سڕینەوە و قازانج قوفڵکراون)
+            <span style={{ 
+              color: '#d97706', 
+              fontSize: '0.75rem', 
+              background: 'var(--warning-light)', 
+              padding: '3px 8px', 
+              borderRadius: '6px',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <Lock size={12} /> دەسەڵاتی کاشێر
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Right / End: Actions, Sync, Theme Toggle & Login/Logout */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* Live Internet Connectivity Badge */}
           {syncData && (
             <div 
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                background: syncData.isOnline ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '9999px',
+                background: syncData.isOnline ? 'var(--success-light)' : 'var(--danger-light)',
                 border: syncData.isOnline ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(239, 68, 68, 0.35)',
-                color: syncData.isOnline ? '#34d399' : '#f87171',
-                fontSize: '0.78rem',
-                fontWeight: 'bold',
-                cursor: 'pointer'
+                color: syncData.isOnline ? 'var(--success-color)' : 'var(--danger-color)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
               }}
               onClick={() => setIsSyncModalOpen(true)}
-              title={syncData.isOnline ? 'ئینتەرنێت هەیە و بەستراوەتەوە' : 'سیستەم بە شێوازی ئۆفلاین کار دەکات'}
+              title={syncData.isOnline ? 'ئینتەرنێت هەیە و بەستراوەتەوە' : 'سیستەم بە شێوازی دەرەوەی هێڵ کار دەکات'}
             >
-              {syncData.isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
-              <span>{syncData.isOnline ? 'ئۆنلاین' : 'ئۆفلاین'}</span>
+              {syncData.isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+              <span>{syncData.isOnline ? 'سەرهێڵ' : 'دەرەوەی هێڵ'}</span>
             </div>
           )}
 
@@ -161,23 +266,22 @@ const UserBar = () => {
           {isAdmin && syncData && (
             <button
               onClick={() => setIsSyncModalOpen(true)}
-              title="دۆخی هاوکاتکردنی کلاود (کلیک بکە بۆ وردەکاری)"
+              title="دۆخی هاوکاتکردنی کلاود"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                background: syncData.pendingCount > 0 ? 'rgba(245, 158, 11, 0.18)' : 'rgba(56, 189, 248, 0.12)',
-                border: syncData.pendingCount > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(56, 189, 248, 0.3)',
-                color: syncData.pendingCount > 0 ? '#fbbf24' : '#38bdf8',
-                fontSize: '0.78rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
+                padding: '5px 12px',
+                borderRadius: '9999px',
+                background: syncData.pendingCount > 0 ? 'var(--warning-light)' : 'var(--accent-light)',
+                border: syncData.pendingCount > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(14, 165, 233, 0.3)',
+                color: syncData.pendingCount > 0 ? 'var(--warning-color)' : 'var(--accent-color)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
               }}
             >
-              <Cloud size={13} />
+              <Cloud size={14} />
               {syncData.pendingCount > 0 ? (
                 <span>{syncData.pendingCount} چاوەڕوان</span>
               ) : (
@@ -193,303 +297,265 @@ const UserBar = () => {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '5px 12px',
-                borderRadius: '10px',
-                background: 'rgba(56, 189, 248, 0.12)',
-                color: '#38bdf8',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                background: 'var(--accent-light)',
+                color: 'var(--accent-hover)',
+                border: '1px solid rgba(14, 165, 233, 0.3)',
                 cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '0.82rem',
-                transition: 'all 0.2s'
+                fontWeight: 600,
+                fontSize: '0.82rem'
               }}
             >
-              <ShieldCheck size={14} /> باکئەپ و پاراستن
+              <ShieldCheck size={15} /> باکئەپ
             </button>
           )}
 
+          {/* Theme Toggle Button */}
           <button
-            onClick={() => {
-              setLoginError('');
-              setIsSwitchModalOpen(true);
-            }}
+            onClick={toggleTheme}
+            title={currentTheme === 'light' ? 'گۆڕین بۆ دۆخی تاریک' : 'گۆڕین بۆ دۆخی ڕووناک'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '5px 14px',
-              borderRadius: '10px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: '#cbd5e1',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '0.82rem',
-              transition: 'all 0.2s'
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              borderRadius: '9999px',
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+              cursor: 'pointer'
             }}
-            onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-            onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
           >
-            <RefreshCw size={14} /> گۆڕینی بەکارهێنەر / چوونەژوورەوە
+            {currentTheme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
-        </div>
-      </div>
 
-      {/* Switch User & Login Modal */}
+          {/* Login / Logout Button */}
+          {isAdmin ? (
+            <button
+              onClick={handleLogoutToCashier}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 16px',
+                borderRadius: '9999px',
+                background: 'var(--danger-light)',
+                color: 'var(--danger-color)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.82rem'
+              }}
+            >
+              <LogOut size={14} /> دەرچوون لە ئەدمین
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setLoginError('');
+                setIsSwitchModalOpen(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 16px',
+                borderRadius: '9999px',
+                background: 'var(--accent-gradient)',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                boxShadow: 'var(--btn-shadow)'
+              }}
+            >
+              <KeyRound size={14} /> چوونەژوورەوەی ئەدمین
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Switch User & Login Modal (Strict Password Login - No 1-click bypass) */}
       {isSwitchModalOpen && (
         <div 
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000,
-            padding: '16px'
-          }}
+          className="pos-modal-overlay"
+          onClick={() => setIsSwitchModalOpen(false)}
         >
           <div 
-            className="glass-panel"
-            style={{
-              width: '100%',
-              maxWidth: '460px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              borderRadius: '24px',
-              padding: '24px',
-              background: '#0f172a',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
-            }}
+            className="pos-modal-card pos-modal-sm"
+            onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.25rem', margin: 0, color: '#38bdf8' }}>
-                <KeyRound size={22} /> گۆڕینی بەکارهێنەر و دەسەڵاتەکان
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'var(--accent-light)',
+                  color: 'var(--accent-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <KeyRound size={22} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text-primary)', fontWeight: 800 }}>
+                    چوونەژوورەوەی بەڕێوەبەر
+                  </h2>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە
+                  </p>
+                </div>
+              </div>
               <button 
                 onClick={() => setIsSwitchModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ 
+                  background: 'var(--bg-tertiary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: 'var(--text-secondary)', 
+                  cursor: 'pointer',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '9999px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* Tabs Toggle */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '12px' }}>
-              <button
-                type="button"
-                onClick={() => setActiveTab('QUICK')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem',
-                  background: activeTab === 'QUICK' ? '#38bdf8' : 'transparent',
-                  color: activeTab === 'QUICK' ? '#0f172a' : '#94a3b8'
-                }}
-              >
-                ⚡ گۆڕینی خێرا (Quick Role)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('LOGIN')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem',
-                  background: activeTab === 'LOGIN' ? '#38bdf8' : 'transparent',
-                  color: activeTab === 'LOGIN' ? '#0f172a' : '#94a3b8'
-                }}
-              >
-                🔑 چوونەژوورەوە بە وشەی نهێنی
-              </button>
-            </div>
-
-            {activeTab === 'QUICK' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: '1.5' }}>
-                  بۆ تاقیکردنەوەی دەسەڵاتەکان و کارکردنی خێرا، کلیک لەسەر یەکێک لەم هەژمارانە بکە:
-                </p>
-
-                {/* Select Admin */}
-                <button
-                  type="button"
-                  onClick={() => switchUserFast('ADMIN', 'admin')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px',
-                    borderRadius: '14px',
-                    background: isAdmin ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isAdmin ? '2px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    textAlign: 'right'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(168, 85, 247, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
-                      <Crown size={22} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>بەڕێوەبەر (Admin)</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.78rem' }}>دەسەڵاتی تەواو: بینینی قازانج، سڕینەوە، ڕاپۆرت و چاودێری</div>
-                    </div>
-                  </div>
-                  {isAdmin && <CheckCircle2 size={20} color="#c084fc" />}
-                </button>
-
-                {/* Select Cashier */}
-                <button
-                  type="button"
-                  onClick={() => switchUserFast('CASHIER', 'کاشێری سەرەکی')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px',
-                    borderRadius: '14px',
-                    background: !isAdmin ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    border: !isAdmin ? '2px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    textAlign: 'right'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399' }}>
-                      <User size={22} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>کاشێر (Cashier)</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.78rem' }}>فرۆشتن، کۆگا و گەڕاندنەوە (سڕینەوە و قازانج قوفڵکراون)</div>
-                    </div>
-                  </div>
-                  {!isAdmin && <CheckCircle2 size={20} color="#34d399" />}
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleLoginFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {loginError && (
-                  <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertCircle size={18} /> {loginError}
-                  </div>
-                )}
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.85rem' }}>
-                    ناوی بەکارهێنەر (Username)
-                  </label>
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="بۆ نموونە: admin یان cashier"
-                    value={usernameInput}
-                    onChange={e => setUsernameInput(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none' }}
-                  />
+            <form onSubmit={handleLoginFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {loginError && (
+                <div style={{ 
+                  padding: '10px 14px', 
+                  borderRadius: '12px', 
+                  background: 'var(--danger-light)', 
+                  border: '1px solid rgba(239, 68, 68, 0.3)', 
+                  color: 'var(--danger-color)', 
+                  fontSize: '0.85rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px' 
+                }}>
+                  <AlertCircle size={18} /> {loginError}
                 </div>
+              )}
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: '#cbd5e1', fontSize: '0.85rem' }}>
-                    وشەی نهێنی (Password)
-                  </label>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                  ناوی بەکارهێنەر (Username)
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  autoFocus
+                  placeholder="بۆ نموونە: admin"
+                  value={usernameInput}
+                  onChange={e => setUsernameInput(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                  وشەی نهێنی (Password)
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input 
-                    type="password" 
+                    type={showPassword ? 'text' : 'password'} 
                     required 
                     placeholder="وشەی نهێنی بنووسە..."
                     value={passwordInput}
                     onChange={e => setPasswordInput(e.target.value)}
-                    style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', outline: 'none' }}
+                    style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '40px' }}
                   />
-                  <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                    ئەدمینی سەرەتا: admin / admin123 | کاشێر: cashier / 1234
-                  </small>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex="-1"
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '4px'
+                    }}
+                    title={showPassword ? 'شاردنەوەی وشەی نهێنی' : 'پیشاندانی وشەی نهێنی'}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  style={{
-                    padding: '14px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #38bdf8, #0284c7)',
-                    color: '#0f172a',
-                    border: 'none',
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    marginTop: '8px'
-                  }}
-                >
-                  {isSubmitting ? 'کەمێک بوەستە...' : 'چوونەژوورەوە 🚀'}
-                </button>
-              </form>
-            )}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn-primary"
+                style={{
+                  padding: '13px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.96rem',
+                  marginTop: '6px'
+                }}
+              >
+                {isSubmitting ? 'کەمێک بوەستە...' : 'چوونەژوورەوە 🚀'}
+              </button>
+            </form>
           </div>
         </div>
       )}
+
       {/* Cloud & Offline Sync Inspector Modal */}
       {isSyncModalOpen && (
         <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.82)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100,
-            padding: '1rem'
-          }}
+          className="pos-modal-overlay"
           onClick={() => setIsSyncModalOpen(false)}
         >
           <div 
-            className="glass-panel"
-            style={{
-              width: '100%',
-              maxWidth: '680px',
-              borderRadius: '24px',
-              padding: '2rem',
-              animation: 'fadeIn 0.25s ease',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}
+            className="pos-modal-card pos-modal-lg"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ padding: '8px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                <div style={{ padding: '8px', borderRadius: '12px', background: 'var(--accent-light)', color: 'var(--accent-color)' }}>
                   <Cloud size={24} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'white' }}>دۆخی هاوکاتکردنی ئۆفلاین و کلاود</h2>
-                  <p style={{ margin: '3px 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
+                  <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--text-primary)', fontWeight: 800 }}>دۆخی هاوکاتکردنی ناوخۆیی و کلاود</h2>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     چاودێری ڕاستەوخۆی ئینتەرنێت، داتاکانی فرۆشتن و ڕیزبەندی کلاود
                   </p>
                 </div>
               </div>
               <button 
                 onClick={() => setIsSyncModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ 
+                  background: 'var(--bg-tertiary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: 'var(--text-secondary)', 
+                  cursor: 'pointer',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '9999px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
 
@@ -502,9 +568,9 @@ const UserBar = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                background: syncData?.isOnline ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                background: syncData?.isOnline ? 'var(--success-light)' : 'var(--warning-light)',
                 border: syncData?.isOnline ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
-                color: syncData?.isOnline ? '#34d399' : '#fbbf24'
+                color: syncData?.isOnline ? 'var(--success-color)' : '#b45309'
               }}
             >
               {syncData?.isOnline ? <Wifi size={20} /> : <WifiOff size={20} />}
@@ -512,28 +578,28 @@ const UserBar = () => {
                 {syncData?.isOnline ? (
                   <span><b>ئینتەرنێت چالاکە و بەستراوەتەوە:</b> هەموو فرۆشتن و گۆڕانکارییەکان بە ئۆتۆماتیک لە باکگراونددا دەنێردرێنە سەر کلاود.</span>
                 ) : (
-                  <span><b>دۆخی ئۆفلاین (Offline Mode):</b> سیستەم بە تەواوی و بەبێ وەستان لەسەر کۆمپیوتەرەکەت کار دەکات. گۆڕانکارییەکان لەناو ڕیزبەندی لۆکاڵدا پارێزراون و دەستبەجێ بە گەڕانەوەی ئینتەرنێت هاوکات دەکرێن.</span>
+                  <span><b>دۆخی دەرەوەی هێڵ (Offline Mode):</b> سیستەم بە تەواوی و بەبێ وەستان لەسەر کۆمپیوتەرەکەت کار دەکات. گۆڕانکارییەکان لەناو ڕیزبەندی ناوخۆییدا پارێزراون و دەستبەجێ بە گەڕانەوەی ئینتەرنێت هاوکات دەکرێن.</span>
                 )}
               </div>
             </div>
 
             {/* Stats Overview */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ padding: '1rem', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>لە چاوەڕوانیدایە</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#fbbf24', marginTop: '4px' }}>
+              <div style={{ padding: '1rem', background: 'var(--warning-light)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>لە چاوەڕوانیدایە</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--warning-color)', marginTop: '4px' }}>
                   {syncData?.pendingCount || 0}
                 </div>
               </div>
-              <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>هاوکاتکراوەکان</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#34d399', marginTop: '4px' }}>
+              <div style={{ padding: '1rem', background: 'var(--success-light)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>هاوکاتکراوەکان</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--success-color)', marginTop: '4px' }}>
                   {syncData?.syncedCount || 0}
                 </div>
               </div>
-              <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>دوایین هاوکاتکردن</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '8px' }}>
+              <div style={{ padding: '1rem', background: 'var(--accent-light)', border: '1px solid rgba(14, 165, 233, 0.25)', borderRadius: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>دوایین هاوکاتکردن</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--accent-color)', marginTop: '8px' }}>
                   {syncData?.lastSuccessfulSync ? new Date(syncData.lastSuccessfulSync).toLocaleTimeString('en-GB') : 'هێشتا نەکراوە'}
                 </div>
               </div>
@@ -544,6 +610,7 @@ const UserBar = () => {
               <button
                 onClick={handleTriggerSyncNow}
                 disabled={syncLoading}
+                className="btn-primary"
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -551,12 +618,6 @@ const UserBar = () => {
                   justifyContent: 'center',
                   gap: '8px',
                   padding: '12px',
-                  background: 'linear-gradient(135deg, #38bdf8, #0284c7)',
-                  color: '#0f172a',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontWeight: 'bold',
-                  fontSize: '0.95rem',
                   cursor: syncLoading ? 'not-allowed' : 'pointer'
                 }}
               >
@@ -569,18 +630,13 @@ const UserBar = () => {
                   setIsSyncModalOpen(false);
                   navigate('/settings');
                 }}
+                className="btn-secondary"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
                   padding: '12px 18px',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#cbd5e1',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '12px',
-                  fontWeight: 'bold',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer'
+                  fontWeight: 700
                 }}
               >
                 ڕێکخستنی کلاود <ArrowUpRight size={16} />
@@ -590,23 +646,23 @@ const UserBar = () => {
             {/* Recent Queue Table */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#cbd5e1' }}>دواین تۆمارەکانی ڕیزبەندی (Sync Queue):</span>
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>کۆی گشتی: {syncData?.totalQueueCount || 0}</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>دواین تۆمارەکانی ڕیزبەندی (Sync Queue):</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>کۆی گشتی: {syncData?.totalQueueCount || 0}</span>
               </div>
 
               {(!syncData?.recentQueue || syncData.recentQueue.length === 0) ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', fontSize: '0.88rem' }}>
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', borderRadius: '14px', fontSize: '0.88rem' }}>
                   هیچ تۆمارێک لە ڕیزبەندی هاوکاتکردندا نییە
                 </div>
               ) : (
-                <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.84rem' }}>
-                    <thead style={{ background: 'rgba(0,0,0,0.3)', position: 'sticky', top: 0 }}>
+                    <thead style={{ background: 'var(--bg-tertiary)', position: 'sticky', top: 0 }}>
                       <tr>
-                        <th style={{ padding: '8px 12px', color: '#94a3b8' }}>جۆر</th>
-                        <th style={{ padding: '8px 12px', color: '#94a3b8' }}>ناسنامە</th>
-                        <th style={{ padding: '8px 12px', color: '#94a3b8' }}>دۆخ</th>
-                        <th style={{ padding: '8px 12px', color: '#94a3b8' }}>کات</th>
+                        <th style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>جۆر</th>
+                        <th style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>ناسنامە</th>
+                        <th style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>دۆخ</th>
+                        <th style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>کات</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -620,26 +676,26 @@ const UserBar = () => {
                           PRODUCT: 'کاڵا'
                         };
                         const statusColors = {
-                          PENDING: { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', label: 'چاوەڕوان' },
-                          SYNCED: { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', label: 'هاوکاتە' },
-                          SYNCING: { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'دەنێردرێت' },
-                          FAILED: { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171', label: 'شکست' }
+                          PENDING: { bg: 'var(--warning-light)', text: 'var(--warning-color)', label: 'چاوەڕوان' },
+                          SYNCED: { bg: 'var(--success-light)', text: 'var(--success-color)', label: 'هاوکاتە' },
+                          SYNCING: { bg: 'var(--accent-light)', text: 'var(--accent-color)', label: 'دەنێردرێت' },
+                          FAILED: { bg: 'var(--danger-light)', text: 'var(--danger-color)', label: 'شکست' }
                         };
                         const s = statusColors[item.status] || statusColors.PENDING;
                         return (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                               {typeLabels[item.entity_type] || item.entity_type}
                             </td>
-                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#94a3b8' }}>
+                            <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
                               #{item.entity_id}
                             </td>
-                            <td style={{ padding: '8px 12px' }}>
-                              <span style={{ padding: '2px 8px', borderRadius: '6px', background: s.bg, color: s.text, fontWeight: 'bold', fontSize: '0.75rem' }}>
+                            <td style={{ padding: '10px 14px' }}>
+                              <span style={{ padding: '3px 10px', borderRadius: '9999px', background: s.bg, color: s.text, fontWeight: 700, fontSize: '0.75rem' }}>
                                 {s.label}
                               </span>
                             </td>
-                            <td style={{ padding: '8px 12px', color: '#64748b', fontSize: '0.78rem' }}>
+                            <td style={{ padding: '10px 14px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                               {new Date(item.created_at).toLocaleTimeString('en-GB')}
                             </td>
                           </tr>
@@ -659,4 +715,3 @@ const UserBar = () => {
 };
 
 export default UserBar;
-

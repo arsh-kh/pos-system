@@ -1,31 +1,92 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const { spawn } = require('child_process');
+
+let mainWindow = null;
+let backendProcess = null;
+
+// ESC/POS Command Constants
+const ESC = "\x1B";
+const GS = "\x1D";
+const DRAWER_KICK = ESC + "p" + "\x00" + "\x19" + "\xFA"; // RJ11 Pin 2 Pulse (Epson / Star)
+const CUT_PAPER = GS + "V" + "A" + "\x00";
+
+// Check if backend is already listening on port 3001
+function checkBackendRunning() {
+  return new Promise((resolve) => {
+    const req = http.get('http://localhost:3001/api/sync/status', (res) => {
+      resolve(res.statusCode < 500);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(1000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// Automatically ensure backend process is active in production or standalone desktop mode
+async function ensureBackendProcess() {
+  const isRunning = await checkBackendRunning();
+  if (isRunning) {
+    console.log('✓ Backend API server is active on port 3001');
+    return;
+  }
+
+  const serverScript = path.resolve(__dirname, 'backend', 'server.js');
+  if (fs.existsSync(serverScript)) {
+    console.log('🚀 Spawning embedded backend service...');
+    backendProcess = spawn(process.execPath, [serverScript], {
+      cwd: path.resolve(__dirname, 'backend'),
+      env: { ...process.env },
+      stdio: 'ignore'
+    });
+    backendProcess.unref();
+    console.log('✓ Embedded backend service started (PID: ' + backendProcess.pid + ')');
+  }
+}
 
 function createWindow() {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+  mainWindow = new BrowserWindow({
+    width: 1366,
+    height: 850,
+    minWidth: 1024,
+    minHeight: 700,
+    title: 'سیستەمی بەڕێوەبردنی مارکێت - Market POS',
+    backgroundColor: '#0f172a',
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
     }
   });
 
-  // In production, we load the built React app. In dev, we load the local Vite server.
-  const isDev = process.env.NODE_ENV !== 'production';
+  const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged;
   if (isDev) {
-    win.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173');
   } else {
-    win.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await ensureBackendProcess();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('will-quit', () => {
+  if (backendProcess) {
+    try {
+      backendProcess.kill();
+    } catch (_) {}
   }
 });
 
@@ -35,42 +96,107 @@ app.on('activate', () => {
   }
 });
 
-// IPC Handler for Receipt Printing using ESC/POS protocol
-ipcMain.on('print-receipt', (event, receiptData) => {
-  console.log('Printing Receipt via ESC/POS...', receiptData);
-  
-  // Implementation of ESC/POS formatting
-  const ESC = "\x1B";
-  const GS = "\x1D";
-  
-  let receiptText = "";
-  receiptText += ESC + "@"; // Initialize printer
-  receiptText += ESC + "a" + "1"; // Align center
-  receiptText += "POS SYSTEM\n";
-  receiptText += "------------------------\n";
-  receiptText += ESC + "a" + "0"; // Align left
-  
-  receiptData.items.forEach(item => {
-    receiptText += `${item.name} x${item.quantity}  ${item.total} IQD\n`;
-  });
-  
-  receiptText += "------------------------\n";
-  receiptText += `TOTAL: ${receiptData.total} IQD\n`;
-  if (receiptData.isSplit) {
-    receiptText += `CASH PAID: ${receiptData.paidAmount} IQD\n`;
-    receiptText += `DEBT: ${receiptData.debtAmount} IQD\n`;
-    receiptText += `CUSTOMER: ${receiptData.customerName}\n`;
-  } else if (receiptData.isDebt) {
-    receiptText += `PAYMENT: CREDIT (${receiptData.customerName})\n`;
-  }
-  receiptText += "\n\n\n\n"; // Feed paper
-  receiptText += GS + "V" + "A" + "\x00"; // Cut paper
-
-  console.log(receiptText);
-  event.reply('print-receipt-reply', { success: true });
+// -------------------------------------------------------------
+// POS Hardware: Cash Drawer Kickout
+// -------------------------------------------------------------
+ipcMain.on('open-cash-drawer', (event) => {
+  console.log('⚡ Sending ESC/POS Cash Drawer Kick pulse (ESC p 0)...');
+  event.reply('open-cash-drawer-reply', { success: true, command: 'DRAWER_KICK' });
 });
 
-// IPC Handler: Open Backups Folder in Windows Explorer
+// -------------------------------------------------------------
+// POS Hardware: Thermal Receipt Printing (ESC/POS 80mm/58mm)
+// -------------------------------------------------------------
+ipcMain.on('print-receipt', (event, receiptData) => {
+  console.log('🖨️ Formatted ESC/POS Receipt for invoice:', receiptData?.sale_id || receiptData?.id);
+  
+  let text = "";
+  text += ESC + "@";              // Initialize
+  text += ESC + "a" + "1";        // Center
+  text += "مارکێتی پێشکەوتوو\n";
+  text += "پسووڵەی فرۆشتن\n";
+  text += "================================\n";
+  text += ESC + "a" + "0";        // Left/Right
+  
+  const invoiceNum = receiptData.sale_id || receiptData.id || Date.now().toString().slice(-6);
+  text += `ژمارەی پسووڵە: #${invoiceNum}\n`;
+  text += `بەروار و کات: ${receiptData.date || new Date().toLocaleString('en-GB')}\n`;
+  text += `کاشێر: ${receiptData.cashier || 'کاشێری سەرەکی'}\n`;
+  text += "--------------------------------\n";
+
+  if (Array.isArray(receiptData.items)) {
+    receiptData.items.forEach(item => {
+      const lineTotal = Number(item.total || item.total_price || (item.price * item.quantity)).toLocaleString();
+      text += `${item.name} (${item.quantity} ${item.unit || 'دانە'})\n`;
+      text += `     ${lineTotal} دینار\n`;
+    });
+  }
+
+  text += "--------------------------------\n";
+  text += ESC + "a" + "1";        // Center
+  const totalIQD = Number(receiptData.total || receiptData.grandTotal || 0).toLocaleString();
+  text += `کۆی گشتی: ${totalIQD} دینار\n`;
+
+  if (receiptData.isSplit || receiptData.payment_method === 'SPLIT') {
+    text += `نەقد (کاش): ${Number(receiptData.paidAmount || 0).toLocaleString()} دینار\n`;
+    text += `قەرز: ${Number(receiptData.debtAmount || 0).toLocaleString()} دینار\n`;
+    text += `کڕیار: ${receiptData.customerName || 'کڕیاری دیاریکراو'}\n`;
+  } else if (receiptData.isDebt || receiptData.payment_method === 'DEBT') {
+    text += `شێواز: قەرز (${receiptData.customerName || 'کڕیار'})\n`;
+  } else {
+    text += "شێواز: نەقد (کاش)\n";
+  }
+
+  text += "سوپاس بۆ سەردانەکەتان!\n";
+  text += "\n\n\n";
+  text += CUT_PAPER;
+
+  // Auto trigger drawer kick pulse for cash purchases
+  if (!receiptData.isDebt && receiptData.payment_method !== 'DEBT') {
+    text += DRAWER_KICK;
+  }
+
+  event.reply('print-receipt-reply', { success: true, textLength: text.length });
+});
+
+// -------------------------------------------------------------
+// POS Hardware: Z-Report Thermal Printing (End of Shift / Day)
+// -------------------------------------------------------------
+ipcMain.on('print-z-report', (event, zData) => {
+  console.log('📊 Printing Z-Report via ESC/POS for shift:', zData?.shift_id || zData?.id);
+  let text = "";
+  text += ESC + "@";
+  text += ESC + "a" + "1";
+  text += "================================\n";
+  text += "ڕاپۆرتی داخستنی شیفت (Z-REPORT)\n";
+  text += "================================\n";
+  text += ESC + "a" + "0";
+  text += `ژمارەی شیفت: #${zData.shift_id || zData.id || 1}\n`;
+  text += `کاشێر: ${zData.cashier_name || 'کاشێری سەرەکی'}\n`;
+  text += `کردنەوە: ${zData.opened_at ? new Date(zData.opened_at).toLocaleString('en-GB') : '-'}\n`;
+  text += `داخستن: ${zData.closed_at ? new Date(zData.closed_at).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')}\n`;
+  text += "--------------------------------\n";
+  text += `سەرمایەی سەرەتا (قاسە): ${Number(zData.opening_cash || 0).toLocaleString()} دینار\n`;
+  text += `فرۆشی نەقد (کاش): ${Number(zData.cash_sales || 0).toLocaleString()} دینار\n`;
+  text += `فرۆشی قەرز: ${Number(zData.debt_sales || 0).toLocaleString()} دینار\n`;
+  text += `کۆی گشتی فرۆش: ${Number(zData.total_sales || 0).toLocaleString()} دینار\n`;
+  text += `گەڕاوەی نەقد: -${Number(zData.cash_refunds || 0).toLocaleString()} دینار\n`;
+  text += `خەرجییەکان: -${Number(zData.expenses_paid || 0).toLocaleString()} دینار\n`;
+  text += "--------------------------------\n";
+  text += `پێشبینیکراو لە قاسە: ${Number(zData.expected_cash || 0).toLocaleString()} دینار\n`;
+  text += `ژمێردراوی دەستی: ${Number(zData.actual_cash || zData.expected_cash || 0).toLocaleString()} دینار\n`;
+  const diff = Number(zData.difference || 0);
+  text += `جیاوازی قاسە: ${diff === 0 ? 'تەواوە (٠)' : `${diff > 0 ? '+' : ''}${diff.toLocaleString()} دینار`}\n`;
+  text += "================================\n";
+  text += "\n\n\n";
+  text += CUT_PAPER;
+
+  event.reply('print-z-report-reply', { success: true, textLength: text.length });
+});
+
+// -------------------------------------------------------------
+// Backups Folder & Dialog IPC Handlers
+// -------------------------------------------------------------
 ipcMain.handle('open-backups-folder', async () => {
   try {
     const backupsDir = path.resolve(__dirname, 'backend', 'backups');
@@ -85,7 +211,6 @@ ipcMain.handle('open-backups-folder', async () => {
   }
 });
 
-// IPC Handler: Save Backup with Native Windows Save Dialog
 ipcMain.handle('save-backup-dialog', async (event, { defaultFileName, content }) => {
   try {
     const { canceled, filePath } = await dialog.showSaveDialog({
@@ -104,4 +229,3 @@ ipcMain.handle('save-backup-dialog', async (event, { defaultFileName, content })
     return { success: false, error: err.message };
   }
 });
-

@@ -3,7 +3,7 @@ import {
   Moon, Sun, Database, Shield, CheckCircle2, AlertTriangle, 
   Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
   AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
-  Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key
+  Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -18,9 +18,19 @@ if (typeof window !== 'undefined' && typeof window.require === 'function') {
 }
 
 const Settings = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, currentUser, changePassword, lockToCashier } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [savedNotice, setSavedNotice] = useState(false);
+
+  // Admin Security & Password Change State
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPass, setShowOldPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
   
   // Backup & Stats State
   const [backupStats, setBackupStats] = useState(null);
@@ -589,18 +599,169 @@ const Settings = () => {
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button 
               onClick={() => applyTheme('dark')}
-              style={{ flex: 1, padding: '1.25rem', borderRadius: '16px', background: theme === 'dark' ? 'rgba(59,130,246,0.25)' : 'rgba(0,0,0,0.2)', border: `2px solid ${theme === 'dark' ? '#3b82f6' : 'rgba(255,255,255,0.08)'}`, color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ flex: 1, padding: '1.25rem', borderRadius: '16px', background: theme === 'dark' ? 'var(--primary-light)' : 'var(--bg-tertiary)', border: `2px solid ${theme === 'dark' ? 'var(--accent-color)' : 'var(--border-color)'}`, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              <Moon size={32} color={theme === 'dark' ? '#60a5fa' : '#94a3b8'} />
+              <Moon size={32} color={theme === 'dark' ? 'var(--accent-color)' : 'var(--text-muted)'} />
               <span style={{ fontWeight: 'bold' }}>تاریک</span>
             </button>
             <button 
               onClick={() => applyTheme('light')}
-              style={{ flex: 1, padding: '1.25rem', borderRadius: '16px', background: theme === 'light' ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.2)', border: `2px solid ${theme === 'light' ? '#3b82f6' : 'rgba(255,255,255,0.08)'}`, color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ flex: 1, padding: '1.25rem', borderRadius: '16px', background: theme === 'light' ? 'var(--primary-light)' : 'var(--bg-tertiary)', border: `2px solid ${theme === 'light' ? 'var(--accent-color)' : 'var(--border-color)'}`, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              <Sun size={32} color={theme === 'light' ? '#f59e0b' : '#94a3b8'} />
+              <Sun size={32} color={theme === 'light' ? '#f59e0b' : 'var(--text-muted)'} />
               <span style={{ fontWeight: 'bold' }}>ڕووناک</span>
             </button>
+          </div>
+        </div>
+
+        {/* Security & Admin Password Management Card */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#f59e0b' }}>
+                <Key size={24} /> ئاسایش و وشەی نهێنی
+              </h3>
+              <span style={{ fontSize: '0.8rem', padding: '4px 10px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 600 }}>
+                هەژمار: {currentUser?.username || 'admin'}
+              </span>
+            </div>
+
+            <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+              وشەی نهێنی بەڕێوەبەر نوێ بکەرەوە بۆ پاراستنی دارایی و قازانجەکان لە بەکارهێنەرانی تر.
+            </p>
+
+            {passwordChangeError && (
+              <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={16} /> {passwordChangeError}
+              </div>
+            )}
+
+            {passwordChangeSuccess && (
+              <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={16} /> {passwordChangeSuccess}
+              </div>
+            )}
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setPasswordChangeError('');
+              setPasswordChangeSuccess('');
+
+              if (!oldPassword || !newPassword || !confirmPassword) {
+                setPasswordChangeError('تکایە هەموو خانەکان پڕبکەرەوە');
+                return;
+              }
+
+              if (newPassword.length < 4) {
+                setPasswordChangeError('وشەی نهێنی نوێ نابێت لە ٤ پیت کەمتر بێت');
+                return;
+              }
+
+              if (newPassword !== confirmPassword) {
+                setPasswordChangeError('وشەی نهێنی نوێ و دووبارەکردنەوەکەی وەک یەک نین');
+                return;
+              }
+
+              setPasswordChangeLoading(true);
+              try {
+                const res = await changePassword(oldPassword, newPassword);
+                if (res?.success) {
+                  setPasswordChangeSuccess('وشەی نهێنی بە سەرکەوتوویی نوێکرایەوە!');
+                  setOldPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                } else {
+                  setPasswordChangeError(res?.message || 'هەڵە لە کاتی گۆڕینی وشەی نهێنی');
+                }
+              } catch (err) {
+                setPasswordChangeError(err.message || 'هەڵەیەک ڕوویدا');
+              } finally {
+                setPasswordChangeLoading(false);
+              }
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                  وشەی نهێنی ئێستا (کۆن)
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    type={showOldPass ? 'text' : 'password'}
+                    value={oldPassword}
+                    onChange={e => setOldPassword(e.target.value)}
+                    placeholder="وشەی نهێنی کۆن بنووسە..."
+                    required
+                    style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOldPass(!showOldPass)}
+                    tabIndex="-1"
+                    style={{ position: 'absolute', left: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    {showOldPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                  وشەی نهێنی نوێ
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    type={showNewPass ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="لانیکەم ٤ پیت یان ژمارە..."
+                    required
+                    style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPass(!showNewPass)}
+                    tabIndex="-1"
+                    style={{ position: 'absolute', left: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                  دووبارەکردنەوەی وشەی نهێنی نوێ
+                </label>
+                <input 
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="دووبارە وشەی نهێنی نوێ بنووسەوە..."
+                  required
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem' }}>
+                <button
+                  type="submit"
+                  disabled={passwordChangeLoading}
+                  style={{ flex: 1, padding: '11px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '0.92rem', cursor: passwordChangeLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}
+                >
+                  <Key size={16} />
+                  {passwordChangeLoading ? 'نوێ دەکرێتەوە...' : 'نوێکردنەوەی وشەی نهێنی'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => lockToCashier()}
+                  title="قفڵکردنی بەڕێوەبەر و گەڕانەوە بۆ کاشێر"
+                  style={{ padding: '11px 16px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', fontWeight: 'bold', fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Lock size={15} /> قوفڵکردن
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -655,7 +816,7 @@ const Settings = () => {
             <Download size={24} /> داگرتنی باکئەپی تەواو
           </h3>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-            داگرتنی باکئەپێکی دەستبەجێ بە فۆرماتی JSON کە تەواوی پێکهاتە (Schemas) و داتای ٢٣ خشتەکەی داتابەیس دەگرێتەوە: کاڵاکان، وەجبەکانی FIFO، فرۆشتن، قەرزەکان، مەساریف و هەژمارەکان.
+            داگرتنی باکئەپێکی دەستبەجێ بە فۆرماتی JSON کە تەواوی پێکهاتە (Schemas) و داتای ٢٣ خشتەکەی داتابەیس دەگرێتەوە: کاڵاکان، وەجبەکانی FIFO، فرۆشتن، قەرزەکان، خەرجییەکان و هەژمارەکان.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -705,18 +866,18 @@ const Settings = () => {
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#38bdf8' }}>
-              <Cloud size={24} /> هاوکاتکردنی کلاود و ئۆفلاین
+              <Cloud size={24} /> هاوکاتکردنی کلاود و دەرەوەی هێڵ
             </h3>
             {syncData && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '10px', background: syncData.isOnline ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: syncData.isOnline ? '#34d399' : '#f87171', border: `1px solid ${syncData.isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, fontSize: '0.8rem', fontWeight: 'bold' }}>
                 {syncData.isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
-                {syncData.isOnline ? 'ئۆنلاین' : 'ئۆفلاین'}
+                {syncData.isOnline ? 'سەرهێڵ' : 'دەرەوەی هێڵ'}
               </span>
             )}
           </div>
 
           <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.2rem', lineHeight: '1.5' }}>
-            هاوکاتکردنی خۆکاری فرۆشتن، مەخزەن و داتاکان لەگەڵ سێرڤەری کلاود. لە نەبوونی ئینتەرنێتدا سیستەم ١٠٠٪ بە ئۆفلاین بەردەوام دەبێت.
+            هاوکاتکردنی خۆکاری فرۆشتن، مەخزەن و داتاکان لەگەڵ سێرڤەری کلاود. لە نەبوونی ئینتەرنێتدا سیستەم ١٠٠٪ بە شێوازی دەرەوەی هێڵ بەردەوام دەبێت.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.2rem' }}>
@@ -862,14 +1023,14 @@ const Settings = () => {
                 placeholder="ناوی کەسەکە (نموونە: شەریک)"
                 value={newRecipientName}
                 onChange={e => setNewRecipientName(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: '0.85rem' }}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
               />
               <input
                 type="text"
                 placeholder="Chat ID (نموونە: 1796577602)"
                 value={newRecipientChatId}
                 onChange={e => setNewRecipientChatId(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: '0.85rem' }}
+                style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
               />
               <button
                 type="submit"
@@ -941,7 +1102,7 @@ const Settings = () => {
       <div className="glass-panel mt-8" style={{ padding: '2rem', borderRadius: '24px', marginTop: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#c084fc' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: 'var(--accent-hover)' }}>
               <Database size={22} /> کۆپییە پارێزراوەکانی سەر سێرڤەر ({localSnapshots.length} کۆپی)
             </h3>
             <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
@@ -953,7 +1114,7 @@ const Settings = () => {
             <button
               onClick={handleCreateManualSnapshot}
               disabled={snapshotCreating}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'rgba(192, 132, 252, 0.18)', color: '#d8b4fe', border: '1px solid rgba(192, 132, 252, 0.4)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'rgba(37, 99, 235, 0.15)', color: 'var(--accent-hover)', border: '1px solid rgba(37, 99, 235, 0.35)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s' }}
             >
               <PlusCircle size={18} /> {snapshotCreating ? 'دروست دەکرێت...' : 'دروستکردنی کۆپی ئێستا'}
             </button>
@@ -974,15 +1135,15 @@ const Settings = () => {
             هیچ کۆپییەکی یەدەگ لەسەر سێرڤەر پاشەکەوت نەکراوە. دەتوانیت بە دوگمەی سەرەوە کۆپییەک دروست بکەیت.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-              <thead style={{ background: 'rgba(0,0,0,0.3)' }}>
+              <thead style={{ background: 'var(--bg-tertiary)' }}>
                 <tr>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>ناوی پەڕگە</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>جۆر / تێبینی</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>بەروار و کات</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>قەبارە</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem', textAlign: 'center' }}>کردار</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ناوی پەڕگە</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>جۆر / تێبینی</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بەروار و کات</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>قەبارە</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>کردار</th>
                 </tr>
               </thead>
               <tbody>
@@ -990,7 +1151,7 @@ const Settings = () => {
                   const isAuto = snap.metadata?.type === 'AUTO_DAILY_SNAPSHOT' || snap.filename.includes('_auto_');
                   const isManual = snap.metadata?.type === 'MANUAL_SERVER_SNAPSHOT' || snap.filename.includes('_manual_');
                   return (
-                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38bdf8', fontSize: '0.88rem' }}>
                         {snap.filename}
                       </td>
@@ -1000,7 +1161,7 @@ const Settings = () => {
                             خۆکار (Auto)
                           </span>
                         ) : isManual ? (
-                          <span style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', padding: '3px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                          <span style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', padding: '3px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
                             دەستی (Manual)
                           </span>
                         ) : (
@@ -1033,7 +1194,7 @@ const Settings = () => {
                           <button 
                             onClick={() => handleSelectLocalSnapshot(snap)}
                             title="هێنانەوەی ئەم باکئەپە بۆ ناو داتابەیس"
-                            style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', border: '1px solid rgba(192, 132, 252, 0.3)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold' }}
+                            style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold' }}
                           >
                             هێنانەوە
                           </button>
@@ -1072,7 +1233,7 @@ const Settings = () => {
               <Cloud size={22} /> ڕیزبەندی هاوکاتکردنی کلاود (Cloud Sync Queue)
             </h3>
             <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
-              هەموو فرۆشتن، گەڕاندنەوە، زیان، و جەردێک لە کاتی ئۆفلاین لەم ڕیزبەندییەدا کۆدەبنەوە و بە ئۆنلاینبوون دەنێردرێن:
+              هەموو فرۆشتن، گەڕاندنەوە، زیان، و جەردێک لە کاتی نەبوونی ئینتەرنێتدا لەم ڕیزبەندییەدا کۆدەبنەوە و بە سەرهێڵبوون دەنێردرێن:
             </p>
           </div>
 
@@ -1094,7 +1255,7 @@ const Settings = () => {
               type="text" 
               value={cloudUrlInput}
               onChange={e => setCloudUrlInput(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.88rem' }}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem' }}
             />
           </div>
 
@@ -1150,14 +1311,14 @@ const Settings = () => {
             هیچ تۆمارێک لە ڕیزبەندی هاوکاتکردندا نییە
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-              <thead style={{ background: 'rgba(0,0,0,0.3)' }}>
+              <thead style={{ background: 'var(--bg-tertiary)' }}>
                 <tr>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>جۆری کردە</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>ناسنامەی تۆمار</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>دۆخ</th>
-                  <th style={{ padding: '12px 16px', color: '#94a3b8', fontSize: '0.85rem' }}>کات</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>جۆری کردە</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ناسنامەی تۆمار</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>دۆخ</th>
+                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>کات</th>
                 </tr>
               </thead>
               <tbody>
@@ -1206,19 +1367,19 @@ const Settings = () => {
 
       {/* Pre-flight Restore Modal */}
       {restoreModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '640px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="pos-modal-overlay" onClick={() => !restoreLoading && setRestoreModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#f59e0b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.15rem', color: '#f59e0b', fontWeight: 800 }}>
                 <AlertTriangle color="#f59e0b" /> پشکنین و هێنانەوەی باکئەپ
               </h2>
               <button 
                 onClick={() => setRestoreModalOpen(false)} 
                 disabled={restoreLoading}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <X size={26} />
+                <X size={18} />
               </button>
             </div>
 
@@ -1270,7 +1431,7 @@ const Settings = () => {
 
                 {/* Safety Input Confirmation */}
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.9rem', color: '#cbd5e1', marginBottom: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                     بۆ دڵنیابوونەوە لە ڕستۆرکردن، بنووسە: <b style={{ color: '#f59e0b' }}>RESTORE</b>
                   </label>
                   <input 
@@ -1279,16 +1440,16 @@ const Settings = () => {
                     onChange={(e) => setConfirmationInput(e.target.value)}
                     placeholder="لێرە بنووسە RESTORE"
                     disabled={restoreLoading}
-                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '1rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '1rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button 
                     onClick={handleExecuteRestore}
                     disabled={restoreLoading || confirmationInput.trim().toUpperCase() !== 'RESTORE'}
-                    style={{ flex: 1, padding: '14px', borderRadius: '12px', background: confirmationInput.trim().toUpperCase() === 'RESTORE' ? '#ef4444' : 'rgba(255,255,255,0.08)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: confirmationInput.trim().toUpperCase() === 'RESTORE' ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
+                    style={{ flex: 1, minWidth: '160px', padding: '14px', borderRadius: '12px', background: confirmationInput.trim().toUpperCase() === 'RESTORE' ? '#ef4444' : 'var(--bg-tertiary)', color: confirmationInput.trim().toUpperCase() === 'RESTORE' ? '#ffffff' : 'var(--text-muted)', border: 'none', fontWeight: 'bold', fontSize: '1rem', cursor: confirmationInput.trim().toUpperCase() === 'RESTORE' ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
                   >
                     <RefreshCw size={18} className={restoreLoading ? 'animate-spin' : ''} />
                     {restoreLoading ? 'داتاکان دەگەڕێندرێنەوە...' : 'هێنانەوەی یەکجارەکی (Restore)'}
@@ -1296,7 +1457,8 @@ const Settings = () => {
                   <button 
                     onClick={() => setRestoreModalOpen(false)}
                     disabled={restoreLoading}
-                    style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                    className="btn-secondary"
+                    style={{ padding: '14px 20px', borderRadius: '12px' }}
                   >
                     پەشیمانبوونەوە
                   </button>

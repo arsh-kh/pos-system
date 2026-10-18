@@ -200,7 +200,7 @@ exports.getAllPurchaseInvoices = async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT pi.*, 
-                   COALESCE(s.name, 'کڕینی لۆکاڵی / بێ کۆمپانیا') as supplier_name, 
+                   COALESCE(s.name, 'کڕینی ناوخۆیی / بێ کۆمپانیا') as supplier_name, 
                    s.phone as supplier_phone,
                    COUNT(pii.id) as total_items
             FROM Purchase_Invoices pi 
@@ -220,7 +220,7 @@ exports.getPurchaseInvoiceDetails = async (req, res) => {
     try {
         const [invoice] = await db.query(`
             SELECT pi.*, 
-                   COALESCE(s.name, 'کڕینی لۆکاڵی / بێ کۆمپانیا') as supplier_name, 
+                   COALESCE(s.name, 'کڕینی ناوخۆیی / بێ کۆمپانیا') as supplier_name, 
                    s.phone as supplier_phone
             FROM Purchase_Invoices pi
             LEFT JOIN Suppliers s ON pi.supplier_id = s.id

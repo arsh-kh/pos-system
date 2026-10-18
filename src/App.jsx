@@ -27,22 +27,20 @@ import './Layout.css';
 
 // PageWrapper adds back nav and top user status bar
 const PageWrapper = ({ children }) => {
-  const navigate = useNavigate();
   const location = useLocation();
+  const isCashier = location.pathname === '/cashier';
+
+  if (isCashier) {
+    return (
+      <div className="page-wrapper cashier-wrapper" style={{ height: '100vh', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
+        {children}
+      </div>
+    );
+  }
 
   return (
-    <div className="page-wrapper" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="page-wrapper" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
       <UserBar />
-      
-      {location.pathname !== '/' && (
-        <nav className="back-nav" style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <button className="btn-back" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-            <ArrowRight size={20} />
-            گەڕانەوە بۆ سەرەکی
-          </button>
-        </nav>
-      )}
-
       <main className="page-content" style={{ flex: 1 }}>
         {children}
       </main>
@@ -52,11 +50,13 @@ const PageWrapper = ({ children }) => {
 
 function AppContent() {
   useEffect(() => {
-    const savedTheme = localStorage.getItem('pos_theme') || 'dark';
+    const savedTheme = localStorage.getItem('pos_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
     if (savedTheme === 'light') {
       document.body.classList.add('theme-light');
+      document.body.classList.remove('theme-dark');
     } else {
+      document.body.classList.add('theme-dark');
       document.body.classList.remove('theme-light');
     }
   }, []);

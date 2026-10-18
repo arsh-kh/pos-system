@@ -12,7 +12,34 @@
     "electron:dev": "electron .",
     "start:backend": "cd backend && npm start",
     "start:frontend": "npm run dev",
-    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\""
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "dist:win": "vite build && electron-builder --win",
+    "pack": "vite build && electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.marketpos.app",
+    "productName": "سیستەمی مارکێت POS",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "backend/**/*",
+      "main.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "سیستەمی مارکێت POS"
+    }
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",

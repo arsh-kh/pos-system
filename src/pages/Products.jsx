@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Search, Plus, Edit2, Trash2, X, Barcode, Printer, Tag, Coins, AlertTriangle, Calendar, Package, Layers } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { useAuth } from '../context/AuthContext';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 // SVG Barcode Component for High-Quality Thermal Print
@@ -246,9 +247,7 @@ const Products = () => {
 
   // Filter Products by Category and Search Term (Name or Barcode)
   const filteredProducts = products.filter(p => {
-    const matchesSearch = 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.barcode.includes(searchTerm);
+    const matchesSearch = kurdishSearchMatch([p.name, p.barcode, p.box_barcode], searchTerm);
     
     const matchesCategory = 
       selectedCategory === 'ALL' || 
@@ -280,6 +279,10 @@ const Products = () => {
       {/* Print-Only Style Sheet for Barcode Thermal Sticker Roll */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -310,6 +313,8 @@ const Products = () => {
             justify-content: center !important;
             align-items: center !important;
             padding: 2mm !important;
+            direction: rtl !important;
+            font-family: 'Noto Kufi Arabic', system-ui, sans-serif !important;
           }
         }
       `}</style>
@@ -318,7 +323,7 @@ const Products = () => {
       <div className="header mb-8" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Tag color="#8b5cf6" size={32} />
+            <Tag color="var(--accent-color)" size={32} />
             بەشی کاڵاکان
           </h1>
           <p className="text-secondary">بینین، گەڕان، بەڕێوەبردنی نرخ و ئامادەکردنی بارکۆد بۆ چاپ</p>
@@ -326,17 +331,17 @@ const Products = () => {
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Quick Search */}
-          <div className="search-box glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1rem', borderRadius: '12px' }}>
-            <Search size={20} color="#94a3b8" />
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1rem', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+            <Search size={20} color="var(--text-muted)" />
             <input 
               type="text" 
               placeholder="گەڕان بە ناو یان بارکۆد..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'white', marginRight: '10px', outline: 'none', width: '220px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '10px', outline: 'none', width: '220px', fontSize: '0.92rem' }}
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
             )}
@@ -362,9 +367,9 @@ const Products = () => {
           style={{
             padding: '8px 18px',
             borderRadius: '12px',
-            border: stockStatusFilter === 'ALL' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)',
-            background: stockStatusFilter === 'ALL' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(0,0,0,0.2)',
-            color: stockStatusFilter === 'ALL' ? '#ffffff' : '#94a3b8',
+            border: stockStatusFilter === 'ALL' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
+            background: stockStatusFilter === 'ALL' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-tertiary)',
+            color: stockStatusFilter === 'ALL' ? 'var(--accent-hover)' : 'var(--text-secondary)',
             cursor: 'pointer',
             fontWeight: 'bold',
             display: 'flex',
@@ -422,8 +427,8 @@ const Products = () => {
             border: 'none',
             cursor: 'pointer',
             fontWeight: selectedCategory === 'ALL' ? 'bold' : 'normal',
-            background: selectedCategory === 'ALL' ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-            color: selectedCategory === 'ALL' ? '#ffffff' : '#94a3b8',
+            background: selectedCategory === 'ALL' ? '#3b82f6' : 'var(--bg-tertiary)',
+            color: selectedCategory === 'ALL' ? '#ffffff' : 'var(--text-secondary)',
             transition: 'all 0.2s'
           }}
         >
@@ -442,8 +447,8 @@ const Products = () => {
                 border: 'none',
                 cursor: 'pointer',
                 fontWeight: isActive ? 'bold' : 'normal',
-                background: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                color: isActive ? '#ffffff' : '#94a3b8',
+                background: isActive ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                color: isActive ? '#ffffff' : 'var(--text-secondary)',
                 transition: 'all 0.2s',
                 whiteSpace: 'nowrap'
               }}
@@ -457,17 +462,17 @@ const Products = () => {
       {/* Products Table */}
       <div className="glass-panel" style={{ padding: '1px', borderRadius: '16px', overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <thead style={{ background: 'var(--bg-tertiary)' }}>
             <tr>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ناوی کاڵا</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کەتەگۆری</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بارکۆد (دانە / کارتۆن)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی کڕین (دینار)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی فرۆشتن (تاک)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>نرخی جوملە (کارتۆن)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کۆگا</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>بەرواری بەسەرچوون</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کردارەکان</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ناوی کاڵا</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کەتەگۆری</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>بارکۆد (دانە / کارتۆن)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی کڕین (دینار)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی فرۆشتن (تاک)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی جوملە (کارتۆن)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کۆگا</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>بەرواری بەسەرچوون</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کردارەکان</th>
             </tr>
           </thead>
           <tbody>
@@ -485,9 +490,9 @@ const Products = () => {
                     </span>
                   </td>
                   <td style={{ padding: '16px 20px' }}>
-                    <div style={{ fontFamily: 'monospace', color: '#a78bfa', fontWeight: 'bold' }}>{p.barcode}</div>
+                    <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: 'bold' }}>{p.barcode}</div>
                     {p.box_barcode && (
-                      <div style={{ fontFamily: 'monospace', color: '#c084fc', fontSize: '0.75rem', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ fontFamily: 'monospace', color: '#0284c7', fontSize: '0.75rem', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Package size={12} /> {p.box_barcode}
                       </div>
                     )}
@@ -501,7 +506,7 @@ const Products = () => {
                   <td style={{ padding: '16px 20px' }}>
                     {p.wholesale_price > 0 ? (
                       <div>
-                        <div style={{ color: '#c084fc', fontWeight: 'bold' }}>{Number(p.wholesale_price).toLocaleString()} دینار</div>
+                        <div style={{ color: '#0284c7', fontWeight: 'bold' }}>{Number(p.wholesale_price).toLocaleString()} دینار</div>
                         <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
                           کارتۆنی {p.units_per_box ? Number(p.units_per_box) : 1} دانەیی
                         </small>
@@ -587,7 +592,7 @@ const Products = () => {
                     <button 
                       title="چاپی لەزگەی بارکۆد" 
                       onClick={() => openPrintModal(p)} 
-                      style={{ background: 'rgba(167, 139, 250, 0.15)', color: '#c084fc', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
                     >
                       <Printer size={16} /> چاپ
                     </button>
@@ -619,111 +624,115 @@ const Products = () => {
 
       {/* Add / Edit Product Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '640px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Tag color="#8b5cf6" />
+        <div className="pos-modal-overlay" onClick={() => setIsModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-lg" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '1.2rem', fontWeight: 800 }}>
+                <Tag color="var(--accent-color)" />
                 {editId ? 'دەستکاریکردنی کاڵا' : 'زیادکردنی کاڵای نوێ'}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={24}/>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18}/>
               </button>
             </div>
             
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              <div className="responsive-grid-2">
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>ناوی کاڵا <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ناوی کاڵا <span style={{ color: '#ef4444' }}>*</span></label>
                   <input 
                     type="text" 
                     required 
                     value={formData.name} 
                     onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>کەتەگۆری</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>کەتەگۆری</label>
                   <select 
                     value={formData.category_id} 
                     onChange={e => setFormData({ ...formData, category_id: e.target.value })} 
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }}
                   >
-                    <option value="" style={{ color: 'black' }}>هەڵبژێرە...</option>
-                    {categories.map(c => <option key={c.id} value={c.id} style={{ color: 'black' }}>{c.name}</option>)}
+                    <option value="">هەڵبژێرە...</option>
+                    {categories.map(c => <option key={c.id} value={c.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{c.name}</option>)}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
                   بارکۆد (Barcode) <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <input 
                     type="text" 
                     required 
                     placeholder="بارکۆد بنووسە یان سکانی بکە..."
                     value={formData.barcode} 
                     onChange={e => setFormData({ ...formData, barcode: e.target.value })} 
-                    style={{ flex: 1, padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontFamily: 'monospace', letterSpacing: '1px' }} 
+                    style={{ flex: '1 1 200px', minWidth: '150px', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '1px' }} 
                   />
                   <button 
                     type="button" 
                     onClick={generateBarcode} 
-                    style={{ background: 'rgba(167, 139, 250, 0.2)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '0 18px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
+                    style={{ background: 'rgba(37, 99, 235, 0.12)', color: 'var(--accent-color)', border: '1px solid rgba(37, 99, 235, 0.3)', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', flexShrink: 0 }}
                   >
                     <Barcode size={18} /> دروستکردنی بارکۆد
                   </button>
                 </div>
-                <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
+                <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   ئەگەر کاڵاکە بارکۆدی نییە، کلیک لەسەر «دروستکردنی بارکۆد» بکە بۆ دروستکردنی بارکۆدی ١٢ ژمارەیی.
                 </small>
               </div>
 
               {/* Pricing Section (Iraqi Dinar Only) */}
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontWeight: 'bold', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Coins size={18} color="#10b981" /> دیاریکردنی نرخەکان (دیناری عێراقی)
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>نرخی کڕین (دینار)</label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>نرخی کڕین (دینار)</label>
                     <input 
                       type="number" 
+                      step="250"
+                      min="0"
                       placeholder="0"
                       value={formData.cost_price} 
                       onChange={e => setFormData({ ...formData, cost_price: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#10b981', fontWeight: 'bold' }}>نرخی فرۆشتنی تاک (دینار) <span style={{ color: '#ef4444' }}>*</span></label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#059669', fontWeight: 'bold' }}>نرخی فرۆشتنی تاک (دینار) <span style={{ color: '#ef4444' }}>*</span></label>
                     <input 
                       type="number" 
+                      step="250"
+                      min="0"
                       required 
                       value={formData.selling_price} 
                       onChange={e => setFormData({ ...formData, selling_price: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 'bold' }} 
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1.5px solid rgba(16, 185, 129, 0.4)', color: '#059669', fontWeight: 'bold' }} 
                     />
                   </div>
                 </div>
               </div>
 
               {/* Packaging & Wholesale / Carton Section */}
-              <div style={{ background: 'rgba(168, 85, 247, 0.08)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
+              <div style={{ background: 'rgba(2, 132, 199, 0.06)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(2, 132, 199, 0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', color: '#c084fc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Package size={18} color="#c084fc" /> فرۆشتنی فرە-جۆر / کارتۆن و سێت (Wholesale / Box)
+                  <span style={{ fontWeight: 'bold', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Package size={18} color="#0284c7" /> فرۆشتنی فرە-جۆر / کارتۆن و سێت (Wholesale / Box)
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '0.75rem' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.88rem' }}>
                       بارکۆدی کارتۆن (Box Barcode)
@@ -734,13 +743,13 @@ const Products = () => {
                         placeholder="بارکۆدی سەر کارتۆن..."
                         value={formData.box_barcode} 
                         onChange={e => setFormData({ ...formData, box_barcode: e.target.value })} 
-                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c084fc', fontFamily: 'monospace' }} 
+                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid rgba(2, 132, 199, 0.35)', color: '#0284c7', fontFamily: 'monospace' }} 
                       />
                       <button 
                         type="button" 
                         onClick={generateBoxBarcode} 
                         title="دروستکردنی بارکۆدی کارتۆن"
-                        style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', padding: '0 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 'bold' }}
+                        style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.35)', padding: '0 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 'bold' }}
                       >
                         ⚡ دروستکردن
                       </button>
@@ -748,7 +757,7 @@ const Products = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.88rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
                       ژمارەی دانە لە کارتۆندا
                     </label>
                     <input 
@@ -758,51 +767,53 @@ const Products = () => {
                       placeholder="بۆ نموونە: 24"
                       value={formData.units_per_box} 
                       onChange={e => setFormData({ ...formData, units_per_box: e.target.value })} 
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#fff', fontWeight: 'bold' }} 
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid rgba(2, 132, 199, 0.35)', color: 'var(--text-primary)', fontWeight: 'bold' }} 
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#c084fc', fontWeight: 'bold', fontSize: '0.88rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#0284c7', fontWeight: 'bold', fontSize: '0.88rem' }}>
                       نرخی فرۆشتنی کارتۆن (دینار)
                     </label>
                     <input 
                       type="number" 
+                      step="250"
+                      min="0"
                       placeholder="0"
                       value={formData.wholesale_price} 
                       onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.1)', border: '1px solid rgba(192, 132, 252, 0.3)', color: '#c084fc', fontWeight: 'bold' }} 
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.08)', border: '1px solid rgba(2, 132, 199, 0.35)', color: '#0284c7', fontWeight: 'bold' }} 
                     />
                   </div>
                 </div>
 
-                <small style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', lineHeight: '1.4' }}>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', lineHeight: '1.4' }}>
                   💡 گەر کڕیار بە کارتۆن بیکڕێت، سیستەم ڕاستەوخۆ نرخی کارتۆن حیساب دەکات و بەپێی ژمارەی دانەکان لە کۆگا کەمی دەکاتەوە.
                 </small>
               </div>
 
               {/* Stock and Expiry Section */}
-              <div style={{ background: 'rgba(0,0,0,0.15)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>دانە لە کۆگا</label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>دانە لە کۆگا</label>
                     <input 
                       type="number" 
                       placeholder="0"
                       value={formData.stock} 
                       onChange={e => setFormData({ ...formData, stock: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#f59e0b' }}>ئاگاداری کەمبوونەوە لە</label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#d97706' }}>ئاگاداری کەمبوونەوە لە</label>
                     <input 
                       type="number" 
                       placeholder="5"
                       value={formData.low_stock_threshold} 
                       onChange={e => setFormData({ ...formData, low_stock_threshold: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
                     />
                   </div>
 
@@ -812,7 +823,7 @@ const Products = () => {
                       type="date" 
                       value={formData.expiry_date} 
                       onChange={e => setFormData({ ...formData, expiry_date: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
                     />
                   </div>
                 </div>
@@ -831,22 +842,22 @@ const Products = () => {
 
       {/* Barcode Sticker Label Print Modal */}
       {printProduct && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '540px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Printer color="#a78bfa" />
+        <div className="pos-modal-overlay" onClick={() => setPrintProduct(null)}>
+          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <Printer color="var(--accent-color)" />
                 ئامادەکردنی بارکۆد بۆ چاپ
               </h2>
-              <button onClick={() => setPrintProduct(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={24}/>
+              <button onClick={() => setPrintProduct(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18}/>
               </button>
             </div>
 
             {/* Print Parameters Form */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>ناوی مارکێت لەسەر لەزگە:</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ناوی مارکێت لەسەر لەزگە:</label>
                 <input 
                   type="text" 
                   value={storeName} 
@@ -854,20 +865,20 @@ const Products = () => {
                     setStoreName(e.target.value);
                     localStorage.setItem('pos_store_name', e.target.value);
                   }}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>ژمارەی کۆپییەکانی لەزگە:</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ژمارەی کۆپییەکانی لەزگە:</label>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <input 
                     type="number" 
                     min="1" 
                     max="500"
                     value={printCopies} 
                     onChange={(e) => setPrintCopies(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ width: '100px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', textAlign: 'center', fontWeight: 'bold' }}
+                    style={{ width: '100px', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', textAlign: 'center', fontWeight: 'bold' }}
                   />
                   {[1, 5, 10, 20, 50].map(cnt => (
                     <button
@@ -908,16 +919,16 @@ const Products = () => {
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button 
                 onClick={handlePrintLabels}
-                style={{ flex: 1, padding: '14px', borderRadius: '12px', background: '#8b5cf6', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)' }}
+                style={{ flex: 1, minWidth: '160px', padding: '14px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1.05rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.35)' }}
               >
                 <Printer size={20} /> چاپکردنی {printCopies} دانە لەزگە
               </button>
               <button 
                 onClick={() => setPrintProduct(null)}
-                style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                style={{ padding: '14px 20px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 داخستن
               </button>
@@ -946,21 +957,21 @@ const Products = () => {
 
       {/* FIFO Batches Transparency Modal */}
       {selectedBatchProduct && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '840px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+        <div className="pos-modal-overlay" onClick={() => setSelectedBatchProduct(null)}>
+          <div className="pos-modal-card pos-modal-xl" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
               <div>
-                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#f8fafc' }}>
+                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', fontSize: '1.15rem', fontWeight: 800 }}>
                   <Layers color="#10b981" />
                   وەجبەکانی کۆگا (حیساباتی وردی FIFO): {selectedBatchProduct.name}
                 </h2>
-                <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '6px', display: 'flex', gap: '15px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '6px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <span>بارکۆد: <code style={{ color: '#38bdf8' }}>{selectedBatchProduct.barcode}</code></span>
                   <span>کۆی مەخزەنی ئێستا: <b style={{ color: '#10b981' }}>{selectedBatchProduct.stock} دانە</b></span>
                 </div>
               </div>
-              <button onClick={() => setSelectedBatchProduct(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={26} />
+              <button onClick={() => setSelectedBatchProduct(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
@@ -992,45 +1003,45 @@ const Products = () => {
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-                    <thead style={{ background: 'rgba(0,0,0,0.3)' }}>
+                    <thead style={{ background: 'var(--bg-tertiary)' }}>
                       <tr>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>ڕیزبەندی (FIFO)</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>کۆد / پسووڵە</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>دابینکەر</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>بەرواری هاتن</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>تێچوونی دانە</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>بڕی سەرەتایی</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>بڕی ماوە</th>
-                        <th style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.85rem' }}>دۆخ</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ڕیزبەندی (FIFO)</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>کۆد / پسووڵە</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>دابینکەر</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بەرواری هاتن</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>تێچوونی دانە</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بڕی سەرەتایی</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بڕی ماوە</th>
+                        <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>دۆخ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {productBatches.map((batch, idx) => {
                         const isActive = batch.status === 'ACTIVE' && Number(batch.remaining_quantity) > 0;
                         return (
-                          <tr key={batch.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: isActive ? 'rgba(16,185,129,0.03)' : 'transparent' }}>
-                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: isActive ? '#10b981' : '#64748b' }}>
+                          <tr key={batch.id} style={{ borderBottom: '1px solid var(--border-color)', background: isActive ? 'rgba(16,185,129,0.03)' : 'transparent' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: isActive ? '#10b981' : 'var(--text-secondary)' }}>
                               #{idx + 1} {isActive ? '⚡' : '✓'}
                             </td>
-                            <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                            <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                               {batch.batch_number || `BATCH-${batch.id}`}
-                              {batch.invoice_number && <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>پسووڵە: {batch.invoice_number}</div>}
+                              {batch.invoice_number && <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>پسووڵە: {batch.invoice_number}</div>}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: '#cbd5e1' }}>
-                              {batch.supplier_name || 'کڕینی لۆکاڵی'}
+                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                              {batch.supplier_name || 'کڕینی ناوخۆیی'}
                             </td>
-                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: '#94a3b8' }}>
+                            <td style={{ padding: '12px 14px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                               {new Date(batch.created_at).toLocaleDateString('en-GB')}
                             </td>
                             <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#fbbf24' }}>
                               {Number(batch.cost_price).toLocaleString()} د.ع
                             </td>
-                            <td style={{ padding: '12px 14px', color: '#94a3b8' }}>
+                            <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>
                               {Number(batch.initial_quantity)} دانە
                             </td>
-                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: isActive ? '#34d399' : '#64748b' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: isActive ? '#34d399' : 'var(--text-secondary)' }}>
                               {Number(batch.remaining_quantity)} دانە
                             </td>
                             <td style={{ padding: '12px 14px' }}>
@@ -1039,7 +1050,7 @@ const Products = () => {
                                   چالاک (لە سەرەتادایە)
                                 </span>
                               ) : (
-                                <span style={{ background: 'rgba(148,163,184,0.15)', color: '#94a3b8', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                <span style={{ background: 'rgba(148,163,184,0.15)', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
                                   تەواوبوو (فرۆشراو)
                                 </span>
                               )}
@@ -1054,7 +1065,8 @@ const Products = () => {
                 <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
                   <button 
                     onClick={() => setSelectedBatchProduct(null)}
-                    style={{ padding: '10px 24px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                    className="btn-secondary"
+                    style={{ padding: '10px 24px' }}
                   >
                     داخستن
                   </button>

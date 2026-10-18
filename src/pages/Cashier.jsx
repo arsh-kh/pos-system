@@ -15,19 +15,30 @@ import {
   Percent,
   Keyboard,
   Lock,
+  Unlock,
   Tag,
-  Package
+  Package,
+  Banknote,
+  CreditCard,
+  Layers,
+  AlertCircle,
+  ArrowRight,
+  Store,
+  User
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const Cashier = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   // Multi-Cart State (Cart 1: Main, Cart 2: Quick-Sell)
   const [activeCartIndex, setActiveCartIndex] = useState(0);
   const [carts, setCarts] = useState([
-    { id: 1, label: 'سەلە ١ (سەرەکی)', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' },
-    { id: 2, label: 'سەلە ٢ (خێرا)', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' }
+    { id: 1, label: 'سەلە ١', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' },
+    { id: 2, label: 'سەلە ٢', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' }
   ]);
 
   // Active Cart Proxies
@@ -110,6 +121,20 @@ const Cashier = () => {
   const [scaleWeight, setScaleWeight] = useState('1.000');
   const [scaleSelectedProductId, setScaleSelectedProductId] = useState('');
 
+  // Quick Inline Customer Modal State
+  const [isQuickCustomerModalOpen, setIsQuickCustomerModalOpen] = useState(false);
+  const [quickCustomerName, setQuickCustomerName] = useState('');
+  const [quickCustomerPhone, setQuickCustomerPhone] = useState('');
+  const [quickCustomerDebt, setQuickCustomerDebt] = useState('');
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+
+  // Fast Uncatalogued Barcode Modal State
+  const [isUncataloguedModalOpen, setIsUncataloguedModalOpen] = useState(false);
+  const [uncataloguedBarcode, setUncataloguedBarcode] = useState('');
+  const [uncataloguedName, setUncataloguedName] = useState('');
+  const [uncataloguedPrice, setUncataloguedPrice] = useState('');
+  const [saveToProductCatalog, setSaveToProductCatalog] = useState(true);
+
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Receipt Print State
@@ -117,6 +142,7 @@ const Cashier = () => {
   const [autoPrint, setAutoPrint] = useState(() => {
     return localStorage.getItem('pos_auto_print') === 'true';
   });
+  const [checkoutNotice, setCheckoutNotice] = useState(null);
   const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی نموونەیی';
   const storePhone = localStorage.getItem('pos_store_phone') || '0750 000 0000';
 
@@ -149,7 +175,30 @@ const Cashier = () => {
     handleProcessBarcode(scannedCode);
   });
 
-  // Global Keyboard Shortcuts (F1, F2, F3, F4, F9, Escape)
+  // Reprint Last Receipt Directly (F8 Shortcut or Header Button)
+  const handleReprintLastReceipt = () => {
+    let targetReceipt = printedReceipt;
+    if (!targetReceipt) {
+      try {
+        const saved = localStorage.getItem('pos_last_receipt');
+        if (saved) targetReceipt = JSON.parse(saved);
+      } catch (_) {}
+    }
+    if (!targetReceipt) {
+      alert('هیچ پسووڵەیەکی پێشوو بۆ چاپکردنەوە نەدۆزرایەوە');
+      return;
+    }
+    setPrintedReceipt(targetReceipt);
+    if (window.require) {
+      try {
+        const { ipcRenderer } = window.require('electron');
+        ipcRenderer.send('print-receipt', targetReceipt);
+      } catch (_) {}
+    }
+    setTimeout(() => window.print(), 100);
+  };
+
+  // Global Keyboard Shortcuts (F1, F2, F3, F4, F6, F7, F8, F9, Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F1') {
@@ -170,14 +219,22 @@ const Cashier = () => {
       } else if (e.key === 'F7' || (e.ctrlKey && e.key === '2')) {
         e.preventDefault();
         setActiveCartIndex(1);
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        handleReprintLastReceipt();
       } else if (e.key === 'F9') {
         e.preventDefault();
         if (cart.length > 0 && !isCheckingOut) {
           handleCheckout();
         }
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        handleOpenCashDrawer();
       } else if (e.key === 'Escape') {
         setIsQuickItemModalOpen(false);
         setIsScaleModalOpen(false);
+        setIsQuickCustomerModalOpen(false);
+        setIsUncataloguedModalOpen(false);
       }
     };
 
@@ -252,7 +309,11 @@ const Cashier = () => {
 
   const updateQuantity = (key, newQty) => {
     const qty = parseFloat(newQty);
-    if (isNaN(qty) || qty <= 0) return;
+    if (isNaN(qty)) return;
+    if (qty <= 0) {
+      removeFromCart(key);
+      return;
+    }
     const roundedQty = Math.round(qty * 1000) / 1000;
     setCart(prev => prev.map(item => (item.cartKey === key || item.barcode === key) ? { ...item, quantity: roundedQty } : item));
   };
@@ -345,25 +406,99 @@ const Cashier = () => {
     }
   };
 
-  // Barcode Handler (Hardware wedge + manual input)
+  // Open Cash Drawer Trigger
+  const handleOpenCashDrawer = () => {
+    if (window.require) {
+      try {
+        const { ipcRenderer } = window.require('electron');
+        ipcRenderer.send('open-cash-drawer');
+      } catch (_) {}
+    }
+    setCheckoutNotice({
+      message: 'قاسی پارە کرایەوە 🔓',
+      receipt: null
+    });
+    setTimeout(() => setCheckoutNotice(null), 2500);
+  };
+
+  // Barcode Handler (Hardware wedge + manual input + electronic scale barcodes)
   const handleProcessBarcode = (code) => {
     if (!code) return;
     const cleanCode = code.trim();
 
     // 1. Check if barcode matches a carton/box barcode directly
     const productBox = products.find(p => p.box_barcode && String(p.box_barcode).trim() === cleanCode);
-    // 2. Check if barcode matches a single piece barcode
-    const productPiece = products.find(p => String(p.barcode).trim() === cleanCode);
-
     if (productBox) {
-      // Scanned carton barcode -> Directly add as BOX with wholesale price and box units deduction
       addToCart(productBox, 1, 'BOX');
-    } else if (productPiece) {
-      // Scanned regular piece barcode
-      addToCart(productPiece, 1, 'PIECE');
-    } else {
-      alert(`کاڵاکە نەدۆزرایەوە بۆ ئەم بارکۆدە: ${cleanCode}`);
+      setBarcodeInput('');
+      barcodeInputRef.current?.focus();
+      return;
     }
+
+    // 2. Check if barcode matches a single piece barcode directly
+    const productPiece = products.find(p => String(p.barcode).trim() === cleanCode);
+    if (productPiece) {
+      addToCart(productPiece, 1, 'PIECE');
+      setBarcodeInput('');
+      barcodeInputRef.current?.focus();
+      return;
+    }
+
+    // 3. Electronic Digital Scale Barcode (EAN-13 variable weight / price barcodes)
+    // Standard supermarket format: Starts with 20, 21, or 22 with 13 digits (e.g. 2000123015004)
+    if (cleanCode.length === 13 && (cleanCode.startsWith('20') || cleanCode.startsWith('21') || cleanCode.startsWith('22'))) {
+      const itemCodeRaw = cleanCode.substring(2, 7);
+      const itemCodeTrimmed = itemCodeRaw.replace(/^0+/, '');
+      const rawValue = parseInt(cleanCode.substring(7, 12), 10);
+      const weightInKg = Math.max(0.001, rawValue / 1000);
+
+      // Find matching scale item by barcode or ID
+      const scaleProd = products.find(p => 
+        String(p.barcode).trim() === itemCodeRaw ||
+        String(p.barcode).trim() === itemCodeTrimmed ||
+        String(p.barcode).trim().endsWith(itemCodeTrimmed) ||
+        String(p.id) === itemCodeTrimmed
+      );
+
+      if (scaleProd) {
+        const item = {
+          id: scaleProd.id,
+          cartKey: `${scaleProd.id}_scale_${Date.now()}`,
+          name: `${scaleProd.name} (${weightInKg} کگم)`,
+          baseName: scaleProd.name,
+          barcode: cleanCode,
+          price: scaleProd.selling_price,
+          single_price: scaleProd.selling_price,
+          selling_price: scaleProd.selling_price,
+          wholesale_price: scaleProd.wholesale_price || 0,
+          stock: scaleProd.stock,
+          quantity: weightInKg,
+          unit: 'کگم',
+          unit_type: 'PIECE',
+          units_per_box: 1,
+          is_weighted: true
+        };
+        setCart(prev => [item, ...prev]);
+        setBarcodeInput('');
+        barcodeInputRef.current?.focus();
+        return;
+      } else {
+        // Product PLU not yet catalogued -> Pre-fill scale modal for fast entry
+        setScaleItemName(`کاڵای کێشراو (${itemCodeTrimmed})`);
+        setScaleWeight(weightInKg.toFixed(3));
+        setScalePricePerKg('');
+        setIsScaleModalOpen(true);
+        setBarcodeInput('');
+        return;
+      }
+    }
+
+    // 4. Uncatalogued barcode scanned -> Fast Price Entry Modal (Non-blocking)
+    setUncataloguedBarcode(cleanCode);
+    setUncataloguedName(`کاڵا (${cleanCode})`);
+    setUncataloguedPrice('');
+    setSaveToProductCatalog(true);
+    setIsUncataloguedModalOpen(true);
     setBarcodeInput('');
     barcodeInputRef.current?.focus();
   };
@@ -372,6 +507,95 @@ const Cashier = () => {
     e.preventDefault();
     if (barcodeInput) {
       handleProcessBarcode(barcodeInput);
+    }
+  };
+
+  // Add Uncatalogued Item Directly to Cart (and optionally to database in background)
+  const handleAddUncataloguedItem = async (e) => {
+    e.preventDefault();
+    const price = Math.max(0, parseInt(uncataloguedPrice) || 0);
+    if (price <= 0) {
+      alert('تکایە نرخێکی دروست بنووسە');
+      return;
+    }
+    const name = uncataloguedName.trim() || `کاڵا (${uncataloguedBarcode})`;
+    const code = uncataloguedBarcode.trim();
+
+    const cartKey = `uncat_${code}_${Date.now()}`;
+    const item = {
+      id: `uncat_${Date.now()}`,
+      cartKey: cartKey,
+      baseName: name,
+      name: name,
+      barcode: code,
+      price: price,
+      single_price: price,
+      wholesale_price: 0,
+      units_per_box: 1,
+      unit_type: 'PIECE',
+      stock: 999,
+      quantity: 1,
+      unit: 'دانە',
+      is_custom: true
+    };
+    setCart(prev => [item, ...prev]);
+
+    // Save to product catalog in background if requested
+    if (saveToProductCatalog) {
+      try {
+        const payload = {
+          name: name,
+          barcode: code,
+          cost_price: 0,
+          selling_price: price,
+          stock: 99,
+          category_id: categories[0]?.id || null
+        };
+        const token = localStorage.getItem('token');
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        axios.post('http://localhost:3001/api/products', payload, config).then(res => {
+          if (res.data?.status === 'SUCCESS') {
+            setProducts(prev => [res.data.data, ...prev]);
+          }
+        }).catch(() => {});
+      } catch (_) {}
+    }
+
+    setIsUncataloguedModalOpen(false);
+    setUncataloguedBarcode('');
+    setUncataloguedName('');
+    setUncataloguedPrice('');
+    barcodeInputRef.current?.focus();
+  };
+
+  // Save Quick Inline Customer
+  const handleSaveQuickCustomer = async (e) => {
+    e.preventDefault();
+    if (!quickCustomerName.trim()) {
+      alert('تکایە ناوی کڕیار بنووسە');
+      return;
+    }
+    setIsSavingCustomer(true);
+    try {
+      const payload = {
+        name: quickCustomerName.trim(),
+        phone: quickCustomerPhone.trim() || null,
+        total_debt: Math.max(0, parseInt(quickCustomerDebt) || 0)
+      };
+      const res = await axios.post('http://localhost:3001/api/customers', payload);
+      if (res.data.status === 'SUCCESS' || res.status === 201) {
+        const newCust = res.data.data;
+        setCustomers(prev => [newCust, ...prev]);
+        setSelectedCustomerId(newCust.id);
+        setIsQuickCustomerModalOpen(false);
+        setQuickCustomerName('');
+        setQuickCustomerPhone('');
+        setQuickCustomerDebt('');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە زیادکردنی کڕیار');
+    } finally {
+      setIsSavingCustomer(false);
     }
   };
 
@@ -544,6 +768,9 @@ const Cashier = () => {
         };
 
         setPrintedReceipt(receiptData);
+        try {
+          localStorage.setItem('pos_last_receipt', JSON.stringify(receiptData));
+        } catch (_) {}
 
         // Only print if requested
         if (shouldPrint) {
@@ -552,14 +779,28 @@ const Cashier = () => {
               const { ipcRenderer } = window.require('electron');
               ipcRenderer.send('print-receipt', receiptData);
             } catch (_) {}
-          } else {
-            setTimeout(() => {
-              window.print();
-            }, 150);
+          }
+          setTimeout(() => {
+            window.print();
+          }, 100);
+        }
+
+        // Auto kick cash drawer if cash was received
+        if (paymentMode === 'CASH' || (paymentMode === 'SPLIT' && (Number(paidAmount) || 0) > 0)) {
+          if (window.require) {
+            try {
+              const { ipcRenderer } = window.require('electron');
+              ipcRenderer.send('open-cash-drawer');
+            } catch (_) {}
           }
         }
 
-        alert(`فرۆشتن بە سەرکەوتوویی ئەنجامدرا! کۆی گشتی: ${grandTotal.toLocaleString()} دینار`);
+        setCheckoutNotice({
+          message: `فرۆشتن بە سەرکەوتوویی ئەنجامدرا! کۆی گشتی: ${grandTotal.toLocaleString()} دینار`,
+          receipt: receiptData
+        });
+        setTimeout(() => setCheckoutNotice(null), 4000);
+
         clearCart();
         fetchData();
         // Smart Auto-Return: If finished checking out on a quick cart (Cart 2 or Cart 3) and Cart 1 has items, return to Cart 1
@@ -580,9 +821,7 @@ const Cashier = () => {
   // Filtered Products for Quick Selection Grid
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const matchesSearch = 
-        p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
-        p.barcode.includes(productSearch);
+      const matchesSearch = kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch);
 
       const matchesCat = 
         selectedCategoryId === 'ALL' || 
@@ -593,11 +832,15 @@ const Cashier = () => {
   }, [products, productSearch, selectedCategoryId]);
 
   return (
-    <div className="dashboard-page p-6" style={{ position: 'relative' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', padding: '6px 10px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }} dir="rtl">
       
       {/* Thermal Print Receipt Style */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -611,8 +854,8 @@ const Cashier = () => {
             width: 78mm !important;
             background: white !important;
             color: black !important;
-            padding: 10px !important;
-            font-family: monospace !important;
+            padding: 8px 10px !important;
+            font-family: monospace, Tahoma, sans-serif !important;
             font-size: 13px !important;
             direction: rtl !important;
             text-align: right !important;
@@ -624,53 +867,167 @@ const Cashier = () => {
         }
       `}</style>
 
-      {/* Keyboard Shortcuts Header Banner */}
-      <div style={{
+      {/* Non-Blocking Sale Success & Quick Print Banner */}
+      {checkoutNotice && (
+        <div style={{
+          position: 'fixed',
+          top: '14px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--success-color)',
+          color: '#ffffff',
+          padding: '8px 16px',
+          borderRadius: '12px',
+          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 9999,
+          fontWeight: 800,
+          fontSize: '0.88rem'
+        }}>
+          <span>✅ {checkoutNotice.message}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPrintedReceipt(checkoutNotice.receipt);
+              setTimeout(() => window.print(), 100);
+            }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.25)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              color: '#ffffff',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 800,
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Printer size={14} /> چاپکردنی پسووڵە
+          </button>
+          <button
+            type="button"
+            onClick={() => setCheckoutNotice(null)}
+            style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '2px', display: 'flex' }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Slim Top Cashier Navigation Bar */}
+      <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        background: 'rgba(15, 23, 42, 0.7)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '14px',
-        padding: '10px 18px',
-        marginBottom: '1.25rem',
-        fontSize: '0.85rem',
-        color: '#94a3b8',
-        flexWrap: 'wrap',
-        gap: '8px'
+        padding: '5px 12px',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        marginBottom: '6px',
+        borderRadius: '8px',
+        flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontWeight: 'bold' }}>
-          <Keyboard size={18} /> کورتکراوەکانی کیبۆرد بۆ خێرایی:
-        </div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span><kbd style={{ background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '5px', color: '#fff', fontWeight: 'bold' }}>F1</kbd> بارکۆد</span>
-          <span><kbd style={{ background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '5px', color: '#fff', fontWeight: 'bold' }}>F2</kbd> کاڵای دەستی</span>
-          <span><kbd style={{ background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '5px', color: '#fff', fontWeight: 'bold' }}>F3</kbd> کێش/تەرازوو ⚖️</span>
-          <span><kbd style={{ background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '5px', color: '#fff', fontWeight: 'bold' }}>F4</kbd> داشکاندن %</span>
-          <span><kbd style={{ background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '5px', color: '#fff', fontWeight: 'bold' }}>F9</kbd> پارەدان و چاپ ⚡</span>
-          <span><kbd style={{ background: 'rgba(255,255,255,0.12)', padding: '2px 7px', borderRadius: '5px', color: '#fff', fontWeight: 'bold' }}>Esc</kbd> داخستن</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '0.8rem'
+            }}
+            title="گەڕانەوە بۆ پەڕەی سەرەکی"
+          >
+            <ArrowRight size={14} />
+            <span>سەرەکی</span>
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+            <Store size={16} color="var(--primary-color)" />
+            <span>خاڵی فرۆشتن (کاشێر)</span>
+          </div>
+
+          <div style={{ height: '16px', width: '1px', background: 'var(--border-color)' }} />
+
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <User size={13} />
+            <span>{currentUser?.username || 'کاشێری سەرەکی'}</span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            type="button" 
+            onClick={handleReprintLastReceipt}
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '5px', 
+              background: 'rgba(56, 189, 248, 0.12)', 
+              color: '#38bdf8', 
+              border: '1px solid rgba(56, 189, 248, 0.35)', 
+              borderRadius: '6px', 
+              padding: '4px 10px', 
+              fontSize: '0.78rem', 
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+            title="چاپکردنەوەی دوایین پسووڵە (F8)"
+          >
+            <Printer size={12} /> چاپکردنەوە (F8)
+          </button>
+
           <button 
             type="button" 
             onClick={() => navigate('/shifts')}
             style={{ 
               display: 'inline-flex', 
               alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(16, 185, 129, 0.2)', 
-              color: '#34d399', 
-              border: '1px solid rgba(16, 185, 129, 0.4)', 
-              borderRadius: '8px', 
-              padding: '5px 12px', 
-              fontSize: '0.82rem', 
+              gap: '5px', 
+              background: 'var(--success-light)', 
+              color: 'var(--success-color)', 
+              border: '1px solid rgba(16, 185, 129, 0.3)', 
+              borderRadius: '6px', 
+              padding: '4px 10px', 
+              fontSize: '0.78rem', 
               cursor: 'pointer',
-              fontWeight: 'bold'
+              fontWeight: 700
             }}
           >
-            <Lock size={14} /> قاسە و شیفت
+            <Lock size={12} /> قاسە و شیفت
+          </button>
+
+          <button 
+            type="button" 
+            onClick={handleOpenCashDrawer}
+            title="کردنەوەی قاسی پارە (F10)"
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '5px', 
+              background: 'rgba(16, 185, 129, 0.12)', 
+              color: '#10b981', 
+              border: '1px solid rgba(16, 185, 129, 0.35)', 
+              borderRadius: '6px', 
+              padding: '4px 10px', 
+              fontSize: '0.78rem', 
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+          >
+            <Unlock size={12} /> قاسی پارە (F10)
           </button>
 
           <button 
@@ -679,77 +1036,106 @@ const Cashier = () => {
             style={{ 
               display: 'inline-flex', 
               alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(168, 85, 247, 0.2)', 
-              color: '#c084fc', 
-              border: '1px solid rgba(168, 85, 247, 0.4)', 
-              borderRadius: '8px', 
-              padding: '5px 12px', 
-              fontSize: '0.82rem', 
+              gap: '5px', 
+              background: 'rgba(217, 119, 6, 0.12)', 
+              color: '#d97706', 
+              border: '1px solid rgba(217, 119, 6, 0.35)', 
+              borderRadius: '6px', 
+              padding: '4px 10px', 
+              fontSize: '0.78rem', 
               cursor: 'pointer',
-              fontWeight: 'bold'
+              fontWeight: 700
             }}
           >
-            <Tag size={14} /> ئۆفەرەکان
+            <Tag size={12} /> ئۆفەرەکان
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Main Layout: Left Products & Barcode Scanner, Right Interactive Cart */}
-      <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      {/* Main Single-Screen Non-Scrolling Layout */}
+      <div style={{ display: 'flex', gap: '10px', height: 'calc(100vh - 54px)', overflow: 'hidden' }}>
         
         {/* Left Side: Products Catalog & Scan Input */}
-        <div style={{ flex: '1 1 58%', minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ flex: '1 1 56%', minWidth: '320px', display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
           
           {/* Top Barcode Input & Search Header */}
-          <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderRadius: '16px', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <form onSubmit={handleBarcodeSubmit} style={{ flex: '1 1 280px', display: 'flex', gap: '8px' }}>
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            border: '1px solid var(--border-color)', 
+            padding: '6px 10px', 
+            borderRadius: '10px', 
+            display: 'flex', 
+            gap: '8px', 
+            alignItems: 'center',
+            flexShrink: 0
+          }}>
+            <form onSubmit={handleBarcodeSubmit} style={{ flex: '1 1 55%', display: 'flex', gap: '6px' }}>
               <div style={{ position: 'relative', flex: 1 }}>
-                <ScanBarcode size={20} color="#38bdf8" style={{ position: 'absolute', right: '12px', top: '12px' }} />
+                <ScanBarcode size={17} color="var(--primary-color)" style={{ position: 'absolute', right: '10px', top: '8px' }} />
                 <input 
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder="سکانکردنی بارکۆد بە ئامێر (F1)..."
+                  placeholder="سکانکردنی بارکۆد (F1)..."
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   autoFocus
-                  style={{ width: '100%', padding: '10px 42px 10px 12px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(56, 189, 248, 0.35)', color: 'white', fontFamily: 'monospace', fontSize: '1rem' }}
+                  style={{ 
+                    width: '100%', 
+                    padding: '7px 32px 7px 10px', 
+                    borderRadius: '8px', 
+                    background: 'var(--bg-tertiary)', 
+                    border: '1px solid var(--border-color)', 
+                    color: 'var(--text-primary)', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.88rem' 
+                  }}
                 />
               </div>
               <button 
                 type="submit" 
-                style={{ padding: '0 18px', borderRadius: '10px', background: '#38bdf8', color: '#0f172a', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                className="btn-primary"
+                style={{ padding: '0 16px', borderRadius: '8px', fontWeight: 700, fontSize: '0.84rem' }}
               >
                 سکان
               </button>
             </form>
 
-            <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <Search size={16} color="#94a3b8" />
+            <div style={{ 
+              flex: '1 1 45%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              background: 'var(--bg-tertiary)', 
+              padding: '5px 10px', 
+              borderRadius: '8px', 
+              border: '1px solid var(--border-color)' 
+            }}>
+              <Search size={15} color="var(--text-muted)" />
               <input 
                 type="text" 
                 placeholder="گەڕان بە ناوی کاڵا..." 
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
-                style={{ background: 'transparent', border: 'none', color: 'white', marginRight: '8px', outline: 'none', width: '100%', fontSize: '0.9rem' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '6px', outline: 'none', width: '100%', fontSize: '0.86rem', boxShadow: 'none', padding: 0 }}
               />
             </div>
           </div>
 
           {/* Category Quick Tabs */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none' }}>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none' }}>
             <button
               onClick={() => setSelectedCategoryId('ALL')}
               style={{
-                padding: '6px 14px',
+                padding: '7px 16px',
                 borderRadius: '8px',
-                border: 'none',
+                border: selectedCategoryId === 'ALL' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                 cursor: 'pointer',
-                fontWeight: selectedCategoryId === 'ALL' ? 'bold' : 'normal',
-                background: selectedCategoryId === 'ALL' ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                color: selectedCategoryId === 'ALL' ? 'white' : '#94a3b8',
-                fontSize: '0.85rem',
-                whiteSpace: 'nowrap'
+                fontWeight: selectedCategoryId === 'ALL' ? 700 : 600,
+                background: selectedCategoryId === 'ALL' ? 'var(--accent-color)' : 'var(--bg-secondary)',
+                color: selectedCategoryId === 'ALL' ? '#ffffff' : 'var(--text-primary)',
+                fontSize: '0.84rem',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+                boxShadow: selectedCategoryId === 'ALL' ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
               }}
             >
               هەموو ({products.length})
@@ -761,15 +1147,17 @@ const Cashier = () => {
                   key={cat.id}
                   onClick={() => setSelectedCategoryId(cat.id)}
                   style={{
-                    padding: '6px 14px',
+                    padding: '7px 16px',
                     borderRadius: '8px',
-                    border: 'none',
+                    border: isActive ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                     cursor: 'pointer',
-                    fontWeight: isActive ? 'bold' : 'normal',
-                    background: isActive ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                    color: isActive ? 'white' : '#94a3b8',
-                    fontSize: '0.85rem',
-                    whiteSpace: 'nowrap'
+                    fontWeight: isActive ? 700 : 600,
+                    background: isActive ? 'var(--accent-color)' : 'var(--bg-secondary)',
+                    color: isActive ? '#ffffff' : 'var(--text-primary)',
+                    fontSize: '0.84rem',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                    boxShadow: isActive ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                   }}
                 >
                   {cat.name}
@@ -779,157 +1167,236 @@ const Cashier = () => {
           </div>
 
           {/* Quick Products Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '12px', maxHeight: 'calc(100vh - 270px)', minHeight: '440px', overflowY: 'auto', padding: '4px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '2px' }}>
             {filteredProducts.map(p => {
               const promo = activePromotions[p.id];
+              const isOutOfStock = p.stock <= 0;
+              const hasCarton = p.units_per_box > 1 || p.wholesale_price > 0;
+
               return (
-                <button
+                <div
                   key={p.id}
-                  onClick={() => addToCart(p, 1)}
-                  className="glass-panel"
+                  onClick={() => addToCart(p, 1, 'PIECE')}
+                  className={`pos-product-card ${promo ? 'has-promo' : ''}`}
                   style={{
-                    padding: '12px 14px',
-                    borderRadius: '14px',
-                    border: promo ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255,255,255,0.08)',
-                    background: promo ? 'linear-gradient(180deg, rgba(168, 85, 247, 0.12) 0%, rgba(30, 41, 59, 0.6) 100%)' : 'rgba(30, 41, 59, 0.6)',
-                    color: 'white',
-                    textAlign: 'right',
-                    cursor: 'pointer',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    border: promo ? '1.5px solid var(--warning-color)' : '1px solid var(--border-color)',
+                    background: promo ? 'linear-gradient(180deg, rgba(217, 119, 6, 0.08) 0%, var(--bg-secondary) 100%)' : 'var(--bg-secondary)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    transition: 'all 0.2s',
-                    minHeight: '128px',
-                    height: 'auto',
-                    gap: '10px'
+                    minHeight: '130px',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}
-                  onMouseOver={e => e.currentTarget.style.borderColor = promo ? '#c084fc' : '#38bdf8'}
-                  onMouseOut={e => e.currentTarget.style.borderColor = promo ? 'rgba(168, 85, 247, 0.5)' : 'rgba(255,255,255,0.08)'}
                 >
-                  <div>
-                    <div style={{ 
-                      fontWeight: 'bold', 
-                      fontSize: '0.92rem', 
-                      display: '-webkit-box', 
-                      WebkitLineClamp: 2, 
-                      WebkitBoxOrient: 'vertical', 
-                      overflow: 'hidden', 
-                      lineHeight: '1.35',
-                      minHeight: '2.7em',
-                      wordBreak: 'break-word'
-                    }}>
-                      {p.name}
+                  {/* Top Meta: Stock & Promo Tag */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '0.72rem', color: isOutOfStock ? '#d97706' : 'var(--text-muted)', fontWeight: isOutOfStock ? 700 : 500 }}>
+                      {isOutOfStock ? (
+                        <span style={{ background: 'var(--warning-light)', color: '#d97706', padding: '1px 5px', borderRadius: '4px' }}>⚠️ تەواوبوو</span>
+                      ) : (
+                        <span>کۆگا: {p.stock}</span>
+                      )}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: p.stock <= 0 ? '#f59e0b' : '#64748b', marginTop: '3px', fontWeight: p.stock <= 0 ? 'bold' : 'normal' }}>
-                      کۆگا: {p.stock} {p.unit || 'دانە'} {p.stock <= 0 ? '(تەواوبوو)' : ''}
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '6px' }}>
-                    {promo ? (
-                      <div>
-                        <span style={{ color: '#c084fc', fontWeight: 'bold', fontSize: '0.98rem', display: 'block', lineHeight: '1.2' }}>
-                          {promo.promo_price.toLocaleString()} د.ع 🏷️
-                        </span>
-                        <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: '0.72rem', display: 'block', marginTop: '2px' }}>
-                          {Number(p.selling_price).toLocaleString()} د.ع
-                        </span>
-                      </div>
-                    ) : (
-                      <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '0.98rem' }}>
-                        {Number(p.selling_price).toLocaleString()} د.ع
+                    {promo && (
+                      <span style={{ 
+                        background: 'rgba(217, 119, 6, 0.12)', 
+                        color: '#d97706', 
+                        border: '1px solid rgba(217, 119, 6, 0.35)', 
+                        padding: '1px 6px', 
+                        borderRadius: '4px', 
+                        fontSize: '0.7rem', 
+                        fontWeight: 800,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
+                        <Tag size={10} /> ئۆفەر
                       </span>
                     )}
+                  </div>
 
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      <span style={{ 
-                        background: promo ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)', 
-                        color: promo ? '#c084fc' : '#38bdf8', 
-                        padding: '3px 8px', 
-                        borderRadius: '6px', 
-                        fontSize: '0.72rem', 
-                        fontWeight: 'bold',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {promo && promo.max_qty_per_sale ? `سنوور: ${promo.max_qty_per_sale}` : `+١ ${p.unit || 'دانە'}`}
-                      </span>
+                  {/* Product Title */}
+                  <div style={{ 
+                    fontWeight: 700, 
+                    fontSize: '0.88rem', 
+                    display: '-webkit-box', 
+                    WebkitLineClamp: 2, 
+                    WebkitBoxOrient: 'vertical', 
+                    overflow: 'hidden', 
+                    lineHeight: '1.35',
+                    minHeight: '2.5em',
+                    wordBreak: 'break-word',
+                    color: 'var(--text-primary)',
+                    margin: '2px 0 6px 0'
+                  }}>
+                    {p.name}
+                  </div>
 
-                      {(p.units_per_box > 1 || p.wholesale_price > 0) && (
-                        <span
-                          role="button"
+                  {/* Pricing and Action Strip */}
+                  <div style={{ marginTop: 'auto' }}>
+                    {/* Price Row */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '6px' }}>
+                      {promo ? (
+                        <>
+                          <span style={{ color: '#d97706', fontWeight: 900, fontSize: '1.05rem', lineHeight: '1' }}>
+                            {Number(promo.promo_price).toLocaleString()} د.ع
+                          </span>
+                          <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through', fontSize: '0.74rem' }}>
+                            {Number(p.selling_price).toLocaleString()}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ color: 'var(--accent-hover)', fontWeight: 900, fontSize: '1.08rem', lineHeight: '1' }}>
+                          {Number(p.selling_price).toLocaleString()} د.ع
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Unit & Carton Buttons */}
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(p, 1, 'PIECE');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '4px 6px',
+                          borderRadius: '6px',
+                          background: 'var(--accent-light)',
+                          color: 'var(--accent-color)',
+                          border: '1px solid rgba(37, 99, 235, 0.25)',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        +١ {p.unit || 'دانە'}
+                      </button>
+
+                      {hasCarton && (
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             addToCart(p, 1, 'BOX');
                           }}
                           title={`زیادکردنی ١ کارتۆن (${p.units_per_box || 1} دانە) بە نرخی ${Number(p.wholesale_price).toLocaleString()} د.ع`}
                           style={{
-                            background: 'rgba(168, 85, 247, 0.25)',
-                            border: '1px solid rgba(168, 85, 247, 0.5)',
-                            color: '#c084fc',
-                            padding: '3px 7px',
+                            flex: 1,
+                            padding: '4px 6px',
                             borderRadius: '6px',
+                            background: 'rgba(2, 132, 199, 0.1)',
+                            border: '1px solid rgba(2, 132, 199, 0.35)',
+                            color: '#0284c7',
                             fontSize: '0.72rem',
-                            fontWeight: 'bold',
-                            whiteSpace: 'nowrap',
-                            cursor: 'pointer'
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '2px'
                           }}
                         >
-                          📦 کارتۆن
-                        </span>
+                          <Package size={11} /> کارتۆن
+                        </button>
                       )}
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
-
         </div>
 
         {/* Right Side: Interactive Cart & Direct Checkout */}
-        <div style={{ flex: '1 1 38%', minWidth: '340px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          
-          <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '20px' }}>
+        <div style={{ flex: '1 1 40%', minWidth: '340px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ 
+            background: 'var(--bg-secondary)', 
+            border: '1px solid var(--border-color)', 
+            padding: '10px 14px', 
+            borderRadius: '14px',
+            boxShadow: 'var(--card-shadow)',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            boxSizing: 'border-box',
+            overflow: 'hidden'
+          }}>
             
             {/* Cart Header with Quick Tool Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShoppingCart color="#38bdf8" size={22} /> عەرەبانەی فرۆشتن
-                {cart.length > 0 && <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>({cart.length})</span>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px', flexShrink: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <ShoppingCart color="var(--accent-color)" size={18} /> عەرەبانە
+                {cart.length > 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>({cart.length})</span>}
               </h2>
 
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => setIsScaleModalOpen(true)}
                   title="تەرازوو و فرۆشتنی بە کێش (F3)"
-                  style={{ padding: '6px 12px', borderRadius: '10px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)' }}
+                  style={{ 
+                    padding: '4px 10px', 
+                    borderRadius: '6px', 
+                    background: 'rgba(2, 132, 199, 0.1)', 
+                    color: '#0284c7', 
+                    border: '1px solid rgba(2, 132, 199, 0.35)', 
+                    fontWeight: 700, 
+                    fontSize: '0.78rem', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px' 
+                  }}
                 >
-                  <Scale size={15} /> تەرازوو ⚖️
+                  <Scale size={13} /> تەرازوو (F3)
                 </button>
 
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => setIsQuickItemModalOpen(true)}
                   title="کاڵای دەستی بێ بارکۆد (F2)"
-                  style={{ padding: '6px 12px', borderRadius: '10px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)' }}
+                  style={{ 
+                    padding: '4px 10px', 
+                    borderRadius: '6px', 
+                    background: 'var(--warning-light)', 
+                    color: '#b45309', 
+                    border: '1px solid rgba(245, 158, 11, 0.3)', 
+                    fontWeight: 700, 
+                    fontSize: '0.78rem', 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px' 
+                  }}
                 >
-                  <Zap size={15} /> کاڵای دەستی ⚡
+                  <Zap size={13} /> دەستی (F2)
                 </button>
 
                 {cart.length > 0 && (
                   <button 
                     onClick={clearCart}
-                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{ background: 'var(--danger-light)', border: '1px solid rgba(239, 68, 68, 0.25)', color: 'var(--danger-color)', cursor: 'pointer', fontSize: '0.78rem', padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}
                   >
-                    <Trash2 size={14} /> سڕینەوە
+                    <Trash2 size={12} /> سڕینەوە
                   </button>
                 )}
               </div>
             </div>
 
             {/* Multi-Cart Tabs Bar (Quick Sell / Parallel Customers) */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', background: 'rgba(0,0,0,0.3)', padding: '6px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-color)', flexShrink: 0 }}>
               {carts.map((c, idx) => {
                 const isActive = activeCartIndex === idx;
                 const itemCount = c.items.length;
@@ -941,36 +1408,39 @@ const Cashier = () => {
                     onClick={() => setActiveCartIndex(idx)}
                     style={{
                       flex: 1,
+                      minWidth: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      border: isActive ? '1.5px solid #38bdf8' : (hasItems ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid transparent'),
+                      gap: '6px',
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      border: isActive ? '1px solid var(--accent-color)' : '1px solid transparent',
                       background: isActive 
-                        ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(14, 165, 233, 0.35))' 
-                        : (hasItems ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255,255,255,0.02)'),
-                      color: isActive ? '#38bdf8' : (hasItems ? '#f59e0b' : '#94a3b8'),
-                      fontWeight: isActive ? 'bold' : 'normal',
+                        ? 'var(--accent-color)' 
+                        : (hasItems ? 'var(--warning-light)' : 'var(--bg-secondary)'),
+                      color: isActive ? '#ffffff' : (hasItems ? 'var(--warning-color)' : 'var(--text-primary)'),
+                      fontWeight: isActive ? 700 : 600,
                       cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: isActive ? '0 4px 12px rgba(56, 189, 248, 0.25)' : 'none'
+                      transition: 'all 0.15s ease',
+                      fontSize: '0.8rem',
+                      boxShadow: isActive ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                     }}
                     title={`سویچ بکە بۆ ${c.label} (${c.shortcut})`}
                   >
-                    <span style={{ fontSize: '0.95rem' }}>{c.label}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
                     <span style={{ 
-                      fontSize: '0.75rem', 
-                      padding: '2px 8px', 
-                      borderRadius: '10px',
+                      flexShrink: 0,
+                      fontSize: '0.7rem', 
+                      padding: '1px 6px', 
+                      borderRadius: '4px', 
                       background: isActive 
-                        ? 'rgba(56, 189, 248, 0.3)' 
-                        : (hasItems ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.06)'),
-                      color: isActive ? '#ffffff' : (hasItems ? '#f59e0b' : '#64748b'),
-                      fontWeight: 'bold'
+                        ? 'rgba(255, 255, 255, 0.25)' 
+                        : (hasItems ? 'rgba(245, 158, 11, 0.25)' : 'var(--bg-tertiary)'),
+                      color: isActive ? '#ffffff' : (hasItems ? '#b45309' : 'var(--text-secondary)'),
+                      fontWeight: 700
                     }}>
-                      {itemCount > 0 ? `${itemCount} کاڵا` : c.shortcut}
+                      {itemCount > 0 ? `${itemCount}` : c.shortcut}
                     </span>
                   </button>
                 );
@@ -978,160 +1448,247 @@ const Cashier = () => {
             </div>
 
             {/* Customer & Payment Mode Selection */}
-            <div style={{ marginBottom: '1rem', padding: '12px', background: 'rgba(0,0,0,0.25)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'bold' }}>
-                  کڕیار (بۆ قەرز یان داشکاندن):
-                </label>
-                {selectedCustomer && (
-                  <span style={{ fontSize: '0.75rem', color: '#f59e0b' }}>
-                    قەرزی پێشوو: {Number(selectedCustomer.total_debt || 0).toLocaleString()} د.ع
-                  </span>
-                )}
-              </div>
-
-              <select 
-                value={selectedCustomerId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedCustomerId(val);
-                  if (!val) {
-                    setPaymentMode('CASH');
-                    setSplitCashAmount('');
-                  }
-                }}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
-              >
-                <option value="">کڕیاری گشتی (نەقد)...</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ''} - قەرز: {Number(c.total_debt || 0).toLocaleString()} دینار
-                  </option>
-                ))}
-              </select>
-
-              {/* Payment Mode Selector Tabs (CASH, DEBT, SPLIT) */}
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '6px' }}>شێوازی پارەدان:</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
+            <div style={{ marginBottom: '6px', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '10px', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+              
+              {/* Row 1: Full-Width Customer Selection + Add Customer Button */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' }}>
+                <select 
+                  value={selectedCustomerId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCustomerId(val);
+                    if (!val) {
                       setPaymentMode('CASH');
                       setSplitCashAmount('');
-                    }}
-                    style={{
-                      padding: '7px 4px',
-                      borderRadius: '8px',
-                      border: paymentMode === 'CASH' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                      background: paymentMode === 'CASH' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.03)',
-                      color: paymentMode === 'CASH' ? '#10b981' : '#94a3b8',
-                      fontWeight: paymentMode === 'CASH' ? 'bold' : 'normal',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    💵 نەقد
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!selectedCustomerId}
-                    onClick={() => {
-                      if (!selectedCustomerId) return;
-                      setPaymentMode('DEBT');
-                      setSplitCashAmount('');
-                    }}
-                    style={{
-                      padding: '7px 4px',
-                      borderRadius: '8px',
-                      border: paymentMode === 'DEBT' ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)',
-                      background: paymentMode === 'DEBT' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.03)',
-                      color: !selectedCustomerId ? '#64748b' : (paymentMode === 'DEBT' ? '#ef4444' : '#94a3b8'),
-                      fontWeight: paymentMode === 'DEBT' ? 'bold' : 'normal',
-                      fontSize: '0.8rem',
-                      cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
-                  >
-                    💳 قەرز
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!selectedCustomerId}
-                    onClick={() => {
-                      if (!selectedCustomerId) return;
-                      setPaymentMode('SPLIT');
-                      if (!splitCashAmount) {
-                        setSplitCashAmount(String(Math.round(grandTotal / 2)));
-                      }
-                    }}
-                    style={{
-                      padding: '7px 4px',
-                      borderRadius: '8px',
-                      border: paymentMode === 'SPLIT' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)',
-                      background: paymentMode === 'SPLIT' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.03)',
-                      color: !selectedCustomerId ? '#64748b' : (paymentMode === 'SPLIT' ? '#f59e0b' : '#94a3b8'),
-                      fontWeight: paymentMode === 'SPLIT' ? 'bold' : 'normal',
-                      fontSize: '0.8rem',
-                      cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
-                  >
-                    ⚖️ تێکەڵ (نەقد+قەرز)
-                  </button>
-                </div>
+                    }
+                  }}
+                  style={{ 
+                    flex: 1, 
+                    minWidth: 0,
+                    padding: '5px 8px', 
+                    borderRadius: '6px', 
+                    background: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)', 
+                    color: 'var(--text-primary)', 
+                    fontSize: '0.8rem', 
+                    outline: 'none',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <option value="">کڕیاری گشتی (نەقد)...</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.phone ? `(${c.phone})` : ''} - قەرز: {Number(c.total_debt || 0).toLocaleString()} د.ع
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickCustomerModalOpen(true)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(37, 99, 235, 0.12)',
+                    border: '1px solid rgba(37, 99, 235, 0.35)',
+                    color: 'var(--primary-color)',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="زیادکردنی خێرای کڕیاری نوێ"
+                >
+                  <Plus size={12} /> کڕیار
+                </button>
               </div>
+
+              {/* Row 2: Payment Mode Selector Tabs (CASH, DEBT, SPLIT) in 3-Column Equal Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMode('CASH');
+                    setSplitCashAmount('');
+                  }}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    padding: '5px 6px',
+                    borderRadius: '6px',
+                    border: paymentMode === 'CASH' ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
+                    background: paymentMode === 'CASH' ? 'var(--success-light)' : 'var(--bg-secondary)',
+                    color: paymentMode === 'CASH' ? 'var(--success-color)' : 'var(--text-secondary)',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Banknote size={13} /> نەقد
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selectedCustomerId}
+                  onClick={() => {
+                    if (!selectedCustomerId) return;
+                    setPaymentMode('DEBT');
+                    setSplitCashAmount('');
+                  }}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    padding: '5px 6px',
+                    borderRadius: '6px',
+                    border: paymentMode === 'DEBT' ? '1px solid var(--danger-color)' : '1px solid var(--border-color)',
+                    background: paymentMode === 'DEBT' ? 'var(--danger-light)' : 'var(--bg-secondary)',
+                    color: !selectedCustomerId ? 'var(--text-muted)' : (paymentMode === 'DEBT' ? 'var(--danger-color)' : 'var(--text-secondary)'),
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
+                >
+                  <CreditCard size={13} /> قەرز
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selectedCustomerId}
+                  onClick={() => {
+                    if (!selectedCustomerId) return;
+                    setPaymentMode('SPLIT');
+                    if (!splitCashAmount) {
+                      setSplitCashAmount(String(Math.round(grandTotal / 2)));
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    minWidth: 0,
+                    padding: '5px 6px',
+                    borderRadius: '6px',
+                    border: paymentMode === 'SPLIT' ? '1px solid var(--warning-color)' : '1px solid var(--border-color)',
+                    background: paymentMode === 'SPLIT' ? 'var(--warning-light)' : 'var(--bg-secondary)',
+                    color: !selectedCustomerId ? 'var(--text-muted)' : (paymentMode === 'SPLIT' ? '#b45309' : 'var(--text-secondary)'),
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: !selectedCustomerId ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={!selectedCustomerId ? 'تکایە سەرەتا کڕیار دیاریبکە' : ''}
+                >
+                  <Layers size={13} /> تێکەڵ
+                </button>
+              </div>
+
+              {selectedCustomer && (
+                <div style={{ fontSize: '0.74rem', color: 'var(--warning-color)', fontWeight: 700, marginTop: '4px', textAlign: 'left' }}>
+                  قەرزی پێشوو: {Number(selectedCustomer.total_debt || 0).toLocaleString()} د.ع
+                </div>
+              )}
 
               {/* Interactive Split Payment Calculator */}
               {paymentMode === 'SPLIT' && (
-                <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(245, 158, 11, 0.08)', borderRadius: '10px', border: '1px dashed rgba(245, 158, 11, 0.3)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                      بڕی پارەی نەقد (کاش):
+                <div style={{ marginTop: '6px', padding: '6px 8px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px dashed var(--warning-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 700 }}>
+                      نەقد (کاش):
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setSplitCashAmount(String(Math.round(grandTotal / 2)))}
-                      style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', cursor: 'pointer' }}
-                    >
-                      ٥٠٪ (نیوە)
-                    </button>
+                    <div style={{ display: 'flex', gap: '3px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const half = Math.round(grandTotal / 2);
+                          const roundedHalf = Math.round(half / 250) * 250;
+                          setSplitCashAmount(String(roundedHalf));
+                        }}
+                        style={{ padding: '2px 6px', fontSize: '0.7rem', borderRadius: '4px', background: 'var(--warning-light)', color: '#b45309', border: '1px solid rgba(245, 158, 11, 0.4)', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        ٥٠٪
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSplitCashAmount(String(grandTotal))}
+                        style={{ padding: '2px 6px', fontSize: '0.7rem', borderRadius: '4px', background: 'var(--success-light)', color: 'var(--success-color)', border: '1px solid rgba(16, 185, 129, 0.4)', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        ١٠٠٪
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = Math.max(0, parseInt(splitCashAmount) || 0);
+                        const nextVal = Math.max(0, current - 250);
+                        setSplitCashAmount(nextVal === 0 ? '' : String(nextVal));
+                      }}
+                      title="-250"
+                      style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--warning-light)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#b45309', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      -٢٥٠
+                    </button>
+
                     <input
                       type="number"
                       min="0"
                       max={grandTotal}
                       step="250"
                       value={splitCashAmount}
-                      placeholder="بڕی نەقد بنووسە..."
+                      placeholder="بڕی نەقد..."
                       onChange={(e) => setSplitCashAmount(e.target.value)}
-                      style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', background: '#0f172a', border: '1px solid #f59e0b', color: '#10b981', fontSize: '1rem', fontWeight: 'bold', outline: 'none' }}
+                      style={{ flex: 1, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--success-color)', fontSize: '0.9rem', fontWeight: 800, textAlign: 'center', outline: 'none' }}
                     />
-                    <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>دینار</span>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = Math.max(0, parseInt(splitCashAmount) || 0);
+                        const nextVal = Math.min(grandTotal, current + 250);
+                        setSplitCashAmount(String(nextVal));
+                      }}
+                      title="+250"
+                      style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--warning-light)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#b45309', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                    >
+                      +٢٥٠
+                    </button>
                   </div>
 
                   {/* Realtime Split Breakdown */}
-                  <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ color: '#10b981' }}>💵 نەقد: {effectiveCashPaid.toLocaleString()} د.ع</span>
-                    <span style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ ماوە بە قەرز: {effectiveDebtAmount.toLocaleString()} د.ع</span>
+                  <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', paddingTop: '4px', borderTop: '1px solid var(--border-color)' }}>
+                    <span style={{ color: 'var(--success-color)', fontWeight: 700 }}>نەقد: {effectiveCashPaid.toLocaleString()} د.ع</span>
+                    <span style={{ color: 'var(--danger-color)', fontWeight: 700 }}>قەرز: {effectiveDebtAmount.toLocaleString()} د.ع</span>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Cart Items List with Decimal & Multipliers */}
-            <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1rem' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px', paddingRight: '2px' }}>
               {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '35px 10px', color: '#94a3b8' }}>
-                  <ShoppingCart size={40} style={{ opacity: 0.2, margin: '0 auto 10px auto' }} />
-                  عەرەبانەی کڕین واڵایە.<br/>کاڵایەک سکان بکە یان کلیک بکە لە خشتەکە.
+                <div style={{ textAlign: 'center', padding: '35px 10px', color: 'var(--text-muted)' }}>
+                  <ShoppingCart size={40} style={{ opacity: 0.25, margin: '0 auto 10px auto' }} />
+                  عەرەبانەی کڕین واڵایە.<br/>کاڵایەک سکان بکە یان لە خشتەکە هەڵیبژێرە.
                 </div>
               ) : (
                 cart.map(item => {
@@ -1143,10 +1700,10 @@ const Cashier = () => {
                     <div 
                       key={itemKey}
                       style={{
-                        padding: '12px',
-                        borderRadius: '12px',
-                        background: item.unit_type === 'BOX' ? 'rgba(168, 85, 247, 0.12)' : (pricing.hasPromo ? 'rgba(168, 85, 247, 0.08)' : 'rgba(0,0,0,0.2)'),
-                        border: item.unit_type === 'BOX' ? '1px solid rgba(168, 85, 247, 0.4)' : (pricing.hasPromo ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(255,255,255,0.05)'),
+                        padding: '12px 14px',
+                        borderRadius: '16px',
+                        background: item.unit_type === 'BOX' ? 'rgba(2, 132, 199, 0.08)' : (pricing.hasPromo ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-tertiary)'),
+                        border: item.unit_type === 'BOX' ? '1.5px solid rgba(2, 132, 199, 0.35)' : (pricing.hasPromo ? '1.5px solid rgba(217, 119, 6, 0.35)' : '1px solid var(--border-color)'),
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '8px'
@@ -1154,21 +1711,21 @@ const Cashier = () => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
-                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             {item.name}
                             {item.is_custom && (
-                              <span style={{ fontSize: '0.72rem', background: isKg ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: isKg ? '#c084fc' : '#f59e0b', padding: '1px 6px', borderRadius: '4px' }}>
-                                {isKg ? '⚖️ بە کێش' : 'دەستی'}
+                              <span style={{ fontSize: '0.72rem', background: isKg ? 'rgba(2, 132, 199, 0.12)' : 'var(--warning-light)', color: isKg ? '#0284c7' : '#b45309', padding: '1px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                {isKg ? 'بە کێش' : 'دەستی'}
                               </span>
                             )}
                             {item.unit_type === 'BOX' && (
-                              <span style={{ fontSize: '0.72rem', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.5)', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '0.72rem', background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.35)', padding: '1px 8px', borderRadius: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                 <Package size={11} /> کارتۆن ({item.units_per_box || 1} دانە)
                               </span>
                             )}
                             {pricing.hasPromo && item.unit_type !== 'BOX' && (
-                              <span style={{ fontSize: '0.72rem', background: 'rgba(168, 85, 247, 0.25)', color: '#c084fc', padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
-                                🏷️ ئۆفەر
+                              <span style={{ fontSize: '0.72rem', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: '1px solid rgba(217, 119, 6, 0.35)', padding: '1px 8px', borderRadius: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Tag size={10} /> ئۆفەر
                               </span>
                             )}
                           </div>
@@ -1177,26 +1734,26 @@ const Cashier = () => {
                           {pricing.hasPromo && item.unit_type !== 'BOX' ? (
                             <div style={{ marginTop: '4px' }}>
                               {pricing.regularQty > 0 ? (
-                                <div style={{ fontSize: '0.78rem', color: '#c084fc' }}>
+                                <div style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 600 }}>
                                   {pricing.promoQty} بە {pricing.promoPrice.toLocaleString()} د.ع (ئۆفەر) + {pricing.regularQty} بە {pricing.regularPrice.toLocaleString()} د.ع (ئاسایی)
                                 </div>
                               ) : (
-                                <div style={{ fontSize: '0.8rem', color: '#a78bfa' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 600 }}>
                                   {pricing.promoPrice.toLocaleString()} دینار (ئۆفەر)
                                 </div>
                               )}
                               {pricing.totalSavings > 0 && (
-                                <span style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: 'bold', display: 'block', marginTop: '2px' }}>
-                                  پاشەکەوت: {pricing.totalSavings.toLocaleString()} دینار 🏷️
+                                <span style={{ fontSize: '0.75rem', color: 'var(--success-color)', fontWeight: 800, display: 'block', marginTop: '2px' }}>
+                                  پاشەکەوت: {pricing.totalSavings.toLocaleString()} دینار
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                               {item.price.toLocaleString()} دینار بۆ هەر {item.unit || 'دانە'}
                               {item.unit_type === 'BOX' && (
-                                <span style={{ color: '#c084fc', marginRight: '6px' }}>
-                                  (تێچووی کۆگایی: {item.units_per_box || 1} دانە بە کۆ)
+                                <span style={{ color: '#0284c7', marginRight: '6px', fontWeight: 600 }}>
+                                  (کۆگایی: {item.units_per_box || 1} دانە)
                                 </span>
                               )}
                             </div>
@@ -1204,15 +1761,15 @@ const Cashier = () => {
                         </div>
 
                         <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontWeight: 'bold', color: item.unit_type === 'BOX' ? '#c084fc' : '#10b981', fontSize: '1rem' }}>
+                          <div style={{ fontWeight: 800, color: item.unit_type === 'BOX' ? '#0284c7' : 'var(--accent-hover)', fontSize: '1.05rem' }}>
                             {lineTotal.toLocaleString()} دینار
                           </div>
                           <button 
                             onClick={() => removeFromCart(itemKey)}
-                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', marginTop: '2px' }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '2px', marginTop: '2px' }}
                             title="سڕینەوە"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
@@ -1221,84 +1778,147 @@ const Cashier = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         
                         {/* Stepper +/- */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary)', borderRadius: '10px', padding: '3px 4px', border: '1px solid var(--border-color)' }}>
                           <button 
-                            onClick={() => updateQuantity(itemKey, Math.max(0.1, item.quantity - (isKg ? 0.25 : 1)))}
-                            style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            type="button"
+                            onClick={() => {
+                              const step = isKg ? 0.25 : 1;
+                              const targetQty = Math.round((Number(item.quantity) - step) * 1000) / 1000;
+                              updateQuantity(itemKey, Math.max(0, targetQty));
+                            }}
+                            title={Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'سڕینەوە لە سەبەتە (0)' : 'کەمکردنەوە'}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '8px', 
+                              background: Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'var(--danger-light)' : 'var(--bg-tertiary)', 
+                              color: Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'var(--danger-color)' : 'var(--text-primary)', 
+                              border: Number(item.quantity) <= (isKg ? 0.25 : 1) ? '1px solid rgba(239, 68, 68, 0.4)' : 'none', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              transition: 'all 0.15s ease'
+                            }}
                           >
-                            <Minus size={14} />
+                            <Minus size={15} />
                           </button>
                           
                           <input 
                             type="number" 
                             step={isKg ? '0.05' : '1'}
-                            min="0.01"
+                            min="0"
                             value={item.quantity}
                             onChange={(e) => updateQuantity(itemKey, e.target.value)}
-                            style={{ width: '60px', textAlign: 'center', background: 'transparent', border: 'none', color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}
+                            style={{ width: '55px', textAlign: 'center', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.98rem', outline: 'none', padding: 0 }}
                           />
 
                           <button 
-                            onClick={() => updateQuantity(itemKey, item.quantity + (isKg ? 0.25 : 1))}
-                            style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            type="button"
+                            onClick={() => {
+                              const step = isKg ? 0.25 : 1;
+                              const targetQty = Math.round((Number(item.quantity) + step) * 1000) / 1000;
+                              updateQuantity(itemKey, targetQty);
+                            }}
+                            title="زیادکردن"
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '8px', 
+                              background: 'var(--bg-tertiary)', 
+                              color: 'var(--text-primary)', 
+                              border: 'none', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              transition: 'all 0.15s ease'
+                            }}
                           >
-                            <Plus size={14} />
+                            <Plus size={15} />
                           </button>
                         </div>
 
                         {/* Unit Switcher: دانە vs کارتۆن */}
                         {(item.units_per_box > 1 || item.wholesale_price > 0 || item.unit_type === 'BOX') && (
-                          <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.35)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(168, 85, 247, 0.35)' }}>
+                          <div style={{ display: 'inline-flex', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
                             <button
                               type="button"
                               onClick={() => setItemUnitType(itemKey, 'PIECE')}
                               style={{
-                                padding: '3px 8px',
+                                padding: '4px 10px',
                                 borderRadius: '6px',
                                 border: 'none',
                                 cursor: 'pointer',
                                 fontSize: '0.74rem',
-                                fontWeight: 'bold',
-                                background: item.unit_type !== 'BOX' ? '#38bdf8' : 'transparent',
-                                color: item.unit_type !== 'BOX' ? '#0f172a' : '#94a3b8'
+                                fontWeight: 700,
+                                background: item.unit_type !== 'BOX' ? 'var(--primary-color)' : 'transparent',
+                                color: item.unit_type !== 'BOX' ? '#ffffff' : 'var(--text-secondary)'
                               }}
                             >
-                              دانە 🏷️
+                              دانە
                             </button>
                             <button
                               type="button"
                               onClick={() => setItemUnitType(itemKey, 'BOX')}
                               style={{
-                                padding: '3px 8px',
+                                padding: '4px 10px',
                                 borderRadius: '6px',
                                 border: 'none',
                                 cursor: 'pointer',
                                 fontSize: '0.74rem',
-                                fontWeight: 'bold',
-                                background: item.unit_type === 'BOX' ? '#c084fc' : 'transparent',
-                                color: item.unit_type === 'BOX' ? '#0f172a' : '#94a3b8'
+                                fontWeight: 700,
+                                background: item.unit_type === 'BOX' ? '#0284c7' : 'transparent',
+                                color: item.unit_type === 'BOX' ? '#ffffff' : 'var(--text-secondary)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
                               }}
                             >
-                              کارتۆن 📦 ({item.units_per_box || 1})
+                              <Package size={11} /> کارتۆن ({item.units_per_box || 1})
                             </button>
                           </div>
                         )}
 
-                        {/* Quick Presets Buttons */}
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {(isKg ? [0.25, 0.5, 1, 2] : [1, 5, 10, 20]).map(q => (
+                        {/* Quick Presets Buttons with 0 to Clear easily */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => removeFromCart(itemKey)}
+                            title="سڕینەوەی خێرا لە سەبەتە (0)"
+                            style={{
+                              padding: '5px 9px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(239, 68, 68, 0.35)',
+                              background: 'var(--danger-light)',
+                              color: 'var(--danger-color)',
+                              fontSize: '0.76rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <Trash2 size={11} /> 0
+                          </button>
+
+                          {(isKg ? [0.25, 0.5, 1, 2] : [1, 2, 5, 10, 20]).map(q => (
                             <button
+                              type="button"
                               key={q}
                               onClick={() => updateQuantity(itemKey, q)}
                               style={{
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                background: Number(item.quantity) === q ? '#38bdf8' : 'rgba(255,255,255,0.05)',
-                                color: Number(item.quantity) === q ? '#0f172a' : '#94a3b8',
-                                fontSize: '0.75rem',
-                                fontWeight: 'bold',
-                                cursor: 'pointer'
+                                padding: '5px 9px',
+                                borderRadius: '8px',
+                                border: Number(item.quantity) === q ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                background: Number(item.quantity) === q ? 'var(--primary-color)' : 'var(--bg-secondary)',
+                                color: Number(item.quantity) === q ? '#ffffff' : 'var(--text-secondary)',
+                                fontSize: '0.76rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
                               }}
                             >
                               {q} {isKg ? 'کگم' : ''}
@@ -1314,119 +1934,140 @@ const Cashier = () => {
               )}
             </div>
 
-            {/* Discount Section (داشکاندن بە بڕ یان ڕێژە) */}
-            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#c084fc', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Percent size={15} /> داشکاندن (تەخفیف):
-                </span>
-                
-                {/* Discount Type Toggle */}
-                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button
-                    type="button"
-                    onClick={() => setDiscountType('AMOUNT')}
-                    style={{
-                      padding: '3px 10px',
-                      borderRadius: '5px',
-                      border: 'none',
-                      background: discountType === 'AMOUNT' ? '#8b5cf6' : 'transparent',
-                      color: discountType === 'AMOUNT' ? 'white' : '#94a3b8',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    دینار (بڕ)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDiscountType('PERCENT')}
-                    style={{
-                      padding: '3px 10px',
-                      borderRadius: '5px',
-                      border: 'none',
-                      background: discountType === 'PERCENT' ? '#8b5cf6' : 'transparent',
-                      color: discountType === 'PERCENT' ? 'white' : '#94a3b8',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ڕێژەی %
-                  </button>
-                </div>
+            {/* Discount Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-tertiary)', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '6px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#0284c7', fontWeight: 700 }}>
+                <Percent size={13} />
+                <button
+                  type="button"
+                  onClick={() => setDiscountType(discountType === 'AMOUNT' ? 'PERCENT' : 'AMOUNT')}
+                  style={{
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid rgba(2, 132, 199, 0.35)',
+                    background: 'rgba(2, 132, 199, 0.1)',
+                    color: '#0284c7',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {discountType === 'AMOUNT' ? 'دینار' : '%'}
+                </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input 
-                  ref={discountInputRef}
-                  type="number"
-                  min="0"
-                  placeholder={discountType === 'PERCENT' ? 'ڕێژەی داشکاندن بنووسە (بۆ نموونە: ١٠ بۆ ١٠%)...' : 'بڕی داشکاندن بە دینار (بۆ نموونە: ٥٠٠)...'}
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139, 92, 246, 0.3)', color: 'white', fontSize: '0.9rem' }}
-                />
-                {calculatedDiscount > 0 && (
-                  <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                    -{calculatedDiscount.toLocaleString()} دینار
-                  </span>
-                )}
-              </div>
+              {/* Stepper -250 / -5% */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (discountType === 'AMOUNT') {
+                    const current = Math.max(0, parseInt(discountValue) || 0);
+                    const nextVal = Math.max(0, current - 250);
+                    setDiscountValue(nextVal === 0 ? '' : String(nextVal));
+                  } else {
+                    const current = Math.max(0, parseInt(discountValue) || 0);
+                    const nextVal = Math.max(0, current - 5);
+                    setDiscountValue(nextVal === 0 ? '' : String(nextVal));
+                  }
+                }}
+                title={discountType === 'AMOUNT' ? 'کەمکردنەوە بە ٢٥٠ دینار' : 'کەمکردنەوە بە ٥٪'}
+                style={{
+                  padding: '3px 7px',
+                  borderRadius: '6px',
+                  background: 'var(--danger-light)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: 'var(--danger-color)',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                {discountType === 'AMOUNT' ? '-٢٥٠' : '-٥٪'}
+              </button>
+
+              <input 
+                ref={discountInputRef}
+                type="number"
+                min="0"
+                max={discountType === 'PERCENT' ? "100" : (subtotal > 0 ? subtotal : undefined)}
+                step={discountType === 'AMOUNT' ? '250' : '1'}
+                placeholder={discountType === 'PERCENT' ? 'داشکاندن (%):' : 'داشکاندن (د.ع):'}
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                style={{ flex: 1, minWidth: 0, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 700, textAlign: 'center', outline: 'none' }}
+              />
+
+              {/* Stepper +250 / +5% */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (discountType === 'AMOUNT') {
+                    const current = Math.max(0, parseInt(discountValue) || 0);
+                    const nextVal = subtotal > 0 ? Math.min(subtotal, current + 250) : current + 250;
+                    setDiscountValue(String(nextVal));
+                  } else {
+                    const current = Math.max(0, parseInt(discountValue) || 0);
+                    const nextVal = Math.min(100, current + 5);
+                    setDiscountValue(String(nextVal));
+                  }
+                }}
+                title={discountType === 'AMOUNT' ? 'زیادکردن بە ٢٥٠ دینار' : 'زیادکردن بە ٥٪'}
+                style={{
+                  padding: '3px 7px',
+                  borderRadius: '6px',
+                  background: 'rgba(2, 132, 199, 0.1)',
+                  border: '1px solid rgba(2, 132, 199, 0.35)',
+                  color: '#0284c7',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                {discountType === 'AMOUNT' ? '+٢٥٠' : '+٥٪'}
+              </button>
+
+              {calculatedDiscount > 0 && (
+                <span style={{ color: 'var(--danger-color)', fontWeight: 800, fontSize: '0.78rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  -{calculatedDiscount.toLocaleString()} د.ع
+                </span>
+              )}
             </div>
 
             {/* Cart Footer: Totals & Checkout Button */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.85rem' }}>
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '6px', flexShrink: 0 }}>
               
               {/* Subtotal & Discount Breakdown */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', fontSize: '0.85rem', color: '#94a3b8' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>کۆی سەرەتایی:</span>
-                  <span>{subtotal.toLocaleString()} دینار</span>
+              {(totalPromotionalSavings > 0 || calculatedDiscount > 0) && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                  <span>سەرەتایی: {subtotal.toLocaleString()} د.ع</span>
+                  {totalPromotionalSavings > 0 && (
+                    <span style={{ color: '#d97706', fontWeight: 700 }}>ئۆفەر: -{totalPromotionalSavings.toLocaleString()} د.ع</span>
+                  )}
+                  {calculatedDiscount > 0 && (
+                    <span style={{ color: 'var(--danger-color)', fontWeight: 700 }}>داشکاندن: -{calculatedDiscount.toLocaleString()} د.ع</span>
+                  )}
                 </div>
+              )}
 
-                {totalPromotionalSavings > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', fontWeight: 'bold' }}>
-                    <span>پاشەکەوتی ئۆفەرەکان:</span>
-                    <span>-{totalPromotionalSavings.toLocaleString()} دینار 🏷️</span>
-                  </div>
-                )}
-
-                {calculatedDiscount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
-                    <span>داشکاندنی پسووڵە:</span>
-                    <span>-{calculatedDiscount.toLocaleString()} دینار</span>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.1rem', color: '#94a3b8' }}>کۆی کۆتایی:</span>
-                <span style={{ fontSize: '1.6rem', fontWeight: 'bold', color: paymentMode === 'DEBT' ? '#ef4444' : (paymentMode === 'SPLIT' ? '#f59e0b' : '#10b981') }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center', background: 'var(--bg-tertiary)', padding: '6px 12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', fontWeight: 700 }}>کۆی گشتی:</span>
+                <span style={{ fontSize: '1.4rem', fontWeight: 900, color: paymentMode === 'DEBT' ? 'var(--danger-color)' : (paymentMode === 'SPLIT' ? 'var(--warning-color)' : 'var(--accent-hover)') }}>
                   {grandTotal.toLocaleString()} دینار
                 </span>
               </div>
 
               {paymentMode === 'DEBT' && (
-                <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem', textAlign: 'center', fontWeight: 'bold' }}>
-                  ⚠️ ئەم بڕە دەچێتە سەر قەرزی: {selectedCustomer?.name}
-                </div>
-              )}
-
-              {paymentMode === 'SPLIT' && (
-                <div style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '10px', color: '#f59e0b', fontSize: '0.85rem', marginBottom: '1rem', border: '1px solid rgba(245, 158, 11, 0.25)', textAlign: 'center' }}>
-                  <div style={{ fontWeight: 'bold' }}>⚖️ فرۆشتنی فرە-جۆر (تێکەڵ):</div>
-                  <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>
-                    💵 نەقد: <strong style={{ color: '#10b981' }}>{effectiveCashPaid.toLocaleString()} د.ع</strong> | 
-                    ⚠️ قەرز: <strong style={{ color: '#ef4444' }}>{effectiveDebtAmount.toLocaleString()} د.ع</strong>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '4px 8px', background: 'var(--danger-light)', borderRadius: '6px', color: 'var(--danger-color)', fontSize: '0.78rem', marginBottom: '6px', fontWeight: 700, border: '1px solid rgba(220, 38, 38, 0.25)' }}>
+                  <AlertCircle size={14} />
+                  <span>دەچێتە سەر قەرزی: <strong>{selectedCustomer?.name}</strong></span>
                 </div>
               )}
 
               {/* Auto-Print Preference Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: '10px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8', userSelect: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px', marginBottom: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-secondary)', userSelect: 'none', fontWeight: 600 }}>
                   <input 
                     type="checkbox" 
                     checked={autoPrint}
@@ -1434,12 +2075,12 @@ const Cashier = () => {
                       setAutoPrint(e.target.checked);
                       localStorage.setItem('pos_auto_print', e.target.checked ? 'true' : 'false');
                     }}
-                    style={{ width: '16px', height: '16px', accentColor: '#38bdf8', cursor: 'pointer' }}
+                    style={{ width: '14px', height: '14px', accentColor: 'var(--accent-color)', cursor: 'pointer' }}
                   />
-                  <span>چاپی خۆکاری وەسڵ</span>
+                  <span>چاپی خۆکاری پسووڵە</span>
                 </label>
-                <span style={{ fontSize: '0.75rem', color: autoPrint ? '#10b981' : '#64748b' }}>
-                  {autoPrint ? 'چالاکە ✓' : 'ناچالاکە ✕'}
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: autoPrint ? 'var(--success-color)' : 'var(--text-muted)' }}>
+                  {autoPrint ? 'چالاکە' : 'ناچالاکە'}
                 </span>
               </div>
 
@@ -1449,50 +2090,54 @@ const Cashier = () => {
                   onClick={() => handleCheckout(false)}
                   disabled={isCheckingOut || cart.length === 0}
                   style={{
-                    padding: '14px 10px',
-                    borderRadius: '12px',
-                    background: cart.length === 0 ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #0284c7, #2563eb)',
-                    color: cart.length === 0 ? '#64748b' : 'white',
+                    minWidth: 0,
+                    padding: '9px 8px',
+                    borderRadius: '8px',
+                    background: cart.length === 0 ? 'var(--bg-tertiary)' : 'var(--primary-color)',
+                    color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
                     border: 'none',
-                    fontWeight: 'bold',
-                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    fontSize: '0.86rem',
                     cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: cart.length === 0 ? 'none' : '0 4px 12px rgba(37,99,235,0.3)'
+                    gap: '5px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <Zap size={18} />
-                  {isCheckingOut ? '...' : 'فرۆشتن بێ چاپ'}
+                  <Zap size={15} style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {isCheckingOut ? '...' : 'فرۆشتن بێ چاپ'}
+                  </span>
                 </button>
 
                 <button
                   onClick={() => handleCheckout(true)}
                   disabled={isCheckingOut || cart.length === 0}
                   style={{
-                    padding: '14px 10px',
-                    borderRadius: '12px',
+                    minWidth: 0,
+                    padding: '9px 8px',
+                    borderRadius: '8px',
                     background: cart.length === 0 
-                      ? 'rgba(255,255,255,0.08)' 
-                      : (paymentMode === 'DEBT' ? '#ef4444' : (paymentMode === 'SPLIT' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)')),
-                    color: cart.length === 0 ? '#64748b' : 'white',
+                      ? 'var(--bg-tertiary)' 
+                      : (paymentMode === 'DEBT' ? 'var(--danger-color)' : (paymentMode === 'SPLIT' ? 'var(--warning-color)' : 'var(--success-color)')),
+                    color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
                     border: 'none',
-                    fontWeight: 'bold',
-                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    fontSize: '0.86rem',
                     cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: cart.length === 0 
-                      ? 'none' 
-                      : (paymentMode === 'DEBT' ? '0 4px 12px rgba(239,68,68,0.3)' : (paymentMode === 'SPLIT' ? '0 4px 12px rgba(245,158,11,0.3)' : '0 4px 12px rgba(16,185,129,0.3)'))
+                    gap: '5px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <Printer size={18} />
-                  {isCheckingOut ? '...' : 'پارەدان و چاپ (F9)'}
+                  <Printer size={15} style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {isCheckingOut ? '...' : 'پارەدان و چاپ (F9)'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -1538,7 +2183,7 @@ const Cashier = () => {
           <div className="receipt-divider"></div>
 
           {printedReceipt.promotionalSavings > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#7c3aed' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#d97706', fontWeight: 'bold' }}>
               <span>پاشەکەوتی ئۆفەرەکان:</span>
               <span>-{printedReceipt.promotionalSavings.toLocaleString()} دینار</span>
             </div>
@@ -1596,90 +2241,122 @@ const Cashier = () => {
 
       {/* Quick Custom Item Modal (F2) */}
       {isQuickItemModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease' }}>
+        <div className="pos-modal-overlay" onClick={() => setIsQuickItemModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.25rem' }}>
-                <Zap color="#f59e0b" /> فرۆشتنی کاڵای دەستی / خێرا (F2)
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <Zap color="#f59e0b" size={22} /> فرۆشتنی کاڵای دەستی / خێرا (F2)
               </h2>
-              <button onClick={() => setIsQuickItemModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={22}/>
+              <button onClick={() => setIsQuickItemModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16}/>
               </button>
             </div>
 
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
               بۆ ئەو کاڵایانەی بێ بارکۆدن یان لە سیستەم تۆمار نەکراون، نرخ بنووسە و ڕاستەوخۆ بیخەرە ناو عەرەبانە.
             </p>
 
-            <form onSubmit={handleAddQuickCustomItem} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <form onSubmit={handleAddQuickCustomItem} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>ناوی کاڵا (ئارەزوومەندانە)</label>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>ناوی کاڵا (ئارەزوومەندانە)</label>
                 <input 
                   type="text" 
                   placeholder="کاڵای دەستی / گشتی..."
                   value={quickItemName}
                   onChange={(e) => setQuickItemName(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#10b981', fontWeight: 'bold' }}>
-                  نرخی فرۆشتن (دینار) <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--success-color)', fontWeight: 700, fontSize: '0.84rem' }}>
+                  نرخی فرۆشتن (دینار) <span style={{ color: 'var(--danger-color)' }}>*</span>
                 </label>
-                <input 
-                  type="number" 
-                  required
-                  autoFocus
-                  placeholder="بۆ نموونە: ٢٥٠٠"
-                  value={quickItemPrice}
-                  onChange={(e) => setQuickItemPrice(e.target.value)}
-                  style={{ width: '100%', padding: '14px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 'bold', fontSize: '1.2rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>بڕ (دانە)</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(quickItemPrice) || 0);
+                      const next = Math.max(0, cur - 250);
+                      setQuickItemPrice(next === 0 ? '' : String(next));
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    -٢٥٠
+                  </button>
                   <input 
                     type="number" 
-                    min="1"
-                    value={quickItemQty}
-                    onChange={(e) => setQuickItemQty(e.target.value)}
-                    style={{ width: '80px', padding: '10px', borderRadius: '8px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold', textAlign: 'center' }}
+                    step="250"
+                    min="0"
+                    required
+                    autoFocus
+                    placeholder="بۆ نموونە: ٢٥٠٠"
+                    value={quickItemPrice}
+                    onChange={(e) => setQuickItemPrice(e.target.value)}
+                    style={{ flex: '1 1 120px', minWidth: '110px', padding: '10px 12px', borderRadius: '10px', background: 'var(--success-light)', border: '1.5px solid rgba(16, 185, 129, 0.4)', color: 'var(--success-color)', fontWeight: 800, fontSize: '1.15rem', textAlign: 'center', boxSizing: 'border-box' }}
                   />
-                  {[1, 2, 3, 5, 10].map(cnt => (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(quickItemPrice) || 0);
+                      setQuickItemPrice(String(cur + 250));
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
+                {/* Fast Dinar Presets */}
+                <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {[250, 500, 1000, 2000, 3000, 5000].map(amt => (
                     <button
-                      key={cnt}
+                      key={amt}
                       type="button"
-                      onClick={() => setQuickItemQty(cnt.toString())}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        background: quickItemQty === cnt.toString() ? '#38bdf8' : 'rgba(255,255,255,0.05)',
-                        color: quickItemQty === cnt.toString() ? '#0f172a' : '#94a3b8',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
+                      onClick={() => setQuickItemPrice(String(amt))}
+                      style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
                     >
-                      {cnt}
+                      {amt.toLocaleString()}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
-                <button 
-                  type="submit" 
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: '#10b981', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1.05rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)' }}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>بڕ (دانە)</label>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={quickItemQty}
+                    onChange={(e) => setQuickItemQty(e.target.value)}
+                    style={{ width: '70px', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }}
+                  />
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', flex: 1 }}>
+                    {[1, 2, 3, 5, 10].map(cnt => (
+                      <button
+                        key={cnt}
+                        type="button"
+                        onClick={() => setQuickItemQty(String(cnt))}
+                        style={{ padding: '6px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {cnt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="submit"
+                  style={{ flex: 1, minWidth: '130px', padding: '12px', borderRadius: '10px', background: 'var(--success-color)', color: '#fff', border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}
                 >
-                  خستنە ناو سەبەتە 🛒
+                  زیادکردن بۆ سەبەتە
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsQuickItemModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                  style={{ padding: '12px 18px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 700, cursor: 'pointer' }}
                 >
                   داخستن
                 </button>
@@ -1691,30 +2368,30 @@ const Cashier = () => {
 
       {/* Scale / Weighted Item Modal (F3) */}
       {isScaleModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease' }}>
+        <div className="pos-modal-overlay" onClick={() => setIsScaleModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.25rem' }}>
-                <Scale color="#8b5cf6" /> تەرازوو و سەوزە و میوە بە کێش (F3)
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <Scale color="#0284c7" size={22} /> تەرازوو و فرۆشتنی بە کێش (F3)
               </h2>
-              <button onClick={() => setIsScaleModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={22}/>
+              <button onClick={() => setIsScaleModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16}/>
               </button>
             </div>
 
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.6' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
               دیاریکردنی نرخی کیلۆ و کێش (بە کیلۆگرام یان گرام) بۆ ئەژمارکردنی خێرای سەوزە و میوە.
             </p>
 
-            <form onSubmit={handleAddScaleItem} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <form onSubmit={handleAddScaleItem} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               {/* Optional: Pick from existing products */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>هەڵبژاردن لە کاڵاکان (ئارەزوومەندانە):</label>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>هەڵبژاردن لە کاڵاکان (ئارەزوومەندانە):</label>
                 <select 
                   value={scaleSelectedProductId}
                   onChange={(e) => handleSelectProductForScale(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem' }}
                 >
                   <option value="">یان بە دەستی بنووسە...</option>
                   {products.map(p => (
@@ -1726,34 +2403,59 @@ const Cashier = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#94a3b8' }}>ناوی کاڵا / سەوزە / میوە <span style={{ color: '#ef4444' }}>*</span></label>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>ناوی کاڵا / سەوزە / میوە <span style={{ color: 'var(--danger-color)' }}>*</span></label>
                 <input 
                   type="text" 
                   required
                   placeholder="بۆ نموونە: تەماتە، خەیار، پەتاتە..."
                   value={scaleItemName}
                   onChange={(e) => setScaleItemName(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#10b981', fontWeight: 'bold' }}>
-                  نرخی یەک کیلۆ (دینار) <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--success-color)', fontWeight: 700, fontSize: '0.84rem' }}>
+                  نرخی یەک کیلۆ (دینار) <span style={{ color: 'var(--danger-color)' }}>*</span>
                 </label>
-                <input 
-                  type="number" 
-                  required
-                  placeholder="بۆ نموونە: ١٠٠٠"
-                  value={scalePricePerKg}
-                  onChange={(e) => setScalePricePerKg(e.target.value)}
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}
-                />
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(scalePricePerKg) || 0);
+                      const next = Math.max(0, cur - 250);
+                      setScalePricePerKg(next === 0 ? '' : String(next));
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    -٢٥٠
+                  </button>
+                  <input 
+                    type="number" 
+                    step="250"
+                    min="0"
+                    required
+                    placeholder="بۆ نموونە: ١٠٠٠"
+                    value={scalePricePerKg}
+                    onChange={(e) => setScalePricePerKg(e.target.value)}
+                    style={{ flex: '1 1 120px', minWidth: '110px', padding: '10px 12px', borderRadius: '10px', background: 'var(--success-light)', border: '1.5px solid rgba(16, 185, 129, 0.4)', color: 'var(--success-color)', fontWeight: 800, fontSize: '1.15rem', textAlign: 'center', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(scalePricePerKg) || 0);
+                      setScalePricePerKg(String(cur + 250));
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#c084fc', fontWeight: 'bold' }}>
-                  کێش (بە کیلۆگرام - کگم) <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: '#0284c7', fontWeight: 700, fontSize: '0.84rem' }}>
+                  کێش (بە کیلۆگرام - کگم) <span style={{ color: 'var(--danger-color)' }}>*</span>
                 </label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input 
@@ -1763,15 +2465,15 @@ const Cashier = () => {
                     required
                     value={scaleWeight}
                     onChange={(e) => setScaleWeight(e.target.value)}
-                    style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c084fc', fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center' }}
+                    style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', background: 'rgba(2, 132, 199, 0.08)', border: '1.5px solid rgba(2, 132, 199, 0.4)', color: '#0284c7', fontWeight: 800, fontSize: '1.15rem', textAlign: 'center', boxSizing: 'border-box' }}
                   />
-                  <span style={{ color: '#94a3b8', fontWeight: 'bold' }}>کگم</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 800, flexShrink: 0 }}>کگم</span>
                 </div>
 
                 {/* Quick Weight Presets */}
-                <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '5px', marginTop: '8px', flexWrap: 'wrap' }}>
                   {[
-                    { label: '٢٥٠ گرام (چارەکە)', val: '0.250' },
+                    { label: '٢٥٠ گرام', val: '0.250' },
                     { label: '٥٠٠ گرام (نیو کگم)', val: '0.500' },
                     { label: '٧٥٠ گرام', val: '0.750' },
                     { label: '١ کگم', val: '1.000' },
@@ -1785,11 +2487,11 @@ const Cashier = () => {
                       style={{
                         padding: '6px 10px',
                         borderRadius: '8px',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        background: scaleWeight === w.val ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
-                        color: scaleWeight === w.val ? 'white' : '#94a3b8',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
+                        border: scaleWeight === w.val ? '1px solid #0284c7' : '1px solid var(--border-color)',
+                        background: scaleWeight === w.val ? '#0284c7' : 'var(--bg-tertiary)',
+                        color: scaleWeight === w.val ? '#ffffff' : 'var(--text-secondary)',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
                         cursor: 'pointer'
                       }}
                     >
@@ -1801,9 +2503,9 @@ const Cashier = () => {
 
               {/* Live Price Calculator Preview */}
               {scalePricePerKg && scaleWeight && (
-                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px', padding: '12px', textAlign: 'center' }}>
-                  <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>کۆی پارەی کێشەکە: </span>
-                  <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.3rem' }}>
+                <div style={{ background: 'var(--success-light)', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>کۆی پارەی کێشەکە: </span>
+                  <span style={{ color: 'var(--success-color)', fontWeight: 900, fontSize: '1.25rem' }}>
                     {Math.round((parseFloat(scalePricePerKg) || 0) * (parseFloat(scaleWeight) || 0)).toLocaleString()} دینار
                   </span>
                 </div>
@@ -1812,14 +2514,218 @@ const Cashier = () => {
               <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white', border: 'none', fontWeight: 'bold', fontSize: '1.05rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)' }}
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', fontWeight: 800, fontSize: '0.96rem', cursor: 'pointer' }}
                 >
-                  خستنە ناو سەبەتە ⚖️
+                  خستنە ناو سەبەتە
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsScaleModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                  className="btn-secondary"
+                  style={{ padding: '12px 18px', borderRadius: '12px', fontWeight: 700 }}
+                >
+                  داخستن
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Add Customer Modal */}
+      {isQuickCustomerModalOpen && (
+        <div className="pos-modal-overlay" onClick={() => setIsQuickCustomerModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
+                <User color="var(--primary-color)" size={22} /> زیادکردنی خێرای کڕیار
+              </h2>
+              <button onClick={() => setIsQuickCustomerModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16}/>
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+              بۆ ئەوەی کڕیار بە قەرز بکڕێت بێ ئەوەی لە کاشێر بچیتە دەرەوە، ناوی کڕیار بنووسە.
+            </p>
+
+            <form onSubmit={handleSaveQuickCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>
+                  ناوی کڕیار <span style={{ color: 'var(--danger-color)' }}>*</span>
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  autoFocus
+                  placeholder="ناوی تەواوی کڕیار..."
+                  value={quickCustomerName}
+                  onChange={(e) => setQuickCustomerName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>
+                  ژمارەی مۆبایل (ئارەزوومەندانە)
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="0750 000 0000"
+                  value={quickCustomerPhone}
+                  onChange={(e) => setQuickCustomerPhone(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box', outline: 'none', direction: 'ltr', textAlign: 'right' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>
+                  قەرزی سەرەتایی (دینار)
+                </label>
+                <input 
+                  type="number" 
+                  step="250"
+                  min="0"
+                  placeholder="0"
+                  value={quickCustomerDebt}
+                  onChange={(e) => setQuickCustomerDebt(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+                <button 
+                  type="submit" 
+                  disabled={isSavingCustomer}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.96rem', cursor: isSavingCustomer ? 'not-allowed' : 'pointer' }}
+                >
+                  {isSavingCustomer ? 'خەریکە پاشەکەوت دەکرێت...' : 'زیادکردن و دیاریکردن'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsQuickCustomerModalOpen(false)}
+                  className="btn-secondary"
+                  style={{ padding: '12px 18px', borderRadius: '12px', fontWeight: 700 }}
+                >
+                  داخستن
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Fast Uncatalogued Barcode Price Entry Modal */}
+      {isUncataloguedModalOpen && (
+        <div className="pos-modal-overlay" onClick={() => setIsUncataloguedModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: '#b45309', fontWeight: 800 }}>
+                <AlertCircle color="#d97706" size={22} /> بارکۆدی تۆمارنەکراو
+              </h2>
+              <button onClick={() => setIsUncataloguedModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16}/>
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+              ئەم بارکۆدە <strong style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{uncataloguedBarcode}</strong> پێشتر تۆمار نەکراوە. تەنها نرخ دیاریبکە بۆ فرۆشتنی دەستبەجێ!
+            </p>
+
+            <form onSubmit={handleAddUncataloguedItem} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.84rem' }}>
+                  ناوی کاڵا
+                </label>
+                <input 
+                  type="text" 
+                  value={uncataloguedName}
+                  onChange={(e) => setUncataloguedName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--success-color)', fontWeight: 700, fontSize: '0.84rem' }}>
+                  نرخی فرۆشتن (دینار) <span style={{ color: 'var(--danger-color)' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(uncataloguedPrice) || 0);
+                      const next = Math.max(0, cur - 250);
+                      setUncataloguedPrice(next === 0 ? '' : String(next));
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    -٢٥٠
+                  </button>
+                  <input 
+                    type="number" 
+                    step="250"
+                    min="0"
+                    required
+                    autoFocus
+                    placeholder="بۆ نموونە: ١٠٠٠"
+                    value={uncataloguedPrice}
+                    onChange={(e) => setUncataloguedPrice(e.target.value)}
+                    style={{ flex: '1 1 120px', minWidth: '110px', padding: '10px 12px', borderRadius: '10px', background: 'var(--success-light)', border: '1.5px solid rgba(16, 185, 129, 0.4)', color: 'var(--success-color)', fontWeight: 800, fontSize: '1.15rem', textAlign: 'center', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(uncataloguedPrice) || 0);
+                      setUncataloguedPrice(String(cur + 250));
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
+
+                {/* Quick Dinar Presets */}
+                <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {[250, 500, 750, 1000, 1500, 2000, 2500, 5000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setUncataloguedPrice(String(amt))}
+                      style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <input 
+                  type="checkbox" 
+                  id="saveToProductCatalog"
+                  checked={saveToProductCatalog}
+                  onChange={(e) => setSaveToProductCatalog(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--primary-color)', cursor: 'pointer' }}
+                />
+                <label htmlFor="saveToProductCatalog" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  ئەم کاڵایە لە لیستی بەرهەمەکانیشدا تۆمار بکرێت بۆ جارەکانی داهاتوو
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn-success"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.96rem' }}
+                >
+                  خستنە ناو سەبەتە
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsUncataloguedModalOpen(false)}
+                  className="btn-secondary"
+                  style={{ padding: '12px 18px', borderRadius: '12px', fontWeight: 700 }}
                 >
                   داخستن
                 </button>

@@ -122,7 +122,7 @@ exports.deleteExpense = async (req, res) => {
     if (userRole === 'CASHIER') {
         return res.status(403).json({ 
             status: 'ERROR', 
-            message: 'کاشێر دەسەڵاتی سڕینەوەی مەساریفی نییە. ئەم کردارە تەنها بۆ بەڕێوەبەر (Admin) ڕێپێدراوە.' 
+            message: 'کاشێر دەسەڵاتی سڕینەوەی خەرجی نییە. ئەم کردارە تەنها بۆ بەڕێوەبەر (Admin) ڕێپێدراوە.' 
         });
     }
 

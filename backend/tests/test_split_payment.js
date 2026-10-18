@@ -87,7 +87,7 @@ async function runTest() {
     }
     console.log('✓ فرۆشتنی قەرز بە تەواوی دروست دەرچوو و تۆمار کرا لە دەفتەری قەرز!');
 
-    // 5. Test 3: Split Payment (کۆی وەسڵ: ٥٠،٠٠٠ د.ع، نەقد: ٢٠،٠٠٠ د.ع، قەرز: ٣٠،٠٠٠ د.ع)
+    // 5. Test 3: Split Payment (کۆی پسووڵە: ٥٠،٠٠٠ د.ع، نەقد: ٢٠،٠٠٠ د.ع، قەرز: ٣٠،٠٠٠ د.ع)
     console.log('\n--- تاقیکردنەوەی ٣: فرە-جۆری پارەدان (Split Payment: ٢٠،٠٠٠ نەقد + ٣٠،٠٠٠ قەرز) ---');
     const t3 = mockReqRes({
       items: [{ barcode, quantity: 5, price: 10000, name: 'شەربەتی تاقیکاری' }],

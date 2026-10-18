@@ -15,6 +15,7 @@ import {
   UserCheck,
   AlertCircle
 } from 'lucide-react';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const Owes = () => {
@@ -120,15 +121,17 @@ const Owes = () => {
       const currentDebt = Number(selectedProfile.total_debt) || 0;
       const newDebt = type === 'ADD' ? currentDebt + amountNum : Math.max(0, currentDebt - amountNum);
 
-      // If customer repaid debt, offer receipt voucher
+      // If customer repaid debt, offer receipt voucher and trigger print
       if (type === 'PAY') {
         setPrintVoucher({
           customerName: selectedProfile.name,
           customerPhone: selectedProfile.phone,
           amountPaid: amountNum,
           remainingDebt: newDebt,
+          isStatement: false,
           date: new Date().toLocaleString('en-US', { hour12: true })
         });
+        setTimeout(() => window.print(), 100);
       }
 
       setTransactionAmount('');
@@ -140,10 +143,31 @@ const Owes = () => {
     }
   };
 
+  const handlePrintCustomerDebt = (customer, paidAmount = null) => {
+    if (!customer) return;
+    setPrintVoucher({
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      amountPaid: paidAmount !== null ? paidAmount : 0,
+      remainingDebt: Number(customer.total_debt || 0),
+      isStatement: paidAmount === null,
+      date: new Date().toLocaleString('en-US', { hour12: true })
+    });
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handlePrintVoucher = (voucherData) => {
+    setPrintVoucher(voucherData);
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (c.phone && c.phone.includes(searchTerm))
+      kurdishSearchMatch([c.name, c.phone, c.notes], searchTerm)
     );
   }, [customers, searchTerm]);
 
@@ -204,19 +228,16 @@ const Owes = () => {
     return list;
   }, [selectedProfile, historyFilter, specificDate, historySort]);
 
-  const handlePrintVoucher = (voucher) => {
-    setPrintVoucher(voucher);
-    setTimeout(() => {
-      window.print();
-    }, 100);
-  };
-
   return (
     <div className="dashboard-page p-8" style={{ position: 'relative' }}>
       
       {/* Print Stylesheet for 80mm / 58mm Thermal Repayment Receipt Voucher */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -231,7 +252,7 @@ const Owes = () => {
             background: white !important;
             color: black !important;
             padding: 8px !important;
-            font-family: monospace !important;
+            font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
             font-size: 13px !important;
             line-height: 1.4 !important;
             text-align: right !important;
@@ -255,16 +276,16 @@ const Owes = () => {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-box glass-panel" style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1rem', borderRadius: '12px' }}>
-            <Search size={20} color="#94a3b8" />
+            <Search size={20} color="var(--text-secondary)" />
             <input 
               type="text" 
               placeholder="گەڕان بە ناو یان مۆبایل..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'white', marginRight: '10px', outline: 'none', width: '220px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '10px', outline: 'none', width: '220px' }}
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <X size={16} />
               </button>
             )}
@@ -305,29 +326,29 @@ const Owes = () => {
       {/* Customer List Table */}
       <div className="glass-panel" style={{ padding: '1px', borderRadius: '16px', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <thead style={{ background: 'var(--bg-tertiary)' }}>
             <tr>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ڕیزبەندی</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ناوی کڕیار</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>ژمارەی مۆبایل</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کۆی قەرز (دینار)</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>پەیوەندی خێرا</th>
-              <th style={{ padding: '16px 20px', color: '#94a3b8', fontWeight: 500 }}>کردار</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ڕیزبەندی</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ناوی کڕیار</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ژمارەی مۆبایل</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کۆی قەرز (دینار)</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>پەیوەندی خێرا</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کردار</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>باردەکرێت...</td></tr>
+              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>باردەکرێت...</td></tr>
             ) : filteredCustomers.length === 0 ? (
-              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ کڕیارێک نەدۆزرایەوە</td></tr>
+              <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>هیچ کڕیارێک نەدۆزرایەوە</td></tr>
             ) : (
               filteredCustomers.map((c, index) => {
                 const debt = Number(c.total_debt) || 0;
                 return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding: '16px 20px', color: '#64748b' }}>#{index + 1}</td>
-                    <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{c.name}</td>
-                    <td style={{ padding: '16px 20px', color: '#a78bfa', fontFamily: 'monospace' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
+                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>#{index + 1}</td>
+                    <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{c.name}</td>
+                    <td style={{ padding: '16px 20px', color: 'var(--text-primary)', fontFamily: 'monospace', fontWeight: 600 }}>
                       {c.phone || '-'}
                     </td>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', color: debt > 0 ? '#ef4444' : '#10b981' }}>
@@ -356,16 +377,28 @@ const Owes = () => {
                           )}
                         </div>
                       ) : (
-                        <span style={{ color: '#64748b', fontSize: '0.85rem' }}>بێ ژمارە</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بێ ژمارە</span>
                       )}
                     </td>
-                    <td style={{ padding: '16px 20px' }}>
+                    <td style={{ padding: '16px 20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <button 
                         onClick={() => openProfile(c.id)} 
                         style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '8px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                       >
                         بینینی پڕۆفایل
                       </button>
+                      {debt > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrintCustomerDebt(c);
+                          }}
+                          title="چاپکردنی خێرای پسووڵەی قەرز"
+                          style={{ background: 'var(--primary-color)', color: '#ffffff', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '0.82rem' }}
+                        >
+                          <Printer size={14} /> پسووڵە
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -377,47 +410,57 @@ const Owes = () => {
 
       {/* Add Customer Modal */}
       {isAddCustomerOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', borderRadius: '24px', padding: '2rem', animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="pos-modal-overlay" onClick={() => setIsAddCustomerOpen(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
                 <UserCheck color="#3b82f6" /> زیادکردنی کڕیاری نوێ
               </h2>
-              <button onClick={() => setIsAddCustomerOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={24}/>
+              <button onClick={() => setIsAddCustomerOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18}/>
               </button>
             </div>
             
             <form onSubmit={handleAddCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>ناوی کڕیار <span style={{ color: '#ef4444' }}>*</span></label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ناوی کڕیار <span style={{ color: '#ef4444' }}>*</span></label>
                 <input 
                   type="text" 
                   required 
                   placeholder="ناوی چواری یان ناسراو..."
                   value={newCustomer.name} 
                   onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }} 
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} 
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>ژمارەی مۆبایل</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ژمارەی مۆبایل</label>
                 <input 
                   type="text" 
                   placeholder="0750 xxx xxxx"
                   value={newCustomer.phone} 
                   onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} 
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontFamily: 'monospace' }} 
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontFamily: 'monospace' }} 
                 />
               </div>
 
-              <button 
-                type="submit" 
-                style={{ marginTop: '0.5rem', width: '100%', padding: '15px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}
-              >
-                پاشەکەوتکردنی کڕیار
-              </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                <button 
+                  type="submit" 
+                  style={{ flex: 1, minWidth: '150px', padding: '14px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}
+                >
+                  پاشەکەوتکردنی کڕیار
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddCustomerOpen(false)}
+                  className="btn-secondary"
+                  style={{ padding: '14px 20px' }}
+                >
+                  داخستن
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -428,11 +471,11 @@ const Owes = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', zIndex: 1100, animation: 'fadeIn 0.3s ease', overflowY: 'auto' }}>
           
           {/* Sticky Header */}
-          <div style={{ padding: '1.25rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.95)', position: 'sticky', top: 0, zIndex: 20 }}>
+          <div style={{ padding: '1.25rem 2rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', position: 'sticky', top: 0, zIndex: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <button 
                 onClick={() => setSelectedProfile(null)} 
-                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
+                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
               >
                 <X size={24}/>
               </button>
@@ -440,12 +483,12 @@ const Owes = () => {
             </div>
           </div>
 
-          <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+          <div style={{ padding: 'clamp(1rem, 2.5vw, 2rem)', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
             
             {/* Profile Info Header */}
             <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '2rem', marginBottom: '2rem' }}>
               <div>
-                <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2.4rem', color: '#f8fafc' }}>{selectedProfile.name}</h1>
+                <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2.4rem', color: 'var(--text-primary)' }}>{selectedProfile.name}</h1>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
                   {selectedProfile.phone ? (
                     <>
@@ -465,46 +508,123 @@ const Owes = () => {
                           <MessageCircle size={18} /> ناردنی ئاگاداری قەرز بە WhatsApp
                         </a>
                       )}
+                      <button 
+                        type="button"
+                        onClick={() => handlePrintCustomerDebt(selectedProfile)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#ffffff', background: 'var(--primary-color)', padding: '8px 16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', border: 'none' }}
+                        title="چاپکردنی پسووڵەی قەرز بۆ کڕیار"
+                      >
+                        <Printer size={18} /> چاپکردنی پسووڵەی قەرز
+                      </button>
                     </>
                   ) : (
-                    <span style={{ color: '#64748b' }}>ژمارەی مۆبایل تۆمار نەکراوە</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>ژمارەی مۆبایل تۆمار نەکراوە</span>
                   )}
                 </div>
               </div>
 
               <div style={{ textAlign: 'center', padding: '1.5rem 2.5rem', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '20px', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-                <p style={{ margin: '0 0 0.5rem 0', color: '#94a3b8', fontSize: '1rem' }}>کۆی قەرزی ماوەی کڕیار</p>
+                <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)', fontSize: '1rem' }}>کۆی قەرزی ماوەی کڕیار</p>
                 <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#ef4444' }}>
                   {Number(selectedProfile.total_debt).toLocaleString()} دینار
                 </div>
               </div>
             </div>
 
-            {/* Quick Add / Deduct Transaction Actions */}
+            {/* Quick Add / Deduct Transaction Actions with 250 IQD Stepper & Currency Pills */}
             <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', marginBottom: '2rem' }}>
-              <h3 style={{ margin: '0 0 1.25rem 0' }}>تۆمارکردنی مامەڵەی نوێ (زیادکردن یان کەمکردنەوەی قەرز)</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+                <h3 style={{ margin: 0 }}>تۆمارکردنی مامەڵەی نوێ (زیادکردن یان کەمکردنەوەی قەرز)</h3>
+                {Number(selectedProfile?.total_debt) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTransactionAmount(String(selectedProfile.total_debt))}
+                    style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
+                  >
+                    تەواوی قەرزەکە: {Number(selectedProfile.total_debt).toLocaleString()} دینار
+                  </button>
+                )}
+              </div>
+
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ flex: '1', minWidth: '260px' }}>
-                  <input 
-                    type="number" 
-                    placeholder="بڕی پارە بە دیناری عێراقی..." 
-                    value={transactionAmount}
-                    onChange={e => setTransactionAmount(e.target.value)}
-                    style={{ width: '100%', padding: '16px', fontSize: '1.2rem', borderRadius: '12px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontWeight: 'bold' }} 
-                  />
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = Math.max(0, parseInt(transactionAmount) || 0);
+                        const nextVal = Math.max(0, current - 250);
+                        setTransactionAmount(nextVal === 0 ? '' : String(nextVal));
+                      }}
+                      title="کەمکردنەوە بە ٢٥٠ دینار"
+                      style={{ width: '48px', height: '52px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      -٢٥٠
+                    </button>
+
+                    <input 
+                      type="number" 
+                      step="250"
+                      min="0"
+                      placeholder="بڕی پارە بە دیناری عێراقی..." 
+                      value={transactionAmount}
+                      onChange={e => setTransactionAmount(e.target.value)}
+                      style={{ flex: 1, padding: '14px', fontSize: '1.25rem', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', textAlign: 'center', outline: 'none' }} 
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = Math.max(0, parseInt(transactionAmount) || 0);
+                        const nextVal = current + 250;
+                        setTransactionAmount(String(nextVal));
+                      }}
+                      title="زیادکردن بە ٢٥٠ دینار"
+                      style={{ width: '48px', height: '52px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      +٢٥٠
+                    </button>
+                  </div>
+
+                  {/* Currency Denominations Pills */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTransactionAmount('')}
+                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.35)', background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      0 ✕
+                    </button>
+                    {[250, 500, 1000, 5000, 10000, 25000, 50000].map(amt => (
+                      <button
+                        type="button"
+                        key={amt}
+                        onClick={() => {
+                          const current = Math.max(0, parseInt(transactionAmount) || 0);
+                          setTransactionAmount(String(current + amt));
+                        }}
+                        style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        +{amt.toLocaleString()}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <button 
-                  onClick={() => handleTransaction('ADD')} 
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 28px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.05rem' }}
-                >
-                  <ArrowUpCircle size={22} /> زیادکردنی قەرز (+)
-                </button>
-                <button 
-                  onClick={() => handleTransaction('PAY')} 
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 28px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.05rem' }}
-                >
-                  <ArrowDownCircle size={22} /> وەرگرتنی قەرز / پارەدان (-)
-                </button>
+
+                <div style={{ display: 'flex', gap: '10px', alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+                  <button 
+                    onClick={() => handleTransaction('ADD')} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 24px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
+                  >
+                    <ArrowUpCircle size={20} /> زیادکردنی قەرز (+)
+                  </button>
+                  <button 
+                    onClick={() => handleTransaction('PAY')} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 24px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
+                  >
+                    <ArrowDownCircle size={20} /> وەرگرتنی قەرز (-)
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -513,13 +633,13 @@ const Owes = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <h3 style={{ margin: 0 }}>مێژووی تەواوی مامەڵەکانی قەرز</h3>
-                  <small style={{ color: '#94a3b8' }}>بینین و فلتەرکردنی هەموو گۆڕانکارییەکانی قەرز</small>
+                  <small style={{ color: 'var(--text-secondary)' }}>بینین و فلتەرکردنی هەموو گۆڕانکارییەکانی قەرز</small>
                 </div>
                 
                 {/* Sort Toggle Button */}
                 <button
                   onClick={() => setHistorySort(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: '#a78bfa', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontWeight: 'bold' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 'bold' }}
                 >
                   <ArrowUpDown size={16} />
                   {historySort === 'DESC' ? 'نوێترین بەرەو کۆنترین' : 'کۆنترین بەرەو نوێترین'}
@@ -527,7 +647,7 @@ const Owes = () => {
               </div>
 
               {/* Interactive Visual Date Filter Buttons */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.5rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', padding: '10px', borderRadius: '14px' }}>
                 {[
                   { id: 'ALL', label: 'هەموو کات' },
                   { id: 'TODAY', label: 'ئەمڕۆ' },
@@ -542,11 +662,11 @@ const Owes = () => {
                     style={{
                       padding: '8px 16px',
                       borderRadius: '8px',
-                      border: 'none',
+                      border: '1px solid ' + (historyFilter === tab.id ? 'transparent' : 'var(--border-color)'),
                       cursor: 'pointer',
                       fontWeight: historyFilter === tab.id ? 'bold' : 'normal',
-                      background: historyFilter === tab.id ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                      color: historyFilter === tab.id ? '#ffffff' : '#94a3b8',
+                      background: historyFilter === tab.id ? '#3b82f6' : 'var(--bg-secondary)',
+                      color: historyFilter === tab.id ? '#ffffff' : 'var(--text-secondary)',
                       transition: 'all 0.2s'
                     }}
                   >
@@ -555,13 +675,13 @@ const Owes = () => {
                 ))}
 
                 {historyFilter === 'DATE' && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '8px' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '4px 10px', borderRadius: '8px' }}>
                     <CalendarIcon size={16} color="#60a5fa" />
                     <input 
                       type="date" 
                       value={specificDate} 
                       onChange={e => setSpecificDate(e.target.value)} 
-                      style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none' }} 
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none' }} 
                     />
                   </div>
                 )}
@@ -570,20 +690,20 @@ const Owes = () => {
               {/* History Table */}
               <div style={{ padding: '1px', borderRadius: '12px', overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+                  <thead style={{ background: 'var(--bg-tertiary)' }}>
                     <tr>
-                      <th style={{ padding: '16px 20px', color: '#94a3b8' }}>جۆری مامەڵە</th>
-                      <th style={{ padding: '16px 20px', color: '#94a3b8' }}>بڕی پارە (دینار)</th>
-                      <th style={{ padding: '16px 20px', color: '#94a3b8' }}>بەروار و کات</th>
-                      <th style={{ padding: '16px 20px', color: '#94a3b8' }}>وەسڵی وەرگرتن</th>
+                      <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>جۆری مامەڵە</th>
+                      <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>بڕی پارە (دینار)</th>
+                      <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>بەروار و کات</th>
+                      <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>پسووڵەی وەرگرتن</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredHistory.length === 0 ? (
-                      <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ مامەڵەیەک تۆمار نەکراوە بۆ ئەم فلتەرە</td></tr>
+                      <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>هیچ مامەڵەیەک تۆمار نەکراوە بۆ ئەم فلتەرە</td></tr>
                     ) : (
                       filteredHistory.map(h => (
-                        <tr key={h.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <td style={{ padding: '16px 20px' }}>
                             {h.transaction_type === 'ADD' ? (
                               <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(239, 68, 68, 0.1)', padding: '4px 10px', borderRadius: '6px' }}>
@@ -595,7 +715,7 @@ const Owes = () => {
                               </span>
                             )}
                             {h.note && (
-                              <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '4px' }}>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', marginTop: '4px' }}>
                                 📝 {h.note}
                               </div>
                             )}
@@ -603,9 +723,9 @@ const Owes = () => {
                           <td style={{ padding: '16px 20px', fontWeight: 'bold', fontSize: '1.1rem', color: h.transaction_type === 'ADD' ? '#ef4444' : '#10b981' }}>
                             {Number(h.amount).toLocaleString()} دینار
                           </td>
-                          <td style={{ padding: '16px 20px', color: '#94a3b8' }}>
+                          <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                              <Clock size={14} color="#64748b" />
+                              <Clock size={14} color="var(--text-secondary)" />
                               {new Date(h.created_at).toLocaleString('en-US', { hour12: true })}
                             </span>
                           </td>
@@ -619,9 +739,9 @@ const Owes = () => {
                                   remainingDebt: Number(selectedProfile.total_debt),
                                   date: new Date(h.created_at).toLocaleString('en-US', { hour12: true })
                                 })}
-                                style={{ background: 'rgba(167, 139, 250, 0.15)', color: '#c084fc', border: 'none', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
                               >
-                                <Printer size={15} /> چاپی وەسڵ
+                                <Printer size={15} /> چاپی پسووڵە
                               </button>
                             )}
                           </td>
@@ -638,14 +758,51 @@ const Owes = () => {
         </div>
       )}
 
+      {/* Thermal Print Receipt Style */}
+      <style>{`
+        @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          #thermal-voucher-receipt, #thermal-voucher-receipt * {
+            visibility: visible !important;
+          }
+          #thermal-voucher-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            background: white !important;
+            color: black !important;
+            padding: 8px 10px !important;
+            font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
+            font-size: 13px !important;
+            direction: rtl !important;
+            text-align: right !important;
+          }
+          .voucher-divider {
+            border-bottom: 1px dashed #000 !important;
+            margin: 6px 0 !important;
+          }
+        }
+      `}</style>
+
       {/* Hidden Thermal Repayment Receipt Voucher Container (Targeted by @media print) */}
       {printVoucher && (
         <div id="thermal-voucher-receipt">
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{storeName}</div>
           <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>
           <div className="voucher-divider"></div>
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>وەسڵی وەرگرتنی پارەی قەرز</div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '2px' }}>Payment Voucher</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
+            {printVoucher.isStatement ? 'پسووڵەی لێدوانی قەرزی کڕیار' : 'پسووڵەی وەرگرتنی پارەی قەرز'}
+          </div>
+          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '2px' }}>
+            {printVoucher.isStatement ? 'Customer Debt Statement' : 'Payment Voucher'}
+          </div>
           <div className="voucher-divider"></div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -665,18 +822,22 @@ const Owes = () => {
 
           <div className="voucher-divider"></div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', margin: '4px 0' }}>
-            <span>بڕی پارەی دراو:</span>
-            <span>{printVoucher.amountPaid.toLocaleString()} دینار</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-            <span>قەرزی ماوە لە ئێستادا:</span>
+          {!printVoucher.isStatement && printVoucher.amountPaid > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', margin: '4px 0' }}>
+              <span>بڕی پارەی دراو:</span>
+              <span>{printVoucher.amountPaid.toLocaleString()} دینار</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', margin: '4px 0' }}>
+            <span>کۆی قەرزی ماوە:</span>
             <span>{printVoucher.remainingDebt.toLocaleString()} دینار</span>
           </div>
 
           <div className="voucher-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>سوپاس بۆ پاکتاوکردنی باڵانسەکەت</div>
-          <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '4px', color: '#555' }}>سیستەمی زیرەکی مارکێت</div>
+          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>
+            {printVoucher.isStatement ? 'سوپاس بۆ مامەڵەکردنتان لەگەڵمان' : 'سوپاس بۆ پاکتاوکردنی باڵانسەکەت'}
+          </div>
+          <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '4px', color: '#555' }}>سیستەمی خاڵی فرۆشتن</div>
         </div>
       )}
 

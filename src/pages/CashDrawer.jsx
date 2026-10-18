@@ -14,8 +14,10 @@ import {
   X,
   History,
   ShieldCheck,
-  Calendar
+  Calendar,
+  Send
 } from 'lucide-react';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Dashboard.css';
 
 const CashDrawer = () => {
@@ -24,23 +26,38 @@ const CashDrawer = () => {
   const [loading, setLoading] = useState(true);
   const [historySearch, setHistorySearch] = useState('');
 
-  // Open Shift Form Modal
-  const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
-  const [openShiftForm, setOpenShiftForm] = useState({
-    cashier_name: 'کاشێری سەرەکی',
-    opening_cash: ''
-  });
-
-  // Close Shift Form Modal
-  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
-  const [closeShiftForm, setCloseShiftForm] = useState({
-    actual_cash: '',
-    notes: ''
-  });
-
   // Z-Report Print Modal
   const [selectedReportForPrint, setSelectedReportForPrint] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [telegramSending, setTelegramSending] = useState(false);
+
+  const printZReport = () => {
+    if (window.require && selectedReportForPrint) {
+      try {
+        const { ipcRenderer } = window.require('electron');
+        ipcRenderer.send('print-z-report', selectedReportForPrint);
+      } catch (_) {}
+    }
+    window.print();
+  };
+
+  const handleSendTelegramZReport = async () => {
+    if (!selectedReportForPrint) return;
+    setTelegramSending(true);
+    try {
+      const shiftId = selectedReportForPrint.id || 'current';
+      const res = await axios.post(`http://localhost:3001/api/shifts/z-report/${shiftId}/telegram`);
+      if (res.data.status === 'SUCCESS') {
+        alert('ڕاپۆرتی Z بە سەرکەوتوویی بۆ تێلیگرام نێردرا ✅');
+      } else {
+        alert(res.data.message || 'هەڵە لە کاتی ناردن');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'شکستی هێنا');
+    } finally {
+      setTelegramSending(false);
+    }
+  };
 
   const fetchShiftData = async () => {
     try {
@@ -67,69 +84,11 @@ const CashDrawer = () => {
     fetchShiftData();
   }, []);
 
-  const handleOpenShift = async (e) => {
-    e.preventDefault();
-    const openingFloat = Math.max(0, parseInt(openShiftForm.opening_cash) || 0);
-    setIsSubmitting(true);
-    try {
-      const res = await axios.post('http://localhost:3001/api/shifts/open', {
-        cashier_name: openShiftForm.cashier_name.trim() || 'کاشێری سەرەکی',
-        opening_cash: openingFloat
-      });
-      if (res.data.status === 'SUCCESS') {
-        alert('شیفتی نوێ بە سەرکەوتوویی کرایەوە');
-        setIsOpenShiftModalOpen(false);
-        setOpenShiftForm({ cashier_name: 'کاشێری سەرەکی', opening_cash: '' });
-        fetchShiftData();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کردنەوەی شیفت');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCloseShift = async (e) => {
-    e.preventDefault();
-    if (!currentShiftData?.shift?.id) return;
-
-    const actualCashNum = Math.max(0, parseInt(closeShiftForm.actual_cash) || 0);
-    setIsSubmitting(true);
-    try {
-      const res = await axios.post(`http://localhost:3001/api/shifts/close/${currentShiftData.shift.id}`, {
-        actual_cash: actualCashNum,
-        notes: closeShiftForm.notes
-      });
-      if (res.data.status === 'SUCCESS') {
-        alert('شیفت بە سەرکەوتوویی داخرا و ڕاپۆرتی Z-Report دروستکرا');
-        setIsCloseShiftModalOpen(false);
-        setSelectedReportForPrint(res.data.data);
-        setCloseShiftForm({ actual_cash: '', notes: '' });
-        fetchShiftData();
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی داخستنی شیفت');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const printZReport = () => {
-    window.print();
-  };
-
   const currentShift = currentShiftData?.shift;
   const stats = currentShiftData?.stats;
 
-  // Real-time calculation for Close Shift modal
-  const enteredActualCash = parseInt(closeShiftForm.actual_cash) || 0;
-  const currentExpectedCash = stats?.expected_cash || 0;
-  const currentDifference = enteredActualCash - currentExpectedCash;
-
   const filteredHistory = shiftHistory.filter(shift => 
-    shift.cashier_name?.toLowerCase().includes(historySearch.toLowerCase()) ||
-    shift.id?.toString().includes(historySearch) ||
-    (shift.notes && shift.notes.toLowerCase().includes(historySearch.toLowerCase()))
+    kurdishSearchMatch([shift.cashier_name, shift.id, shift.notes], historySearch)
   );
 
   return (
@@ -144,136 +103,157 @@ const CashDrawer = () => {
           <p className="text-secondary">چاودێری ڕاستەوخۆی پارەی ناو قاسە، هاوسەنگی فرۆشتن و دەرکردنی پسووڵەی Z-Report</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
+            type="button"
+            className="btn-secondary"
             onClick={fetchShiftData} 
             disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 18px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.15s ease' }}
           >
             <RefreshCw size={18} className={loading ? 'spin' : ''} />
             نوێکردنەوە
           </button>
 
-          {currentShift ? (
-            <button 
-              onClick={() => setIsCloseShiftModalOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #ef4444, #b91c1c)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)' }}
-            >
-              <Lock size={20} /> داخستنی شیفت (Z-Report)
-            </button>
-          ) : (
-            <button 
-              onClick={() => setIsOpenShiftModalOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)' }}
-            >
-              <Unlock size={20} /> کردنەوەی شیفتی نوێ
-            </button>
-          )}
+          {/* Direct 1-Click Print Day Summary */}
+          <button 
+            type="button"
+            onClick={() => {
+              setSelectedReportForPrint({
+                id: currentShift?.id || 'TODAY',
+                cashier_name: currentShift?.cashier_name || 'کاشێری سەرەکی',
+                opened_at: currentShift?.opened_at || new Date().toISOString(),
+                closed_at: new Date().toISOString(),
+                opening_cash: stats?.opening_cash || 0,
+                cash_sales: stats?.cash_sales || 0,
+                debt_sales: stats?.debt_sales || 0,
+                debt_repaid_cash: stats?.debt_repaid_cash || 0,
+                expenses_paid: stats?.expenses_paid || 0,
+                cash_refunds: stats?.cash_refunds || 0,
+                expected_cash: stats?.expected_cash || 0,
+                actual_cash: stats?.expected_cash || 0,
+                difference: 0
+              });
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)', transition: 'all 0.15s ease' }}
+          >
+            <Printer size={20} /> 🖨️ چاپکردنی ڕاپۆرتی ئەمڕۆ (Print Day)
+          </button>
+
+          {/* 1-Click Close & Reset Day (No modal interrogation) */}
+          <button 
+            type="button"
+            disabled={isSubmitting}
+            onClick={async () => {
+              if (!window.confirm('ئایا دڵنیایت لە داخستنی ڕۆژ و تۆمارکردنی پسووڵەی Z-Report؟')) return;
+              setIsSubmitting(true);
+              try {
+                const shiftId = currentShift?.id || 'TODAY';
+                const res = await axios.post(`http://localhost:3001/api/shifts/close/${shiftId}`, {
+                  actual_cash: stats?.expected_cash || 0,
+                  notes: 'داخستنی خودکاری کۆتایی ڕۆژ'
+                });
+                if (res.data.status === 'SUCCESS') {
+                  setSelectedReportForPrint(res.data.data);
+                  fetchShiftData();
+                }
+              } catch (err) {
+                alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا');
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.15s ease' }}
+          >
+            <Lock size={18} /> داخستنی ڕۆژ و نوێکردنەوە
+          </button>
         </div>
       </div>
 
-      {/* Active Shift Status Section */}
-      {currentShift ? (
-        <div className="glass-panel mb-8" style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.5) 100%)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
-                شیفتی کراوەی ئێستا: #{currentShift.id}
-              </span>
-              <span style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-                کاشێر: <strong style={{ color: 'white' }}>{currentShift.cashier_name}</strong>
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', fontSize: '0.9rem' }}>
-              <Calendar size={16} />
-              دەستپێکردن: {new Date(currentShift.opened_at).toLocaleDateString('ku-IQ')} - {new Date(currentShift.opened_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
-            </div>
+      {/* Active Shift / Day Status Section - Always visible, 0 restrictions */}
+      <div className="glass-panel mb-8" style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.3)', background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, var(--bg-secondary) 100%)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: 'bold', fontSize: '0.9rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+              ڕاپۆرتی دارایی ئەمڕۆ: #{currentShift?.id || 'TODAY'}
+            </span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+              کاشێر: <strong style={{ color: 'var(--text-primary)' }}>{currentShift?.cashier_name || 'کاشێری سەرەکی'}</strong>
+            </span>
           </div>
 
-          {/* 6 Real-time Metrics Grid */}
-          <div className="stats-grid">
-            {/* Opening Float */}
-            <div className="stat-card glass-panel" style={{ background: 'rgba(59, 130, 246, 0.08)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3>سەرمایەی سەرەتا (قاسە)</h3>
-                <Coins size={20} color="#60a5fa" />
-              </div>
-              <div className="value" style={{ color: '#60a5fa' }}>
-                {Number(stats?.opening_cash || 0).toLocaleString()} دینار
-              </div>
-              <div className="sub-text">پارەی پێشوەختەی دانراو لە قاسەدا</div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            <Calendar size={16} />
+            دەستپێکردن: {currentShift?.opened_at ? new Date(currentShift.opened_at).toLocaleDateString('ku-IQ') : new Date().toLocaleDateString('ku-IQ')} - {currentShift?.opened_at ? new Date(currentShift.opened_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' }) : '٠٠:٠٠'}
+          </div>
+        </div>
 
-            {/* Cash Sales */}
-            <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3>فرۆشتنی نەقد (کاش)</h3>
-                <TrendingUp size={20} color="#34d399" />
-              </div>
-              <div className="value" style={{ color: '#34d399' }}>
-                {Number(stats?.cash_sales || 0).toLocaleString()} دینار
-              </div>
-              <div className="sub-text">{stats?.sale_count || 0} پسووڵەی فرۆشراو لەم شیفتەدا</div>
+        {/* 6 Real-time Metrics Grid */}
+        <div className="stats-grid">
+          {/* Opening Float */}
+          <div className="stat-card glass-panel" style={{ background: 'rgba(59, 130, 246, 0.08)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>سەرمایەی سەرەتا (قاسە)</h3>
+              <Coins size={20} color="#60a5fa" />
             </div>
-
-            {/* Debt Sales */}
-            <div className="stat-card glass-panel" style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3>فرۆشتنی قەرز</h3>
-                <CreditCard size={20} color="#fbbf24" />
-              </div>
-              <div className="value" style={{ color: '#fbbf24' }}>
-                {Number(stats?.debt_sales || 0).toLocaleString()} دینار
-              </div>
-              <div className="sub-text">ناچێتە ناو ژماردنی نەقدی قاسە</div>
+            <div className="value" style={{ color: '#60a5fa' }}>
+              {Number(stats?.opening_cash || 0).toLocaleString()} دینار
             </div>
+            <div className="sub-text">پارەی پێشوەختەی دانراو لە قاسەدا</div>
+          </div>
 
-            {/* Expenses Paid */}
-            <div className="stat-card glass-panel" style={{ background: 'rgba(244, 63, 94, 0.08)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3>مەساریف و خەرجی دراو</h3>
-                <Wallet size={20} color="#fb7185" />
-              </div>
-              <div className="value" style={{ color: '#fb7185' }}>
-                {Number(stats?.expenses_paid || 0).toLocaleString()} دینار
-              </div>
-              <div className="sub-text">پارەی دراو لە قاسەوە بۆ خەرجی</div>
+          {/* Cash Sales */}
+          <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>فرۆشتنی نەقد (کاش)</h3>
+              <TrendingUp size={20} color="#34d399" />
             </div>
+            <div className="value" style={{ color: '#34d399' }}>
+              {Number(stats?.cash_sales || 0).toLocaleString()} دینار
+            </div>
+            <div className="sub-text">{stats?.sale_count || 0} پسووڵەی فرۆشراو لەمڕۆدا</div>
+          </div>
 
-            {/* Expected Cash in Drawer */}
-            <div className="stat-card glass-panel" style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15))', borderColor: 'rgba(168, 85, 247, 0.4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '1.15rem', color: '#c084fc', fontWeight: 'bold' }}>کۆی گشتی پێشبینیکراوی ناو قاسە</h3>
-                <ShieldCheck size={28} color="#c084fc" />
-              </div>
-              <div className="value" style={{ color: '#f3e8ff', fontSize: '2.2rem', marginTop: '4px' }}>
-                {Number(stats?.expected_cash || 0).toLocaleString()} دینار
-              </div>
-              <div className="sub-text" style={{ color: '#cbd5e1' }}>
-                هاوکێشە: (سەرمایەی سەرەتا + فرۆشتنی نەقد) - مەساریف و خەرجییەکان
-              </div>
+          {/* Debt Sales */}
+          <div className="stat-card glass-panel" style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>فرۆشتنی قەرز</h3>
+              <CreditCard size={20} color="#fbbf24" />
+            </div>
+            <div className="value" style={{ color: '#fbbf24' }}>
+              {Number(stats?.debt_sales || 0).toLocaleString()} دینار
+            </div>
+            <div className="sub-text">ناچێتە ناو ژماردنی نەقدی قاسە</div>
+          </div>
+
+          {/* Expenses Paid */}
+          <div className="stat-card glass-panel" style={{ background: 'rgba(244, 63, 94, 0.08)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>خەرجی و تێچووی دراو</h3>
+              <Wallet size={20} color="#fb7185" />
+            </div>
+            <div className="value" style={{ color: '#fb7185' }}>
+              {Number(stats?.expenses_paid || 0).toLocaleString()} دینار
+            </div>
+            <div className="sub-text">پارەی دراو لە قاسەوە بۆ خەرجی</div>
+          </div>
+
+          {/* Expected Cash in Drawer */}
+          <div className="stat-card glass-panel" style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(2, 132, 199, 0.15))', borderColor: 'rgba(2, 132, 199, 0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.15rem', color: 'var(--accent-hover)', fontWeight: 'bold' }}>کۆی گشتی پێشبینیکراوی ناو قاسە</h3>
+              <ShieldCheck size={28} color="var(--accent-hover)" />
+            </div>
+            <div className="value" style={{ color: 'var(--text-primary)', fontSize: '2.2rem', marginTop: '4px', fontWeight: 900 }}>
+              {Number(stats?.expected_cash || 0).toLocaleString()} دینار
+            </div>
+            <div className="sub-text" style={{ color: '#cbd5e1' }}>
+              هاوکێشە: سەرمایەی سەرەتا + فرۆشتنی نەقد + قیستی وەرگیراو - خەرجییەکان
             </div>
           </div>
         </div>
-      ) : (
-        <div className="glass-panel mb-8" style={{ padding: '36px', borderRadius: '20px', textAlign: 'center', border: '1px dashed rgba(255, 255, 255, 0.2)' }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <Lock size={32} color="#f87171" />
-          </div>
-          <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>لە ئێستادا هیچ شیفتێکی کراوە بوونی نییە</h2>
-          <p style={{ color: '#94a3b8', maxWidth: '500px', margin: '0 auto 24px' }}>
-            بۆ دەستپێکردنی فرۆشتن و چاودێریکردنی وردی قاسە، تکایە شیفتی نوێ بکەرەوە و سەرمایەی دەستپێک دیاری بکە.
-          </p>
-          <button 
-            onClick={() => setIsOpenShiftModalOpen(true)}
-            style={{ padding: '12px 28px', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
-          >
-            کردنەوەی شیفتی نوێ ئێستا 🚀
-          </button>
-        </div>
-      )}
+      </div>
 
       {/* Shift History Section */}
       <div className="glass-panel" style={{ padding: '24px', borderRadius: '20px' }}>
@@ -288,30 +268,30 @@ const CashDrawer = () => {
             placeholder="گەڕان بەپێی کاشێر، تێبینی یان ژمارەی شیفت..."
             value={historySearch}
             onChange={(e) => setHistorySearch(e.target.value)}
-            style={{ padding: '10px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', width: '320px', outline: 'none' }}
+            style={{ padding: '10px 16px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', width: '320px', outline: 'none' }}
           />
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-            <thead style={{ background: 'rgba(0,0,0,0.2)' }}>
+            <thead style={{ background: 'var(--bg-tertiary)' }}>
               <tr>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>#</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کاشێر</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کاتی کردنەوە</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کاتی داخستن</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>فرۆشتنی نەقد</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>پێشبینیکراو</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>ژمێردراو</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>جیاوازی</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>دۆخ</th>
-                <th style={{ padding: '14px 18px', color: '#94a3b8' }}>کردارەکان</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>#</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>کاشێر</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>کاتی کردنەوە</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>کاتی داخستن</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>فرۆشتنی نەقد</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>پێشبینیکراو</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>ژمێردراو</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>جیاوازی</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>دۆخ</th>
+                <th style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>کردارەکان</th>
               </tr>
             </thead>
             <tbody>
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
                     هیچ شیفتێک لە مێژوودا نەدۆزرایەوە
                   </td>
                 </tr>
@@ -321,13 +301,13 @@ const CashDrawer = () => {
                   const diff = Number(shift.difference) || 0;
 
                   return (
-                    <tr key={shift.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>#{shift.id}</td>
-                      <td style={{ padding: '14px 18px' }}>{shift.cashier_name}</td>
-                      <td style={{ padding: '14px 18px', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                    <tr key={shift.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>#{shift.id}</td>
+                      <td style={{ padding: '14px 18px', color: 'var(--text-primary)' }}>{shift.cashier_name}</td>
+                      <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                         {new Date(shift.opened_at).toLocaleDateString('ku-IQ')} {new Date(shift.opened_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td style={{ padding: '14px 18px', color: '#cbd5e1', fontSize: '0.85rem' }}>
+                      <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                         {shift.closed_at ? (
                           `${new Date(shift.closed_at).toLocaleDateString('ku-IQ')} ${new Date(shift.closed_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}`
                         ) : (
@@ -337,15 +317,15 @@ const CashDrawer = () => {
                       <td style={{ padding: '14px 18px', color: '#34d399', fontWeight: 'bold' }}>
                         {Number(shift.cash_sales || 0).toLocaleString()} د.ع
                       </td>
-                      <td style={{ padding: '14px 18px', color: '#94a3b8' }}>
+                      <td style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>
                         {Number(shift.expected_cash || 0).toLocaleString()} د.ع
                       </td>
-                      <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>
+                      <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                         {isClosed ? `${Number(shift.actual_cash || 0).toLocaleString()} د.ع` : '-'}
                       </td>
                       <td style={{ padding: '14px 18px' }}>
                         {!isClosed ? (
-                          <span style={{ color: '#94a3b8' }}>-</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>-</span>
                         ) : diff === 0 ? (
                           <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
                             <CheckCircle2 size={16} /> تەواو (٠)
@@ -367,7 +347,7 @@ const CashDrawer = () => {
                           fontSize: '0.8rem', 
                           fontWeight: 'bold',
                           background: isClosed ? 'rgba(100, 116, 139, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                          color: isClosed ? '#94a3b8' : '#34d399'
+                          color: isClosed ? 'var(--text-secondary)' : '#34d399'
                         }}>
                           {isClosed ? 'داخراو' : 'کراوە'}
                         </span>
@@ -391,208 +371,18 @@ const CashDrawer = () => {
         </div>
       </div>
 
-      {/* Modal: Open Shift */}
-      {isOpenShiftModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: 0 }}>
-                <Unlock size={24} color="#10b981" /> کردنەوەی شیفتی نوێ
-              </h2>
-              <button onClick={() => setIsOpenShiftModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
 
-            <form onSubmit={handleOpenShift}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>ناوی کاشێر</label>
-                <input 
-                  type="text" 
-                  value={openShiftForm.cashier_name} 
-                  onChange={(e) => setOpenShiftForm({ ...openShiftForm, cashier_name: e.target.value })}
-                  placeholder="ناوی کاشێر"
-                  required
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>سەرمایەی دەستپێکی قاسە (Opening Float بە دینار)</label>
-                <input 
-                  type="number" 
-                  value={openShiftForm.opening_cash} 
-                  onChange={(e) => setOpenShiftForm({ ...openShiftForm, opening_cash: e.target.value })}
-                  placeholder="نموونە: 50000"
-                  min="0"
-                  required
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none', fontSize: '1.1rem', fontWeight: 'bold' }}
-                />
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '6px', display: 'block' }}>
-                  ئەو بڕە پارەیەی کە لە دەستپێکی ڕۆژدا لەناو قاسەکەدایە بۆ ووردە.
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
-                >
-                  {isSubmitting ? 'کەمێک بوەستە...' : 'دەستپێکردنی شیفت 🚀'}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsOpenShiftModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: 'none', cursor: 'pointer' }}
-                >
-                  پاشگەزبوونەوە
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Close Shift & Count Cash */}
-      {isCloseShiftModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: 0, color: '#f87171' }}>
-                <Lock size={24} /> داخستنی شیفت و دەرکردنی Z-Report
-              </h2>
-              <button onClick={() => setIsCloseShiftModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCloseShift}>
-              {/* Financial Breakdown */}
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '14px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                  <span>سەرمایەی سەرەتا:</span>
-                  <span style={{ fontWeight: 'bold' }}>{Number(stats?.opening_cash || 0).toLocaleString()} دینار</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', color: '#34d399' }}>
-                  <span>فرۆشتنی نەقد:</span>
-                  <span style={{ fontWeight: 'bold' }}>+{Number(stats?.cash_sales || 0).toLocaleString()} دینار</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', color: '#fb7185' }}>
-                  <span>مەساریف و خەرجی دراو:</span>
-                  <span style={{ fontWeight: 'bold' }}>-{Number(stats?.expenses_paid || 0).toLocaleString()} دینار</span>
-                </div>
-                <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '10px 0' }}></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: 'bold', color: '#c084fc' }}>
-                  <span>کۆی پێشبینیکراوی قاسە:</span>
-                  <span>{Number(stats?.expected_cash || 0).toLocaleString()} دینار</span>
-                </div>
-              </div>
-
-              {/* Input for Actual Counted Cash */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                  بڕی پارەی ژمێردراوی ڕاستەقینە لە قاسەدا (دینار) *
-                </label>
-                <input 
-                  type="number" 
-                  value={closeShiftForm.actual_cash} 
-                  onChange={(e) => setCloseShiftForm({ ...closeShiftForm, actual_cash: e.target.value })}
-                  placeholder="پارەی ناو قاسە بژمێرە و بڕەکەی بنووسە"
-                  min="0"
-                  required
-                  autoFocus
-                  style={{ width: '100%', padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(99, 102, 241, 0.4)', color: 'white', outline: 'none', fontSize: '1.25rem', fontWeight: 'bold', textAlign: 'center' }}
-                />
-              </div>
-
-              {/* Live Discrepancy Indicator */}
-              {closeShiftForm.actual_cash !== '' && (
-                <div style={{ 
-                  padding: '12px 16px', 
-                  borderRadius: '12px', 
-                  marginBottom: '20px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '10px',
-                  background: currentDifference === 0 
-                    ? 'rgba(16, 185, 129, 0.15)' 
-                    : currentDifference > 0 
-                      ? 'rgba(59, 130, 246, 0.15)' 
-                      : 'rgba(239, 68, 68, 0.15)',
-                  border: `1px solid ${currentDifference === 0 ? '#10b981' : currentDifference > 0 ? '#3b82f6' : '#ef4444'}`
-                }}>
-                  {currentDifference === 0 ? (
-                    <>
-                      <CheckCircle2 size={24} color="#10b981" />
-                      <div>
-                        <strong style={{ color: '#10b981', display: 'block' }}>هاوسەنگی تەواوە (بێ جیاوازی)</strong>
-                        <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>پارەی ناو قاسە ڕێک هاوتایە لەگەڵ فرۆشتن و خەرجی.</span>
-                      </div>
-                    </>
-                  ) : currentDifference > 0 ? (
-                    <>
-                      <AlertCircle size={24} color="#3b82f6" />
-                      <div>
-                        <strong style={{ color: '#60a5fa', display: 'block' }}>زیادە لە قاسەدا: +{currentDifference.toLocaleString()} دینار</strong>
-                        <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>پارەی ژمێردراو زیاترە لە بڕی پێشبینیکراو.</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle size={24} color="#ef4444" />
-                      <div>
-                        <strong style={{ color: '#f87171', display: 'block' }}>کورتهێنان لە قاسەدا: {currentDifference.toLocaleString()} دینار</strong>
-                        <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>پارەی ژمێردراو کەمترە لە بڕی پێشبینیکراو.</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Notes */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#cbd5e1', fontSize: '0.9rem' }}>تێبینی و هۆکاری جیاوازی (ئەگەر هەبێت)</label>
-                <textarea 
-                  value={closeShiftForm.notes} 
-                  onChange={(e) => setCloseShiftForm({ ...closeShiftForm, notes: e.target.value })}
-                  placeholder="تێبینی دەربارەی شیفت یان جیاوازی پارە..."
-                  rows="2"
-                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none', resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, #ef4444, #b91c1c)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
-                >
-                  {isSubmitting ? 'کەمێک بوەستە...' : 'پشتڕاستکردنەوە و داخستنی شیفت 🔒'}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsCloseShiftModalOpen(false)}
-                  style={{ padding: '14px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: 'none', cursor: 'pointer' }}
-                >
-                  پاشگەزبوونەوە
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal: View & Print Z-Report */}
       {selectedReportForPrint && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)' }}>
+        <div className="pos-modal-overlay" onClick={() => setSelectedReportForPrint(null)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', margin: 0, color: '#38bdf8' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', margin: 0, color: '#38bdf8', fontWeight: 800 }}>
                 <Printer size={20} /> ڕاپۆرتی داخستنی ڕۆژ (Z-Report)
               </h2>
-              <button onClick={() => setSelectedReportForPrint(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
+              <button onClick={() => setSelectedReportForPrint(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
@@ -624,7 +414,7 @@ const CashDrawer = () => {
                   <span>{Number(selectedReportForPrint.debt_sales || 0).toLocaleString()} دینار</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>خەرجی و مەساریف:</span>
+                  <span>خەرجی و تێچووەکان:</span>
                   <span>-{Number(selectedReportForPrint.expenses_paid || 0).toLocaleString()} دینار</span>
                 </div>
               </div>
@@ -673,16 +463,24 @@ const CashDrawer = () => {
             </div>
 
             {/* Print Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
               <button 
                 onClick={printZReport}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                style={{ flex: 1, minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 <Printer size={18} /> چاپکردنی Z-Report
               </button>
               <button 
+                onClick={handleSendTelegramZReport}
+                disabled={telegramSending}
+                style={{ flex: 1, minWidth: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: 'white', border: 'none', cursor: telegramSending ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
+              >
+                <Send size={18} /> {telegramSending ? 'دەستپێکردنی ناردن...' : '📱 ناردن بۆ تێلیگرام'}
+              </button>
+              <button 
                 onClick={() => setSelectedReportForPrint(null)}
-                style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: 'none', cursor: 'pointer' }}
+                className="btn-secondary"
+                style={{ padding: '12px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 داخستن
               </button>
@@ -694,22 +492,29 @@ const CashDrawer = () => {
       {/* Global Thermal Print CSS for Z-Report */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           #z-report-printable-area, #z-report-printable-area * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #z-report-printable-area {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 80mm;
-            margin: 0;
-            padding: 10px;
-            font-size: 12px;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+            font-size: 12px !important;
             color: #000 !important;
             background: #fff !important;
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
           }
         }
       `}</style>

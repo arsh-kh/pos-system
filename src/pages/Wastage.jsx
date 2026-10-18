@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { 
   PackageX, 
   Search, 
@@ -23,7 +24,7 @@ const REASON_OPTIONS = [
   { value: 'EXPIRED', label: 'بەسەردەچوون (بەروار بەسەرچوو)', color: '#ef4444', icon: '⏳' },
   { value: 'BROKEN', label: 'شکان و لەدەستچوون', color: '#f97316', icon: '💥' },
   { value: 'DAMAGED', label: 'تێکچوو / کەم و کوڕی', color: '#eab308', icon: '⚠️' },
-  { value: 'THEFT_OR_LOST', label: 'ونبوون یان دزراو', color: '#a855f7', icon: '🔍' },
+  { value: 'THEFT_OR_LOST', label: 'ونبوون یان دزراو', color: '#0284c7', icon: '🔍' },
   { value: 'OTHER', label: 'هۆکاری تر', color: '#64748b', icon: '📝' }
 ];
 
@@ -92,23 +93,16 @@ const Wastage = () => {
   // Handle live search in history table
   const filteredHistory = useMemo(() => {
     if (!searchQuery.trim()) return damagesList;
-    const q = searchQuery.toLowerCase();
     return damagesList.filter(d => 
-      d.product_name?.toLowerCase().includes(q) ||
-      d.barcode?.toLowerCase().includes(q) ||
-      d.notes?.toLowerCase().includes(q) ||
-      d.reason_label?.toLowerCase().includes(q)
+      kurdishSearchMatch([d.product_name, d.barcode, d.notes, d.reason_label], searchQuery)
     );
   }, [damagesList, searchQuery]);
 
   // Autocomplete products for recording
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return [];
-    const q = productSearch.toLowerCase();
     return products.filter(p => 
-      p.name?.toLowerCase().includes(q) ||
-      p.barcode?.toLowerCase().includes(q) ||
-      p.box_barcode?.toLowerCase().includes(q)
+      kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch)
     ).slice(0, 10);
   }, [products, productSearch]);
 
@@ -269,101 +263,101 @@ const Wastage = () => {
   };
 
   return (
-    <div className="dashboard-page p-8" dir="rtl">
+    <div className="dashboard-page" style={{ padding: '12px 18px' }} dir="rtl">
       {/* Header */}
-      <div className="page-header mb-8" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0 0 6px 0', color: '#f87171' }}>
-            <PackageX size={34} color="#ef4444" />
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 2px 0', color: '#f87171', fontSize: '1.25rem', fontWeight: 800 }}>
+            <PackageX size={22} color="#ef4444" />
             تۆمارکردنی زیان و فەوتانی کاڵا (Wastage & Damage)
           </h1>
-          <p className="text-secondary" style={{ margin: 0, fontSize: '0.95rem' }}>
-            تۆمارکردنی کاڵای بەسەرچوو، شکاو و تێکچوو بۆ دەرکردن لە مەخزەن و دیاریکردنی زەرەری دارایی بۆ پاراستنی قازانجی ڕاستەقینە
+          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            تۆمارکردنی کاڵای بەسەرچوو، شکاو و تێکچوو بۆ دەرکردن لە مەخزەن و دیاریکردنی زەرەری دارایی
           </p>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="stats-grid mb-8">
+      {/* KPI Stats Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', marginBottom: '10px' }}>
         {/* This Month Loss */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>کۆی زەرەری ئەم مانگە</h3>
-            <Flame size={22} color="#ef4444" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>کۆی زەرەری ئەم مانگە</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ef4444' }}>
+              {Number(stats.this_month?.this_month_loss || 0).toLocaleString()} د.ع <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>({stats.this_month?.this_month_records || 0})</span>
+            </div>
           </div>
-          <div className="value highlight" style={{ color: '#f87171' }}>
-            {Number(stats.this_month?.this_month_loss || 0).toLocaleString()} دینار
-          </div>
-          <div className="sub-text" style={{ color: '#fca5a5' }}>
-            لە {stats.this_month?.this_month_records || 0} تۆماری جیاواز
-          </div>
+          <Flame size={20} color="#ef4444" />
         </div>
 
         {/* This Month Units */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>کاڵای فەوتاوی ئەم مانگە</h3>
-            <TrendingDown size={22} color="#f59e0b" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>کاڵای فەوتاوی ئەم مانگە</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--warning-color)' }}>
+              {Number(stats.this_month?.this_month_units || 0).toLocaleString()} دانە
+            </div>
           </div>
-          <div className="value" style={{ color: '#fbbf24' }}>
-            {Number(stats.this_month?.this_month_units || 0).toLocaleString()} دانە
-          </div>
-          <div className="sub-text" style={{ color: '#fde68a' }}>
-            کۆی گشتی ئەو دانانەی لە مەخزەن دەرچوون
-          </div>
+          <TrendingDown size={20} color="var(--warning-color)" />
         </div>
 
         {/* Today Loss */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(56, 189, 248, 0.08)', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>زەرەری تۆمارکراوی ئەمڕۆ</h3>
-            <Calendar size={22} color="#38bdf8" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>زەرەری ئەمڕۆ</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--accent-hover)' }}>
+              {Number(stats.today?.today_loss || 0).toLocaleString()} د.ع <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>({stats.today?.today_units || 0} د)</span>
+            </div>
           </div>
-          <div className="value" style={{ color: '#38bdf8' }}>
-            {Number(stats.today?.today_loss || 0).toLocaleString()} دینار
-          </div>
-          <div className="sub-text" style={{ color: '#bae6fd' }}>
-            {stats.today?.today_units || 0} دانە لە بەرواری ئەمڕۆ
-          </div>
+          <Calendar size={20} color="var(--accent-hover)" />
         </div>
 
         {/* Lifetime Loss */}
-        <div className="stat-card glass-panel" style={{ background: 'rgba(168, 85, 247, 0.08)', borderColor: 'rgba(168, 85, 247, 0.25)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>کۆی گشتی زیان (هەموو کات)</h3>
-            <AlertTriangle size={22} color="#a855f7" />
+        <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 600 }}>کۆی گشتی زیان (هەموو کات)</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--danger-color)' }}>
+              {Number(stats.lifetime?.lifetime_loss || 0).toLocaleString()} د.ع
+            </div>
           </div>
-          <div className="value" style={{ color: '#c084fc' }}>
-            {Number(stats.lifetime?.lifetime_loss || 0).toLocaleString()} دینار
-          </div>
-          <div className="sub-text" style={{ color: '#e9d5ff' }}>
-            کۆی گشتی فەوتان لە سەرەتای کارکردنەوە
-          </div>
+          <AlertTriangle size={20} color="var(--danger-color)" />
         </div>
       </div>
 
       {/* Main Content Layout: Form & History */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
         
         {/* Form Card */}
-        <div className="glass-panel" style={{ padding: '24px', borderRadius: '20px', border: '1px solid rgba(239, 68, 68, 0.25)', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: '0 0 20px 0', color: '#f87171' }}>
-            <Plus size={22} /> تۆمارکردنی کاڵای زیانلێکەوتووی نوێ
+        <div style={{ 
+          background: 'var(--bg-secondary)', 
+          border: '1px solid var(--border-color)', 
+          borderRadius: '12px', 
+          padding: '12px 16px', 
+          boxShadow: 'var(--card-shadow)' 
+        }}>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.05rem', margin: '0 0 10px 0', color: '#f87171', fontWeight: 800 }}>
+            <Plus size={18} /> تۆمارکردنی کاڵای زیانلێکەوتووی نوێ
           </h2>
 
           <form onSubmit={handleSubmitDamage}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+            {/* Row 1: Product, Unit, Quantity, Cost */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '12px', 
+              marginBottom: '12px' 
+            }}>
               
               {/* Product Search & Autocomplete */}
-              <div style={{ position: 'relative' }}>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+              <div style={{ position: 'relative', minWidth: '240px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   کاڵا یان بارکۆد:
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
                     ref={barcodeInputRef}
                     type="text"
-                    placeholder="بارکۆد سکان بکە یان ناوی کاڵا بنووسە..."
+                    placeholder="بارکۆد سکان بکە یان ناوی کاڵا..."
                     value={productSearch}
                     onChange={(e) => {
                       setProductSearch(e.target.value);
@@ -374,18 +368,18 @@ const Wastage = () => {
                     onKeyDown={handleProductSearchKeyDown}
                     style={{
                       width: '100%',
-                      padding: '12px 16px',
-                      paddingLeft: '38px',
-                      borderRadius: '12px',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: selectedProduct ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.15)',
-                      color: 'white',
-                      fontSize: '0.95rem',
+                      padding: '7px 10px',
+                      paddingLeft: '32px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-tertiary)',
+                      border: selectedProduct ? '1px solid #10b981' : '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.84rem',
                       outline: 'none',
                       boxSizing: 'border-box'
                     }}
                   />
-                  <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <Search size={15} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                 </div>
 
                 {/* Dropdown Results */}
@@ -395,13 +389,13 @@ const Wastage = () => {
                     top: '100%',
                     right: 0,
                     left: 0,
-                    marginTop: '6px',
-                    background: '#1e293b',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                    marginTop: '4px',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-color)',
+                    boxShadow: 'var(--card-shadow)',
                     zIndex: 100,
-                    maxHeight: '260px',
+                    maxHeight: '220px',
                     overflowY: 'auto'
                   }}>
                     {filteredProducts.map((p) => (
@@ -409,26 +403,26 @@ const Wastage = () => {
                         key={p.id}
                         onClick={() => handleSelectProduct(p)}
                         style={{
-                          padding: '10px 14px',
-                          borderBottom: '1px solid rgba(255,255,255,0.08)',
+                          padding: '8px 12px',
+                          borderBottom: '1px solid var(--border-color)',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           transition: 'background 0.15s'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
                         <div>
-                          <div style={{ fontWeight: 'bold', color: 'white', fontSize: '0.95rem' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.86rem' }}>{p.name}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
                             بارکۆد: {p.barcode || '-'} {p.box_barcode ? `| کارتۆن: ${p.box_barcode}` : ''}
                           </div>
                         </div>
-                        <div style={{ textAlign: 'left', fontSize: '0.85rem' }}>
-                          <span style={{ color: '#38bdf8' }}>مەخزەن: {p.stock} دانە</span>
-                          <div style={{ color: '#94a3b8', fontSize: '0.78rem' }}>تێچوون: {Number(p.cost_price || 0).toLocaleString()} د.ع</div>
+                        <div style={{ textAlign: 'left', fontSize: '0.78rem' }}>
+                          <span style={{ color: 'var(--accent-hover)', fontWeight: 600 }}>مەخزەن: {p.stock} دانە</span>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>تێچوون: {Number(p.cost_price || 0).toLocaleString()} د.ع</div>
                         </div>
                       </div>
                     ))}
@@ -437,24 +431,25 @@ const Wastage = () => {
               </div>
 
               {/* Unit Type Selection */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+              <div style={{ minWidth: '180px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   جۆری یەکە:
                 </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => setUnitType('PIECE')}
                     style={{
                       flex: 1,
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: unitType === 'PIECE' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.12)',
-                      background: unitType === 'PIECE' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.04)',
-                      color: unitType === 'PIECE' ? '#38bdf8' : '#94a3b8',
+                      padding: '7px 8px',
+                      borderRadius: '8px',
+                      border: unitType === 'PIECE' ? '2px solid var(--accent-hover)' : '1px solid var(--border-color)',
+                      background: unitType === 'PIECE' ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                      color: unitType === 'PIECE' ? 'var(--accent-hover)' : 'var(--text-secondary)',
                       cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '0.95rem'
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     📦 دانە (Piece)
@@ -464,24 +459,25 @@ const Wastage = () => {
                     onClick={() => setUnitType('BOX')}
                     style={{
                       flex: 1,
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: unitType === 'BOX' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.12)',
-                      background: unitType === 'BOX' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.04)',
-                      color: unitType === 'BOX' ? '#f59e0b' : '#94a3b8',
+                      padding: '7px 8px',
+                      borderRadius: '8px',
+                      border: unitType === 'BOX' ? '2px solid #f59e0b' : '1px solid var(--border-color)',
+                      background: unitType === 'BOX' ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-tertiary)',
+                      color: unitType === 'BOX' ? '#f59e0b' : 'var(--text-secondary)',
                       cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '0.95rem'
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    📦 کارتۆن {selectedProduct?.units_per_box > 1 ? `(${selectedProduct.units_per_box} دانەیی)` : ''}
+                    📦 کارتۆن {selectedProduct?.units_per_box > 1 ? `(${selectedProduct.units_per_box})` : ''}
                   </button>
                 </div>
               </div>
 
               {/* Quantity */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+              <div style={{ minWidth: '110px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   ژمارەی کاڵا (بڕ):
                 </label>
                 <input
@@ -492,13 +488,13 @@ const Wastage = () => {
                   onChange={(e) => setQuantity(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    fontWeight: 'bold',
+                    padding: '7px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -506,32 +502,67 @@ const Wastage = () => {
               </div>
 
               {/* Cost Price per Unit */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+              <div style={{ minWidth: '190px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   نرخی تێچوونی دانە (دینار):
                 </label>
-                <input
-                  type="number"
-                  value={costPrice}
-                  onChange={(e) => setCostPrice(e.target.value)}
-                  placeholder="نرخی تێچوونی دانە..."
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'white',
-                    fontSize: '1rem',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(costPrice) || 0);
+                      const next = Math.max(0, cur - 250);
+                      setCostPrice(next === 0 ? '' : String(next));
+                    }}
+                    style={{ flexShrink: 0, padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    -٢٥٠
+                  </button>
+                  <input
+                    type="number"
+                    step="250"
+                    min="0"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    placeholder="نرخی تێچوونی دانە..."
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      padding: '7px 10px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.84rem',
+                      textAlign: 'center',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Math.max(0, parseInt(costPrice) || 0);
+                      setCostPrice(String(cur + 250));
+                    }}
+                    style={{ flexShrink: 0, padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    +٢٥٠
+                  </button>
+                </div>
               </div>
+            </div>
 
+            {/* Row 2: Reason & Notes */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+              gap: '12px', 
+              marginBottom: '10px' 
+            }}>
               {/* Reason Selection */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   هۆکاری زیان / فەوتان:
                 </label>
                 <select
@@ -539,12 +570,12 @@ const Wastage = () => {
                   onChange={(e) => setReason(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    background: '#1e293b',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'white',
-                    fontSize: '0.95rem',
+                    padding: '7px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.84rem',
                     outline: 'none',
                     cursor: 'pointer',
                     boxSizing: 'border-box'
@@ -560,51 +591,50 @@ const Wastage = () => {
 
               {/* Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '6px', color: '#cbd5e1', fontWeight: 'bold' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: '4px', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   تێبینی زیاتر:
                 </label>
                 <input
                   type="text"
-                  placeholder="نموونە: بەسەرچوونی بەرواری لە کۆگا دۆزرایەوە..."
+                  placeholder="نموونە: بەسەرچوونی بەرواری لە کۆگا..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'white',
-                    fontSize: '0.95rem',
+                    padding: '7px 10px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.84rem',
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
                 />
               </div>
-
             </div>
 
             {/* Live Calculation Banner */}
             {selectedProduct && (
               <div style={{
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.35)',
-                borderRadius: '14px',
-                padding: '14px 20px',
-                marginBottom: '20px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: '10px',
+                padding: '8px 14px',
+                marginBottom: '10px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: '12px'
+                gap: '8px'
               }}>
                 <div>
-                  <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#f87171' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.96rem', color: '#ef4444' }}>
                     کۆی زەرەری دارایی بەپێی تێچوون: {calculationSummary.totalLoss.toLocaleString()} دینار
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '4px' }}>
-                    دەرچوون لە مەخزەن: <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{calculationSummary.totalUnits} دانە</span>
-                    {calculationSummary.isBox && ` (بەپێی پێوانەی ${calculationSummary.multiplier} دانە بۆ هەر کارتۆنێک)`}
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    دەرچوون لە مەخزەن: <span style={{ color: '#fbbf24', fontWeight: 700 }}>{calculationSummary.totalUnits} دانە</span>
+                    {calculationSummary.isBox && ` (${calculationSummary.multiplier} دانە بۆ هەر کارتۆنێک)`}
                     {' | '} مەخزەنی ئێستا: {selectedProduct.stock} دانە 
                     {' ⬅️ '} دەبێتە: {Number(selectedProduct.stock) - calculationSummary.totalUnits} دانە
                   </div>
@@ -614,21 +644,21 @@ const Wastage = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '12px 28px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    background: '#ef4444',
                     color: 'white',
                     border: 'none',
                     cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)'
+                    gap: '6px',
+                    boxShadow: 'var(--card-shadow)'
                   }}
                 >
-                  <PackageX size={20} />
+                  <PackageX size={17} />
                   {submitting ? 'تۆمار دەکرێت...' : 'تۆمارکردنی زیان و دەرکردن لە کۆگا'}
                 </button>
               </div>
@@ -637,25 +667,31 @@ const Wastage = () => {
         </div>
 
         {/* History Table & Filter Section */}
-        <div className="glass-panel" style={{ padding: '24px', borderRadius: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: 0 }}>
-              <Filter size={22} color="#38bdf8" /> مێژووی کاڵا زیانلێکەوتووەکان
+        <div style={{ 
+          background: 'var(--bg-secondary)', 
+          border: '1px solid var(--border-color)', 
+          borderRadius: '12px', 
+          padding: '12px 16px', 
+          boxShadow: 'var(--card-shadow)' 
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.05rem', margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>
+              <Filter size={18} color="var(--accent-hover)" /> مێژووی کاڵا زیانلێکەوتووەکان
             </h2>
 
             {/* Filter Tabs */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 onClick={() => setTimeFilter('THIS_MONTH')}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: timeFilter === 'THIS_MONTH' ? '#38bdf8' : 'rgba(255,255,255,0.06)',
-                  color: timeFilter === 'THIS_MONTH' ? '#0f172a' : 'white',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: timeFilter === 'THIS_MONTH' ? 'none' : '1px solid var(--border-color)',
+                  background: timeFilter === 'THIS_MONTH' ? 'var(--accent-hover)' : 'var(--bg-tertiary)',
+                  color: timeFilter === 'THIS_MONTH' ? 'white' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
+                  fontWeight: 700,
+                  fontSize: '0.8rem'
                 }}
               >
                 ئەم مانگە
@@ -663,14 +699,14 @@ const Wastage = () => {
               <button
                 onClick={() => setTimeFilter('TODAY')}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: timeFilter === 'TODAY' ? '#38bdf8' : 'rgba(255,255,255,0.06)',
-                  color: timeFilter === 'TODAY' ? '#0f172a' : 'white',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: timeFilter === 'TODAY' ? 'none' : '1px solid var(--border-color)',
+                  background: timeFilter === 'TODAY' ? 'var(--accent-hover)' : 'var(--bg-tertiary)',
+                  color: timeFilter === 'TODAY' ? 'white' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
+                  fontWeight: 700,
+                  fontSize: '0.8rem'
                 }}
               >
                 ئەمڕۆ
@@ -678,14 +714,14 @@ const Wastage = () => {
               <button
                 onClick={() => setTimeFilter('ALL')}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: timeFilter === 'ALL' ? '#38bdf8' : 'rgba(255,255,255,0.06)',
-                  color: timeFilter === 'ALL' ? '#0f172a' : 'white',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: timeFilter === 'ALL' ? 'none' : '1px solid var(--border-color)',
+                  background: timeFilter === 'ALL' ? 'var(--accent-hover)' : 'var(--bg-tertiary)',
+                  color: timeFilter === 'ALL' ? 'white' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '0.85rem'
+                  fontWeight: 700,
+                  fontSize: '0.8rem'
                 }}
               >
                 هەمووی
@@ -696,12 +732,12 @@ const Wastage = () => {
                 value={selectedReason}
                 onChange={(e) => setSelectedReason(e.target.value)}
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: 'white',
-                  fontSize: '0.85rem',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.82rem',
                   outline: 'none',
                   cursor: 'pointer'
                 }}
@@ -719,14 +755,14 @@ const Wastage = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
-                  padding: '8px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: 'white',
-                  fontSize: '0.85rem',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.82rem',
                   outline: 'none',
-                  minWidth: '180px'
+                  minWidth: '160px'
                 }}
               />
             </div>
@@ -736,24 +772,24 @@ const Wastage = () => {
           <div className="table-responsive">
             <table className="data-table" style={{ width: '100%', textAlign: 'right', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}>
-                  <th style={{ padding: '12px' }}>#</th>
-                  <th style={{ padding: '12px' }}>بەروار و کات</th>
-                  <th style={{ padding: '12px' }}>ناوی کاڵا</th>
-                  <th style={{ padding: '12px' }}>بارکۆد</th>
-                  <th style={{ padding: '12px' }}>بڕی فەوتاو</th>
-                  <th style={{ padding: '12px' }}>دەرچوو لە کۆگا</th>
-                  <th style={{ padding: '12px' }}>نرخی تێچوون</th>
-                  <th style={{ padding: '12px' }}>کۆی زیانی دارایی</th>
-                  <th style={{ padding: '12px' }}>هۆکار</th>
-                  <th style={{ padding: '12px' }}>تێبینی و بەکارهێنەر</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>کردار</th>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>#</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>بەروار و کات</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>ناوی کاڵا</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>بارکۆد</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>بڕی فەوتاو</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>دەرچوو لە کۆگا</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>نرخی تێچوون</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>کۆی زیانی دارایی</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>هۆکار</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem' }}>تێبینی و بەکارهێنەر</th>
+                  <th style={{ padding: '8px 10px', fontSize: '0.8rem', textAlign: 'center' }}>کردار</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="11" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
                       هیچ تۆمارێکی زیان یان فەوتان نەدۆزرایەوە لەم بەروارەدا.
                     </td>
                   </tr>
@@ -763,38 +799,38 @@ const Wastage = () => {
                     const unitsDeducted = parseFloat(item.quantity) * parseFloat(item.units_multiplier);
 
                     return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '12px', color: '#64748b' }}>{idx + 1}</td>
-                        <td style={{ padding: '12px', fontSize: '0.85rem' }}>
+                      <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{idx + 1}</td>
+                        <td style={{ padding: '8px 10px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                           {new Date(item.created_at).toLocaleString('ku-IQ')}
                         </td>
-                        <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.86rem' }}>
                           {item.product_name}
                         </td>
-                        <td style={{ padding: '12px', color: '#94a3b8', fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                           {item.barcode || '-'}
                         </td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{ fontWeight: 'bold' }}>{Number(item.quantity)}</span> {item.unit_type === 'BOX' ? 'کارتۆن' : 'دانە'}
+                        <td style={{ padding: '8px 10px', fontSize: '0.84rem' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{Number(item.quantity)}</span> {item.unit_type === 'BOX' ? 'کارتۆن' : 'دانە'}
                         </td>
-                        <td style={{ padding: '12px', color: '#fbbf24', fontWeight: 'bold' }}>
+                        <td style={{ padding: '8px 10px', color: '#fbbf24', fontWeight: 700, fontSize: '0.84rem' }}>
                           {unitsDeducted} دانە
                         </td>
-                        <td style={{ padding: '12px', color: '#cbd5e1' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                           {Number(item.cost_price).toLocaleString()} د.ع
                         </td>
-                        <td style={{ padding: '12px', fontWeight: 'bold', color: '#f87171' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 800, color: '#ef4444', fontSize: '0.86rem' }}>
                           {Number(item.total_cost_loss).toLocaleString()} دینار
                         </td>
-                        <td style={{ padding: '12px' }}>
+                        <td style={{ padding: '8px 10px' }}>
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
                             background: `${rOpt.color}20`,
                             color: rOpt.color,
                             border: `1px solid ${rOpt.color}40`
@@ -802,12 +838,12 @@ const Wastage = () => {
                             {rOpt.icon} {item.reason_label}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        <td style={{ padding: '8px 10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                           <div>{item.notes || '-'}</div>
-                          <small style={{ color: '#64748b' }}>تۆمارکەر: {item.created_by_username || 'کاشێر'}</small>
+                          <small style={{ color: 'var(--text-secondary)' }}>تۆمارکەر: {item.created_by_username || 'کاشێر'}</small>
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                             <button
                               onClick={() => setSelectedReceipt({
                                 id: item.id,
@@ -824,40 +860,40 @@ const Wastage = () => {
                                 created_at: item.created_at
                               })}
                               style={{
-                                padding: '6px 10px',
-                                borderRadius: '8px',
-                                background: 'rgba(255,255,255,0.06)',
-                                border: '1px solid rgba(255,255,255,0.12)',
-                                color: '#38bdf8',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                background: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border-color)',
+                                color: 'var(--accent-hover)',
                                 cursor: 'pointer',
-                                fontSize: '0.8rem',
+                                fontSize: '0.76rem',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px'
+                                gap: '3px'
                               }}
                               title="چاپکردنی پسووڵەی زیان"
                             >
-                              <Printer size={14} /> پسووڵە
+                              <Printer size={13} /> پسووڵە
                             </button>
 
                             {isAdmin && (
                               <button
                                 onClick={() => handleDeleteDamage(item.id, item.product_name, unitsDeducted)}
                                 style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '8px',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
                                   background: 'rgba(239, 68, 68, 0.1)',
                                   border: '1px solid rgba(239, 68, 68, 0.3)',
                                   color: '#f87171',
                                   cursor: 'pointer',
-                                  fontSize: '0.8rem',
+                                  fontSize: '0.76rem',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '4px'
+                                  gap: '3px'
                                 }}
                                 title="هەڵوەشاندنەوە و گەڕاندنەوە بۆ کۆگا"
                               >
-                                <RotateCcw size={14} /> گەڕاندنەوە
+                                <RotateCcw size={13} /> گەڕاندنەوە
                               </button>
                             )}
                           </div>
@@ -875,95 +911,95 @@ const Wastage = () => {
 
       {/* Modal: Printable Wastage Voucher */}
       {selectedReceipt && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', padding: '24px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', margin: 0, color: '#f87171' }}>
-                <PackageX size={20} /> پسووڵەی فەوتان و زیانی کاڵا
+        <div className="pos-modal-overlay" onClick={() => setSelectedReceipt(null)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem', margin: 0, color: '#f87171', fontWeight: 800 }}>
+                <PackageX size={18} /> پسووڵەی فەوتان و زیانی کاڵا
               </h2>
-              <button onClick={() => setSelectedReceipt(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
+              <button onClick={() => setSelectedReceipt(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={16} />
               </button>
             </div>
 
             {/* Printable Box */}
-            <div id="damage-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '20px 18px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
-              <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '12px', marginBottom: '12px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#b91c1c' }}>پسووڵەی کاڵای فەوتاو و زیانلێکەوتوو</h4>
-                <div style={{ fontSize: '12px' }}>ژمارەی تۆمار: #{selectedReceipt.id}</div>
+            <div id="damage-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '16px 14px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
+              <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold', color: '#b91c1c' }}>پسووڵەی کاڵای فەوتاو و زیانلێکەوتوو</h4>
+                <div style={{ fontSize: '11px' }}>ژمارەی تۆمار: #{selectedReceipt.id}</div>
               </div>
 
-              <div style={{ fontSize: '11px', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
+              <div style={{ fontSize: '11px', marginBottom: '8px', borderBottom: '1px solid #ddd', paddingBottom: '6px' }}>
                 <div>بەروار: {new Date(selectedReceipt.created_at).toLocaleString('ku-IQ')}</div>
                 <div>تۆمارکەر: {selectedReceipt.username}</div>
               </div>
 
-              <div style={{ borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontWeight: 'bold' }}>
+              <div style={{ borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontWeight: 'bold' }}>
                   <span>ناوی کاڵا:</span>
                   <span>{selectedReceipt.product_name}</span>
                 </div>
                 {selectedReceipt.barcode && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px', color: '#555' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '11px', color: '#555' }}>
                     <span>بارکۆد:</span>
                     <span>{selectedReceipt.barcode}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                   <span>بڕی فەوتاو:</span>
                   <span>{selectedReceipt.quantity} {selectedReceipt.unit}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                   <span>کۆی دەرچوو لە کۆگا:</span>
                   <span>{selectedReceipt.total_units} دانە</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                   <span>تێچوونی دانە:</span>
                   <span>{Number(selectedReceipt.cost_price).toLocaleString()} دینار</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                   <span>هۆکاری زیان:</span>
                   <span>{selectedReceipt.reason_label}</span>
                 </div>
                 {selectedReceipt.notes && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px', color: '#555' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '11px', color: '#555' }}>
                     <span>تێبینی:</span>
                     <span>{selectedReceipt.notes}</span>
                   </div>
                 )}
               </div>
 
-              <div style={{ borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', color: '#b91c1c' }}>
+              <div style={{ borderBottom: '2px dashed #000', paddingBottom: '8px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', color: '#b91c1c' }}>
                   <span>کۆی زەرەری دارایی:</span>
                   <span>{Number(selectedReceipt.total_loss).toLocaleString()} دینار</span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', paddingTop: '10px', fontSize: '11px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', paddingTop: '8px', fontSize: '11px', textAlign: 'center' }}>
                 <div style={{ width: '45%' }}>
                   <div>بەرپرسی کۆگا / کاشێر</div>
-                  <div style={{ marginTop: '25px', borderBottom: '1px dotted #000' }}></div>
+                  <div style={{ marginTop: '20px', borderBottom: '1px dotted #000' }}></div>
                 </div>
                 <div style={{ width: '45%' }}>
                   <div>پەسەندکردنی بەڕێوەبەر</div>
-                  <div style={{ marginTop: '25px', borderBottom: '1px dotted #000' }}></div>
+                  <div style={{ marginTop: '20px', borderBottom: '1px dotted #000' }}></div>
                 </div>
               </div>
             </div>
 
             {/* Modal Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
               <button 
                 onClick={printReceipt}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.86rem' }}
               >
-                <Printer size={18} /> چاپکردنی پسووڵە
+                <Printer size={16} /> چاپکردنی پسووڵە
               </button>
               <button 
                 onClick={() => setSelectedReceipt(null)}
-                style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: 'none', cursor: 'pointer' }}
+                style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.86rem', fontWeight: 600 }}
               >
                 داخستن
               </button>
@@ -975,19 +1011,29 @@ const Wastage = () => {
       {/* Print CSS */}
       <style>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 0;
+          }
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           #damage-receipt-printable-area, #damage-receipt-printable-area * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #damage-receipt-printable-area {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 80mm;
-            margin: 0;
-            padding: 10px;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+            font-size: 12px !important;
+            color: #000 !important;
+            background: #fff !important;
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
           }
         }
       `}</style>

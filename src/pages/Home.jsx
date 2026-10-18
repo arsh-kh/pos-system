@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     ShoppingCart, 
@@ -18,102 +18,120 @@ import {
     PackageX,
     Truck,
     ClipboardCheck,
+    Search,
+    X,
     Settings as SettingsIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import './Home.css';
 
 const modules = [
-  { id: 'cashier', path: '/cashier', label: 'کاشێر', icon: <ShoppingCart size={32} />, color: '#3b82f6', desc: 'خاڵی فرۆشتن و پسووڵە' },
-  { id: 'promotions', path: '/promotions', label: 'ئۆفەر و داشکاندن', icon: <Tag size={32} />, color: '#a855f7', desc: 'ئۆفەری کاتی و داشکاندنی بە سنوور' },
-  { id: 'inventory-audit', path: '/inventory-audit', label: 'جەردکردنی زیرەک', icon: <ClipboardCheck size={32} />, color: '#10b981', desc: 'سکانی ڕەفەکان و دۆزینەوەی نوقسانی' },
-  { id: 'shifts', path: '/shifts', label: 'قاسە و داخستنی شیفت', icon: <Lock size={32} />, color: '#10b981', desc: 'چاودێری قاسە و دەرکردنی Z-Report' },
-  { id: 'returns', path: '/returns', label: 'گەڕاندنەوەی کاڵا', icon: <RotateCcw size={32} />, color: '#f43f5e', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە' },
-  { id: 'vendor-returns', path: '/vendor-returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', icon: <Truck size={32} />, color: '#0ea5e9', desc: 'گەڕاندنەوە بۆ مەندوب و داشکاندن لە قەرز' },
-  { id: 'wastage', path: '/wastage', label: 'زیان و فەوتان', icon: <PackageX size={32} />, color: '#ef4444', desc: 'تۆمارکردنی کاڵای بەسەرچوو و شکاو' },
-  { id: 'products', path: '/products', label: 'کاڵاکان', icon: <Package size={32} />, color: '#8b5cf6', desc: 'بەڕێوەبردنی کۆگا و نرخەکان' },
-  { id: 'owes', path: '/owes', label: 'قەرزەکان', icon: <Users size={32} />, color: '#ef4444', desc: 'قەرزی کڕیارەکان و وەرگرتن' },
-  { id: 'this-month', path: '/this-month', label: 'ئەم مانگە', icon: <TrendingUp size={32} />, color: '#059669', desc: 'ئاماری فرۆشتنی مانگانە' },
-  { id: 'expenses', path: '/expenses', label: 'خەرجییەکان', icon: <Wallet size={32} />, color: '#fb7185', desc: 'مەساریف و تێچووەکانی مارکێت' },
-  { id: 'total-sales', path: '/total-sales', label: 'کۆی فرۆشتن', icon: <BarChart3 size={32} />, color: '#ec4899', desc: 'شیکاری فرۆشتنی مانگانە و کاتژمێری' },
-  { id: 'needs', path: '/needs', label: 'پێداویستیەکان', icon: <ClipboardList size={32} />, color: '#f59e0b', desc: 'لیستی کڕینی پێداویستی' },
-  { id: 'purchases', path: '/purchases', label: 'پسووڵەی کڕین', icon: <FileText size={32} />, color: '#f43f5e', desc: 'تۆمارکردنی کاڵای نوێ' },
-  { id: 'history', path: '/history', label: 'مێژووی فرۆشتن', icon: <History size={32} />, color: '#64748b', desc: 'گەڕان بەدوای پسووڵەکان' },
-  { id: 'audit-logs', path: '/audit-logs', label: 'چاودێری و لۆگەکان', icon: <ShieldCheck size={32} />, color: '#a855f7', desc: 'تۆماری گۆڕانکارییەکان بۆ ئەدمین', adminOnly: true },
-  { id: 'financials', path: '/financials', label: 'کۆمپانیاکان و قازانج', icon: <Building2 size={32} />, color: '#06b6d4', desc: 'قازانجی پوخت و دابینکەران', adminOnly: true },
-  { id: 'settings', path: '/settings', label: 'ڕێکخستنەکان', icon: <SettingsIcon size={32} />, color: '#94a3b8', desc: 'ڕووکار و بەکارهێنەران', adminOnly: true },
+  { id: 'cashier', path: '/cashier', label: 'کاشێر', icon: <ShoppingCart size={28} />, color: '#2563eb', desc: 'خاڵی فرۆشتن و دەرکردنی پسووڵە' },
+  { id: 'products', path: '/products', label: 'کاڵاکان', icon: <Package size={28} />, color: '#0284c7', desc: 'بەڕێوەبردنی کۆگا و نرخەکان' },
+  { id: 'owes', path: '/owes', label: 'قەرزەکان', icon: <Users size={28} />, color: '#dc2626', desc: 'قەرزی کڕیاران و وەرگرتنەوە' },
+  { id: 'shifts', path: '/shifts', label: 'قاسە و شیفت', icon: <Lock size={28} />, color: '#059669', desc: 'چاودێری قاسە و داخستنی ڕۆژانە' },
+  { id: 'returns', path: '/returns', label: 'گەڕاندنەوەی کاڵا', icon: <RotateCcw size={28} />, color: '#e11d48', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە' },
+  { id: 'promotions', path: '/promotions', label: 'ئۆفەر و داشکاندن', icon: <Tag size={28} />, color: '#d97706', desc: 'ئۆفەری کاتی و داشکاندنی دیاریکراو' },
+  { id: 'inventory-audit', path: '/inventory-audit', label: 'جەردکردنی کۆگا', icon: <ClipboardCheck size={28} />, color: '#0d9488', desc: 'سکانی ڕەفەکان و دۆزینەوەی نوقسانی' },
+  { id: 'vendor-returns', path: '/vendor-returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', icon: <Truck size={28} />, color: '#0284c7', desc: 'گەڕاندنەوە بۆ مەندوب و لێدەرکردنی قەرز' },
+  { id: 'wastage', path: '/wastage', label: 'زیان و فەوتان', icon: <PackageX size={28} />, color: '#b91c1c', desc: 'تۆمارکردنی کاڵای بەسەرچوو و شکاو' },
+  { id: 'purchases', path: '/purchases', label: 'پسووڵەی کڕین', icon: <FileText size={28} />, color: '#ea580c', desc: 'تۆمارکردنی پسووڵەی کڕینی نوێ' },
+  { id: 'needs', path: '/needs', label: 'پێداویستیەکان', icon: <ClipboardList size={28} />, color: '#d97706', desc: 'لیستی کاڵا کەمبووەوەکانی مارکێت' },
+  { id: 'expenses', path: '/expenses', label: 'خەرجییەکان', icon: <Wallet size={28} />, color: '#e11d48', desc: 'خەرجی و تێچووەکانی فرۆشگا' },
+  { id: 'this-month', path: '/this-month', label: 'ئەم مانگە', icon: <TrendingUp size={28} />, color: '#16a34a', desc: 'ئامار و داتای فرۆشتنی مانگانە' },
+  { id: 'total-sales', path: '/total-sales', label: 'کۆی فرۆشتن', icon: <BarChart3 size={28} />, color: '#0f766e', desc: 'شیکاری فرۆشتنی کاتژمێری و ڕۆژانە' },
+  { id: 'history', path: '/history', label: 'مێژووی فرۆشتن', icon: <History size={28} />, color: '#475569', desc: 'گەڕان بەدوای پسووڵەکانی پێشوو' },
+  { id: 'financials', path: '/financials', label: 'کۆمپانیا و قازانج', icon: <Building2 size={28} />, color: '#0891b2', desc: 'حسابی دابینکەران و قازانجی پوخت', adminOnly: true },
+  { id: 'audit-logs', path: '/audit-logs', label: 'چاودێری و لۆگەکان', icon: <ShieldCheck size={28} />, color: '#334155', desc: 'تۆماری تەواوی کردارەکانی بەکارهێنەران', adminOnly: true },
+  { id: 'settings', path: '/settings', label: 'ڕێکخستنەکان', icon: <SettingsIcon size={28} />, color: '#64748b', desc: 'ڕێکخستنی سیستەم و بەکارهێنەران', adminOnly: true },
 ];
 
 const Home = () => {
   const navigate = useNavigate();
   const { isAdmin, setIsSwitchModalOpen } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleCardClick = (mod) => {
     if (mod.adminOnly && !isAdmin) {
-      alert('⚠️ ئەم بەشە تایبەتە بە بەڕێوەبەر (Admin). تکایە لە شریتی سەرەوە بە هەژماری ئەدمین بچۆ ژوورەوە.');
+      alert('ئەم بەشە تایبەتە بە بەڕێوەبەر (Admin). تکایە لە شریتی سەرەوە بە هەژماری ئەدمین بچۆ ژوورەوە.');
       setIsSwitchModalOpen(true);
       return;
     }
     navigate(mod.path);
   };
 
+  const filteredModules = modules.filter(m => 
+    kurdishSearchMatch([m.label, m.desc], searchQuery)
+  );
+
   return (
     <div className="home-container">
       <div className="home-header">
-        <h1>سیستەمی زیرەکی بەڕێوەبردنی مارکێت</h1>
-        <p>تکایە بەشێک هەڵبژێرە بۆ دەستپێکردن</p>
+        <h1>سیستەمی بەڕێوەبردنی مارکێت</h1>
+        <p>بەشێک هەڵبژێرە یان ناوی بەشەکە بگەڕێ بۆ دەستپێکردن</p>
+      </div>
+
+      {/* Instant Search Bar */}
+      <div className="home-search-wrapper">
+        <Search size={18} className="search-icon" />
+        <input 
+          type="text"
+          placeholder="گەڕانی خێرا لە بەشەکاندا (کاشێر، کۆگا، قەرز، جەرد، خەرجی...)..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="home-search-input"
+        />
+        {searchQuery && (
+          <button 
+            type="button" 
+            onClick={() => setSearchQuery('')}
+            className="search-clear-btn"
+            title="سڕینەوەی گەڕان"
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
       
       <div className="modules-grid">
-        {modules.map((mod) => {
+        {filteredModules.map((mod) => {
           const isLocked = mod.adminOnly && !isAdmin;
 
           return (
             <button 
               key={mod.id} 
-              className="module-card" 
+              className={`module-card ${isLocked ? 'is-locked' : ''}`}
               onClick={() => handleCardClick(mod)}
-              style={{ 
-                '--module-color': mod.color,
-                opacity: isLocked ? 0.75 : 1,
-                border: isLocked ? '1px dashed rgba(245, 158, 11, 0.4)' : undefined,
-                position: 'relative'
-              }}
             >
               {isLocked && (
-                <span 
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    background: 'rgba(239, 68, 68, 0.25)',
-                    color: '#f87171',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    fontSize: '0.72rem',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  🔒 تەنها ئەدمین
+                <span className="admin-lock-badge">
+                  <Lock size={12} />
+                  <span>تەنها ئەدمین</span>
                 </span>
               )}
 
-              <div className="module-icon-wrapper">
-                  <div className="module-icon">{mod.icon}</div>
+              <div className="module-icon-box" style={{ color: mod.color, background: `${mod.color}15` }}>
+                {mod.icon}
               </div>
+
               <div className="module-content">
-                  <h2>{mod.label}</h2>
-                  <p>{mod.desc}</p>
+                <h2>{mod.label}</h2>
+                <p>{mod.desc}</p>
               </div>
-              <div className="module-glow"></div>
             </button>
           );
         })}
       </div>
+
+      {filteredModules.length === 0 && (
+        <div className="no-modules-found">
+          <p>هیچ بەشێک نەدۆزرایەوە بە ناوی "<strong>{searchQuery}</strong>"</p>
+          <button onClick={() => setSearchQuery('')} className="btn-secondary">
+            پیشاندانی هەموو بەشەکان
+          </button>
+        </div>
+      )}
     </div>
   );
 };
