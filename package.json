@@ -41,9 +41,12 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "سیستەمی مارکێت POS"
+      "shortcutName": "سیستەمی مارکێت POS",
+      "runAfterFinish": true,
+      "artifactName": "MarketPOS_Setup.${ext}",
+      "deleteAppDataOnUninstall": false
     }
   },
   "dependencies": {
