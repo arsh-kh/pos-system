@@ -14,8 +14,8 @@ const SalesHistory = () => {
   
   // Re-print Thermal Receipt State
   const [reprintReceipt, setReprintReceipt] = useState(null);
-  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی نموونەیی';
-  const storePhone = localStorage.getItem('pos_store_phone') || '0750 000 0000';
+  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
+  const storePhone = localStorage.getItem('pos_store_phone') || '0772 979 0421';
 
   const fetchSales = async () => {
     try {

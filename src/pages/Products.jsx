@@ -83,7 +83,7 @@ const Products = () => {
   const [printProduct, setPrintProduct] = useState(null);
   const [printCopies, setPrintCopies] = useState(1);
   const [storeName, setStoreName] = useState(() => {
-    return localStorage.getItem('pos_store_name') || 'مارکێتی نموونەیی';
+    return localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
   });
   const printAreaRef = useRef(null);
 

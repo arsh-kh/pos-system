@@ -175,7 +175,7 @@ const UserBar = () => {
               <Store size={16} />
             </div>
             <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-              مارکێتی سەرەکی
+              {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
             </span>
           </div>
 

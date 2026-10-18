@@ -1116,10 +1116,14 @@ const VendorReturns = () => {
               </button>
             </div>
 
-            {/* Printable Area */}
             <div id="rtv-voucher-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '16px 14px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold' }}>
+                  {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
+                </h3>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#555', marginBottom: '4px' }}>
+                  پەیوەندی: {localStorage.getItem('pos_store_phone') || '0772 979 0421'}
+                </div>
                 <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold', color: '#0284c7' }}>وەسڵی گەڕاندنەوەی کاڵا بۆ مەندوب</h4>
                 <div style={{ fontSize: '11px' }}>ژمارەی تۆمار: #{selectedReceipt.id}</div>
               </div>

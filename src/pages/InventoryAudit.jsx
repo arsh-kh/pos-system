@@ -852,10 +852,14 @@ const InventoryAudit = () => {
               </button>
             </div>
 
-            {/* Printable Box */}
             <div id="audit-voucher-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '20px 18px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '12px', marginBottom: '12px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>
+                  {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
+                </h3>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#555', marginBottom: '4px' }}>
+                  پەیوەندی: {localStorage.getItem('pos_store_phone') || '0772 979 0421'}
+                </div>
                 <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#047857' }}>وەسڵی فەرمیی جەردی کۆگا و ڕەفەکان</h4>
                 <div style={{ fontSize: '12px' }}>ژمارەی تۆمار: #{selectedVoucher.id}</div>
               </div>

@@ -54,8 +54,8 @@ const ThisMonth = () => {
   const navigate = useNavigate();
   const printAreaRef = useRef(null);
 
-  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی زیرەک';
-  const storePhone = localStorage.getItem('pos_store_phone') || '0750 000 0000';
+  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
+  const storePhone = localStorage.getItem('pos_store_phone') || '0772 979 0421';
 
   // Time-Range State
   const [selectedRange, setSelectedRange] = useState('month');

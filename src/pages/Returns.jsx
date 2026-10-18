@@ -569,10 +569,14 @@ const Returns = () => {
               </button>
             </div>
 
-            {/* Printable Box */}
             <div id="refund-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '20px 18px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '12px', marginBottom: '12px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>
+                  {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
+                </h3>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#555', marginBottom: '4px' }}>
+                  پەیوەندی: {localStorage.getItem('pos_store_phone') || '0772 979 0421'}
+                </div>
                 <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#b91c1c' }}>وەسڵی گەڕاندنەوەی کاڵا</h4>
                 <div style={{ fontSize: '12px' }}>بۆ وەسڵی ژمارە: #{selectedReceipt.sale_id}</div>
               </div>
@@ -630,7 +634,7 @@ const Returns = () => {
               </div>
 
               <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '10px', color: '#555' }}>
-                سوپاس بۆ مامەڵەکردنتان لەگەڵ مارکێتی ئێمە
+                سوپاس بۆ مامەڵەکردنتان لەگەڵ {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
               </div>
             </div>
 

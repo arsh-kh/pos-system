@@ -144,9 +144,12 @@ const Login = () => {
           }}>
             <Store size={32} color="#ffffff" />
           </div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
-            سیستەمی مارکێت POS
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
+            {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
           </h1>
+          <div style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 700, direction: 'ltr', marginBottom: '8px' }}>
+            {localStorage.getItem('pos_store_phone') || '0772 979 0421'}
+          </div>
           <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>
             تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە بۆ چوونەژوورەوە
           </p>
