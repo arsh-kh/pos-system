@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const Cashier = () => {
@@ -764,7 +765,8 @@ const Cashier = () => {
         // Prepare Receipt Data with Promotion Breakdown & Split Payment details
         const receiptData = {
           saleId,
-          date: new Date().toLocaleString('en-US', { hour12: true }),
+          date: formatDateTime(new Date(), { twelveHour: true }),
+          cashierName: currentUser?.full_name || currentUser?.username || 'کاشێر',
           customerName: selectedCustomer ? selectedCustomer.name : 'کڕیاری گشتی',
           customerPhone: selectedCustomer ? selectedCustomer.phone : '',
           paymentMethod: paymentMode,
@@ -2303,6 +2305,10 @@ const Cashier = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>کڕیار:</span>
             <span>{printedReceipt.customerName}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>کاشێر:</span>
+            <span>{printedReceipt.cashierName || 'کاشێر'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>بەروار:</span>

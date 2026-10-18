@@ -14,6 +14,7 @@ import {
   FileText
 } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const REASON_OPTIONS = [
@@ -350,7 +351,7 @@ const Returns = () => {
                 <div>
                   <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>بەرواری فرۆشتن:</div>
                   <div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>
-                    {new Date(searchedSale.created_at).toLocaleDateString('ku-IQ')}
+                    {formatDate(searchedSale.created_at)}
                   </div>
                 </div>
 
@@ -502,7 +503,7 @@ const Returns = () => {
                   <tr key={ret.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>#{ret.id}</td>
                     <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      {new Date(ret.created_at).toLocaleDateString('ku-IQ')} {new Date(ret.created_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
+                      {formatDateTime(ret.created_at)}
                     </td>
                     <td style={{ padding: '14px 18px', color: 'var(--accent-color)', fontWeight: 'bold' }}>
                       #{ret.sale_id}
@@ -577,7 +578,7 @@ const Returns = () => {
               </div>
 
               <div style={{ fontSize: '11px', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
-                <div>بەروار: {new Date(selectedReceipt.created_at).toLocaleString('ku-IQ')}</div>
+                <div>بەروار: {formatDateTime(selectedReceipt.created_at, { twelveHour: true })}</div>
                 <div>کڕیار: {selectedReceipt.customer_name}</div>
               </div>
 

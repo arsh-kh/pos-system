@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const CATEGORIES = [
@@ -259,7 +260,7 @@ const Expenses = () => {
                 return (
                   <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
                     <td style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                      {exp.expense_date ? new Date(exp.expense_date).toLocaleDateString('en-GB') : '-'}
+                      {exp.expense_date ? formatDate(exp.expense_date) : '-'}
                     </td>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                       {exp.title}

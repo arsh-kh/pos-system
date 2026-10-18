@@ -18,6 +18,7 @@ import {
   Send
 } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const CashDrawer = () => {
@@ -185,7 +186,7 @@ const CashDrawer = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             <Calendar size={16} />
-            دەستپێکردن: {currentShift?.opened_at ? new Date(currentShift.opened_at).toLocaleDateString('ku-IQ') : new Date().toLocaleDateString('ku-IQ')} - {currentShift?.opened_at ? new Date(currentShift.opened_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' }) : '٠٠:٠٠'}
+            دەستپێکردن: {currentShift?.opened_at ? formatDateTime(currentShift.opened_at) : formatDateTime(new Date())}
           </div>
         </div>
 
@@ -305,12 +306,10 @@ const CashDrawer = () => {
                       <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>#{shift.id}</td>
                       <td style={{ padding: '14px 18px', color: 'var(--text-primary)' }}>{shift.cashier_name}</td>
                       <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {new Date(shift.opened_at).toLocaleDateString('ku-IQ')} {new Date(shift.opened_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
+                        {formatDateTime(shift.opened_at)}
                       </td>
                       <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {shift.closed_at ? (
-                          `${new Date(shift.closed_at).toLocaleDateString('ku-IQ')} ${new Date(shift.closed_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}`
-                        ) : (
+                        {shift.closed_at ? formatDateTime(shift.closed_at) : (
                           <span style={{ color: '#34d399' }}>چالاکە...</span>
                         )}
                       </td>
@@ -396,8 +395,8 @@ const CashDrawer = () => {
               </div>
 
               <div style={{ fontSize: '11px', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
-                <div>دەستپێکردن: {new Date(selectedReportForPrint.opened_at).toLocaleString('ku-IQ')}</div>
-                <div>کۆتایی هاتن: {selectedReportForPrint.closed_at ? new Date(selectedReportForPrint.closed_at).toLocaleString('ku-IQ') : 'چالاک'}</div>
+                <div>دەستپێکردن: {formatDateTime(selectedReportForPrint.opened_at)}</div>
+                <div>کۆتایی هاتن: {selectedReportForPrint.closed_at ? formatDateTime(selectedReportForPrint.closed_at) : 'چالاک'}</div>
               </div>
 
               <div style={{ borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>

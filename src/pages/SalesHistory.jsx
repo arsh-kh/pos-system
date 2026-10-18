@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Search, FileText, X, Printer, Layers } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const SalesHistory = () => {
@@ -245,7 +246,7 @@ const SalesHistory = () => {
                     <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>{s.item_count} دانە</td>
                     <td style={{ padding: '16px 20px', color: 'var(--accent-color)', fontWeight: 'bold' }}>{Number(s.total_amount).toLocaleString()} دینار</td>
                     <td style={{ padding: '16px 20px', color: '#10b981', fontWeight: 'bold' }}>{Number(s.total_profit).toLocaleString()} دینار</td>
-                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{new Date(s.created_at).toLocaleString('en-GB')}</td>
+                    <td style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{formatDateTime(s.created_at)}</td>
                     <td style={{ padding: '16px 20px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <button 
                         onClick={() => openSaleDetails(s.id, false)}
@@ -276,7 +277,7 @@ const SalesHistory = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
               <div>
                 <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.2rem', fontWeight: 800 }}>پسووڵەی فرۆشتن #{selectedSale.id}</h2>
-                <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{new Date(selectedSale.created_at).toLocaleString('en-GB')}</p>
+                <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{formatDateTime(selectedSale.created_at)}</p>
               </div>
               <button onClick={() => setSelectedSale(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
@@ -395,7 +396,7 @@ const SalesHistory = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>بەروار:</span>
-            <span>{new Date(reprintReceipt.created_at).toLocaleString('en-US', { hour12: true })}</span>
+            <span>{formatDateTime(reprintReceipt.created_at, { twelveHour: true })}</span>
           </div>
 
           <div className="receipt-divider"></div>

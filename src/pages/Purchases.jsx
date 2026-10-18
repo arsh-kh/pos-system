@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const Purchases = () => {
@@ -307,7 +308,7 @@ const Purchases = () => {
         invoiceNumber: invoiceNumber || `INV-${Date.now().toString().slice(-6)}`,
         supplierName: savedSupplier ? savedSupplier.name : 'کۆمپانیای گشتی',
         supplierPhone: savedSupplier ? savedSupplier.phone : '',
-        date: invoiceDate,
+        date: formatDate(invoiceDate || new Date()),
         paymentMethod: paymentMethod === 'CASH' ? 'نەقد (کاش)' : (paymentMethod === 'DEBT' ? 'قەرز' : 'بەشەکی'),
         paidAmount: effectivePaid,
         remainingAmount: totalRemaining,
@@ -1164,7 +1165,6 @@ const Purchases = () => {
           <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>
           <div className="purchase-divider"></div>
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>پسووڵەی کڕینی کاڵا</div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '2px' }}>Purchase Invoice Voucher</div>
           <div className="purchase-divider"></div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const InventoryAudit = () => {
@@ -742,7 +743,7 @@ const InventoryAudit = () => {
                       <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.84rem' }}>
                         <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{idx + 1}</td>
                         <td style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                          {new Date(item.created_at).toLocaleString('ku-IQ')}
+                          {formatDateTime(item.created_at)}
                         </td>
                         <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {item.product_name}
@@ -860,7 +861,7 @@ const InventoryAudit = () => {
               </div>
 
               <div style={{ fontSize: '11px', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
-                <div>بەروار: {new Date(selectedVoucher.created_at).toLocaleString('ku-IQ')}</div>
+                <div>بەروار: {formatDateTime(selectedVoucher.created_at, { twelveHour: true })}</div>
                 <div>جەردکەر: {selectedVoucher.audited_by_username || 'خاوەنکار'}</div>
               </div>
 

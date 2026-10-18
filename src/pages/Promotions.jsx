@@ -16,6 +16,7 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const Promotions = () => {
@@ -353,7 +354,7 @@ const Promotions = () => {
                     <td style={{ padding: '16px 20px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Calendar size={14} color="var(--text-secondary)" />
-                        لە {new Date(promo.start_date).toLocaleDateString('ku-IQ')} تا {new Date(promo.end_date).toLocaleDateString('ku-IQ')}
+                        لە {formatDate(promo.start_date)} تا {formatDate(promo.end_date)}
                       </div>
                     </td>
 

@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const Owes = () => {
@@ -129,7 +130,7 @@ const Owes = () => {
           amountPaid: amountNum,
           remainingDebt: newDebt,
           isStatement: false,
-          date: new Date().toLocaleString('en-US', { hour12: true })
+          date: formatDateTime(new Date(), { twelveHour: true })
         });
         setTimeout(() => window.print(), 100);
       }
@@ -654,7 +655,7 @@ const Owes = () => {
                   { id: 'YESTERDAY', label: 'دوێنێ' },
                   { id: 'WEEK', label: 'ئەم هەفتەیە' },
                   { id: 'MONTH', label: 'ئەم مانگە' },
-                  { id: 'DATE', label: 'ڕۆژێک لە Calendar' }
+                  { id: 'DATE', label: 'بەرواری دیاریکراو' }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -726,7 +727,7 @@ const Owes = () => {
                           <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                               <Clock size={14} color="var(--text-secondary)" />
-                              {new Date(h.created_at).toLocaleString('en-US', { hour12: true })}
+                              {formatDateTime(h.created_at)}
                             </span>
                           </td>
                           <td style={{ padding: '16px 20px' }}>
@@ -737,7 +738,7 @@ const Owes = () => {
                                   customerPhone: selectedProfile.phone,
                                   amountPaid: Number(h.amount),
                                   remainingDebt: Number(selectedProfile.total_debt),
-                                  date: new Date(h.created_at).toLocaleString('en-US', { hour12: true })
+                                  date: formatDateTime(h.created_at, { twelveHour: true })
                                 })}
                                 style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
                               >
@@ -799,9 +800,6 @@ const Owes = () => {
           <div className="voucher-divider"></div>
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
             {printVoucher.isStatement ? 'پسووڵەی لێدوانی قەرزی کڕیار' : 'پسووڵەی وەرگرتنی پارەی قەرز'}
-          </div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '2px' }}>
-            {printVoucher.isStatement ? 'Customer Debt Statement' : 'Payment Voucher'}
           </div>
           <div className="voucher-divider"></div>
           

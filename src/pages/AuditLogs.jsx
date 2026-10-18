@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const ACTION_LABELS = {
@@ -358,11 +359,8 @@ const AuditLogs = () => {
 
                     <td style={{ padding: '16px 20px', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={14} color="var(--text-secondary)" />
-                        <span>{new Date(log.created_at).toLocaleDateString('ku-IQ')}</span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                          {new Date(log.created_at).toLocaleTimeString('ku-IQ', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <Clock size={14} color="var(--text-secondary)" />
+                        <span>{formatDateTime(log.created_at)}</span>
                       </div>
                     </td>
 

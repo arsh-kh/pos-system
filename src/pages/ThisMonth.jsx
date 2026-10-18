@@ -470,7 +470,7 @@ const ThisMonth = () => {
           <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '8px' }}>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={20} color="#f59e0b" /> پڕفرۆشترین کاڵاکان لەم ماوەیەدا (Top Products)
+                <Award size={20} color="#f59e0b" /> پڕفرۆشترین کاڵاکان لەم ماوەیەدا
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 بەپێی زۆرترین دانەی فرۆشراو

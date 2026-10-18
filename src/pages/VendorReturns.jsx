@@ -19,14 +19,15 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const REASON_PRESETS = [
-  'بەسەردەچوونی بەروار (Expired)',
+  'بەسەردەچوونی بەروار',
   'تێکچوون یان کەم و کوڕی لە کارگە',
   'شکان و لەدەستچوون لە گواستنەوەدا',
   'کاڵای هەڵە / جیاواز لە داواکاری',
-  'گۆڕینەوە بە کاڵای نوێ (Exchange)',
+  'گۆڕینەوە بە کاڵای نوێ',
   'هۆکاری تر'
 ];
 
@@ -989,7 +990,7 @@ const VendorReturns = () => {
                       <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{idx + 1}</td>
                         <td style={{ padding: '8px 10px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                          {new Date(item.created_at).toLocaleString('ku-IQ')}
+                          {formatDateTime(item.created_at)}
                         </td>
                         <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--accent-hover)', fontSize: '0.84rem' }}>
                           {item.supplier_name}
@@ -1124,7 +1125,7 @@ const VendorReturns = () => {
               </div>
 
               <div style={{ fontSize: '11px', marginBottom: '8px', borderBottom: '1px solid #ddd', paddingBottom: '6px' }}>
-                <div>بەروار: {new Date(selectedReceipt.created_at).toLocaleString('ku-IQ')}</div>
+                <div>بەروار: {formatDateTime(selectedReceipt.created_at, { twelveHour: true })}</div>
                 <div>کۆمپانیا: <strong>{selectedReceipt.supplier_name}</strong></div>
                 <div>مەندوب / وەرگر: <strong>{selectedReceipt.representative_name}</strong></div>
                 {selectedReceipt.supplier_phone && <div>پەیوەندی: {selectedReceipt.supplier_phone}</div>}

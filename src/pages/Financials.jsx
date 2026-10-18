@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const Financials = () => {
@@ -494,7 +495,7 @@ const Financials = () => {
                         {inv.supplier_name}
                       </td>
                       <td style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        {new Date(inv.created_at).toLocaleDateString('en-GB')}
+                        {formatDate(inv.created_at)}
                       </td>
                       <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                         {Number(inv.total_amount).toLocaleString()} دینار
@@ -600,7 +601,7 @@ const Financials = () => {
                   filteredReturns.map(r => (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
                       <td style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                        {new Date(r.created_at).toLocaleDateString('en-GB')}
+                        {formatDate(r.created_at)}
                       </td>
                       <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                         {r.product_name}
@@ -1074,7 +1075,7 @@ const Financials = () => {
                             #{inv.invoice_number || inv.id}
                           </td>
                           <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                            {new Date(inv.created_at).toLocaleDateString('en-GB')}
+                            {formatDate(inv.created_at)}
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                             {Number(inv.total_amount).toLocaleString()} دینار
@@ -1122,7 +1123,7 @@ const Financials = () => {
                   <FileText color="#38bdf8" /> وردەکاری پسووڵەی کڕین #{selectedInvoice.id}
                 </h2>
                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-                  کۆمپانیا: <strong style={{ color: 'var(--text-primary)' }}>{selectedInvoice.supplier_name}</strong> • {new Date(selectedInvoice.created_at).toLocaleString('en-US', { hour12: true })}
+                  کۆمپانیا: <strong style={{ color: 'var(--text-primary)' }}>{selectedInvoice.supplier_name}</strong> • {formatDateTime(selectedInvoice.created_at, { twelveHour: true })}
                 </div>
               </div>
               <button onClick={() => setSelectedInvoice(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
