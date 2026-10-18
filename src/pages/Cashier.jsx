@@ -22,6 +22,7 @@ import {
   CreditCard,
   Layers,
   AlertCircle,
+  CheckCircle2,
   ArrowRight,
   Store,
   User
@@ -437,7 +438,7 @@ const Cashier = () => {
       } catch (_) {}
     }
     setCheckoutNotice({
-      message: 'قاسی پارە کرایەوە 🔓',
+      message: 'قاسی پارە کرایەوە',
       receipt: null
     });
     setTimeout(() => setCheckoutNotice(null), 2500);
@@ -908,7 +909,9 @@ const Cashier = () => {
           fontWeight: 800,
           fontSize: '0.88rem'
         }}>
-          <span>✅ {checkoutNotice.message}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <CheckCircle2 size={16} color="#10b981" /> {checkoutNotice.message}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -1077,8 +1080,8 @@ const Cashier = () => {
       {/* Main Single-Screen Non-Scrolling Layout */}
       <div style={{ display: 'flex', gap: '10px', height: 'calc(100vh - 54px)', overflow: 'hidden' }}>
         
-        {/* Left Side: Products Catalog & Scan Input */}
-        <div style={{ flex: '1 1 56%', minWidth: '320px', display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
+        {/* Products Catalog & Scan Input */}
+        <div style={{ flex: '1 1 50%', minWidth: '320px', display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
           
           {/* Top Barcode Input & Search Header */}
           <div style={{ 
@@ -1189,7 +1192,7 @@ const Cashier = () => {
           </div>
 
           {/* Quick Products Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 2px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 2px' }}>
             {filteredProducts.map(p => {
               const promo = activePromotions[p.id];
               const isOutOfStock = p.stock <= 0;
@@ -1201,14 +1204,14 @@ const Cashier = () => {
                   onClick={() => addToCart(p, 1, 'PIECE')}
                   className={`pos-product-card ${promo ? 'has-promo' : ''}`}
                   style={{
-                    padding: '12px 14px',
-                    borderRadius: '14px',
+                    padding: '8px 10px',
+                    borderRadius: '12px',
                     border: promo ? '1.5px solid rgba(217, 119, 6, 0.45)' : '1px solid var(--border-color)',
                     background: promo ? 'linear-gradient(180deg, rgba(217, 119, 6, 0.08) 0%, var(--bg-secondary) 100%)' : 'var(--bg-secondary)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    minHeight: '165px',
+                    minHeight: '135px',
                     boxSizing: 'border-box',
                     cursor: 'pointer',
                     position: 'relative',
@@ -1217,17 +1220,20 @@ const Cashier = () => {
                   }}
                 >
                   {/* Top Meta: Stock & Promo Tag */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', minHeight: '22px' }}>
-                    <div style={{ fontSize: '0.73rem', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', minHeight: '18px' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600 }}>
                       {isOutOfStock ? (
                         <span style={{ 
                           background: 'rgba(239, 68, 68, 0.12)', 
                           color: '#dc2626', 
                           border: '1px solid rgba(239, 68, 68, 0.3)', 
                           padding: '2px 7px', 
-                          borderRadius: '6px' 
+                          borderRadius: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px'
                         }}>
-                          ⚠️ تەواوبوو
+                          <AlertCircle size={11} /> تەواوبوو
                         </span>
                       ) : (
                         <span style={{ 
@@ -1263,16 +1269,16 @@ const Cashier = () => {
                   {/* Product Title */}
                   <div style={{ 
                     fontWeight: 700, 
-                    fontSize: '0.92rem', 
+                    fontSize: '0.86rem', 
                     display: '-webkit-box', 
                     WebkitLineClamp: 2, 
                     WebkitBoxOrient: 'vertical', 
                     overflow: 'hidden', 
-                    lineHeight: '1.4',
-                    minHeight: '2.8em',
+                    lineHeight: '1.35',
+                    minHeight: '2.4em',
                     wordBreak: 'break-word',
                     color: 'var(--text-primary)',
-                    margin: '2px 0 8px 0'
+                    margin: '2px 0 5px 0'
                   }}>
                     {p.name}
                   </div>
@@ -1280,25 +1286,25 @@ const Cashier = () => {
                   {/* Pricing and Action Strip */}
                   <div style={{ marginTop: 'auto' }}>
                     {/* Price Row */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '5px' }}>
                       {promo ? (
                         <>
-                          <span style={{ color: '#d97706', fontWeight: 900, fontSize: '1.18rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
+                          <span style={{ color: '#d97706', fontWeight: 900, fontSize: '1.05rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
                             {Number(promo.promo_price).toLocaleString()} د.ع
                           </span>
-                          <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through', fontSize: '0.78rem', fontWeight: 500 }}>
+                          <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through', fontSize: '0.74rem', fontWeight: 500 }}>
                             {Number(p.selling_price).toLocaleString()}
                           </span>
                         </>
                       ) : (
-                        <span style={{ color: 'var(--accent-hover)', fontWeight: 900, fontSize: '1.2rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
+                        <span style={{ color: 'var(--accent-hover)', fontWeight: 900, fontSize: '1.08rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
                           {Number(p.selling_price).toLocaleString()} د.ع
                         </span>
                       )}
                     </div>
 
                     {/* Unit & Carton Buttons */}
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '5px' }}>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1307,13 +1313,13 @@ const Cashier = () => {
                         }}
                         style={{
                           flex: 1,
-                          height: '34px',
-                          padding: '0 10px',
+                          height: '30px',
+                          padding: '0 8px',
                           borderRadius: '8px',
                           background: 'var(--accent-light)',
                           color: 'var(--accent-color)',
                           border: '1px solid rgba(37, 99, 235, 0.25)',
-                          fontSize: '0.82rem',
+                          fontSize: '0.8rem',
                           fontWeight: 800,
                           cursor: 'pointer',
                           display: 'inline-flex',
@@ -1363,8 +1369,8 @@ const Cashier = () => {
           </div>
         </div>
 
-        {/* Right Side: Interactive Cart & Direct Checkout */}
-        <div style={{ flex: '1 1 40%', minWidth: '340px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Left Side (in RTL): Interactive Cart & Direct Checkout */}
+        <div style={{ flex: '0 0 49%', minWidth: '420px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ 
             background: 'var(--bg-secondary)', 
             border: '1px solid var(--border-color)', 

@@ -4,7 +4,8 @@ import {
   Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
   AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
   Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock,
-  Copy, ExternalLink, Edit2, Printer, ScanBarcode, Volume2, Zap, HelpCircle as HelpIcon
+  Copy, ExternalLink, Edit2, Printer, ScanBarcode, Volume2, Zap, HelpCircle as HelpIcon,
+  Bot, Info, BookOpen, FileText, Folder
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -62,7 +63,7 @@ const Settings = () => {
     localStorage.setItem('pos_selected_printer', selectedPrinter);
     localStorage.setItem('pos_paper_width', paperWidth);
     localStorage.setItem('pos_silent_print', silentPrint ? 'true' : 'false');
-    setHardwareNotice('ڕێکخستنەکانی چاپکەر و ئامێرەکان بە سەرکەوتوویی پاشەکەوت کران ✔');
+    setHardwareNotice('ڕێکخستنەکانی چاپکەر و ئامێرەکان بە سەرکەوتوویی پاشەکەوت کران');
     setTimeout(() => setHardwareNotice(''), 3500);
   };
 
@@ -78,13 +79,13 @@ const Settings = () => {
           paperWidth
         });
         if (res?.success) {
-          setHardwareNotice('پسووڵەی تاقیکردنەوە ڕەوانەی چاپکەر کرا ✔');
+          setHardwareNotice('پسووڵەی تاقیکردنەوە ڕەوانەی چاپکەر کرا');
         } else {
           setHardwareNotice(res?.error || 'کێشەیەک لە ناردن بۆ چاپکەر ڕوویدا');
         }
       } else {
         window.print();
-        setHardwareNotice('پەنجەرەی چاپکردنی تاقیکردنەوە کرایەوە ✔');
+        setHardwareNotice('پەنجەرەی چاپکردنی تاقیکردنەوە کرایەوە');
       }
     } catch (err) {
       setHardwareNotice('هەڵە لە چاپکردن: ' + (err.message || ''));
@@ -102,7 +103,7 @@ const Settings = () => {
         await ipcRenderer.invoke('test-cash-drawer');
         ipcRenderer.send('open-cash-drawer');
       }
-      setHardwareNotice('فەرمانی کردنەوەی قاسەی پارە (RJ11 Pulse) نێردرا 🔓');
+      setHardwareNotice('فەرمانی کردنەوەی قاسەی پارە (RJ11 Pulse) نێردرا');
     } catch (_) {
       setHardwareNotice('قاسەی پارە کرایەوە');
     } finally {
@@ -162,7 +163,7 @@ const Settings = () => {
     const res = await updatePermissions(permDraft);
     setPermSaving(false);
     if (res?.success) {
-      setPermNotice('دەسەڵاتەکان بە سەرکەوتوویی پاشەکەوت کران ✔');
+      setPermNotice('دەسەڵاتەکان بە سەرکەوتوویی پاشەکەوت کران');
       setTimeout(() => setPermNotice(''), 3000);
     } else {
       alert(res?.message || 'هەڵە لە نوێکردنەوەی دەسەڵاتەکان');
@@ -738,7 +739,7 @@ const Settings = () => {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
         
         {/* Appearance Settings */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
@@ -1129,7 +1130,7 @@ const Settings = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
         
         {/* Card 1: Thermal Receipt Printer & Cash Drawer Setup */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative' }}>
@@ -1339,7 +1340,7 @@ const Settings = () => {
         </div>
 
         {/* Card 2: Barcode Scanner Live Test Pad */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '8px' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#10b981', fontSize: '1.15rem', fontWeight: 800 }}>
@@ -1448,7 +1449,7 @@ const Settings = () => {
       {showTroubleshoot && (
         <div className="glass-panel" style={{ marginTop: '1.5rem', padding: '1.8rem', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
           <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            📘 ڕێبەری تەواوی دانان و بەستنەوەی سکانەر، چاپکەر و قاسەی پارە
+            <BookOpen size={20} color="#0284c7" /> ڕێبەری تەواوی دانان و بەستنەوەی سکانەر، چاپکەر و قاسەی پارە
           </h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
@@ -1503,7 +1504,7 @@ const Settings = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
 
         {/* Telegram Cloud Backup Card (Multiple Recipients & Clean Folder Naming) */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
@@ -1513,7 +1514,7 @@ const Settings = () => {
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                🤖 @{telegramSettings?.bot_username || 'cashier_system_bot'}
+                <Bot size={15} /> @{telegramSettings?.bot_username || 'cashier_system_bot'}
               </span>
               <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
                 {telegramSettings?.activeCount || 0} وەرگر چالاکە
@@ -1629,9 +1630,9 @@ const Settings = () => {
                         type="button"
                         onClick={() => handleTestRecipient(r.id)}
                         title="ناردنی پەیامی تاقیکاری تەنها بۆ ئەم چاتە"
-                        style={{ padding: '5px 9px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                        style={{ padding: '5px 9px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                       >
-                        ⚡ پشکنین
+                        <Zap size={13} /> پشکنین
                       </button>
                       <button
                         type="button"
@@ -1702,16 +1703,23 @@ const Settings = () => {
               </div>
             </div>
 
-            <div style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: '1.6' }}>
-              💡 <strong>چۆنیەتی بەستنەوە:</strong> پێویست بە هیچ Chat ID و ژمارەیەک ناکات! تەنها ئەم بەستەرەی سەرەوە بنێرە بۆ هەر کەسێک کە دەتەوێت باکئەپی مارکێت وەربگرێت (شەریک، بەڕێوەبەر، ژمێریار). هەر کە لە تێلیگرام دوگمەی <strong>Start</strong> دادەگرن، ناویان بە شێوەیەکی ئۆتۆماتیکی لەم لیستەی سەرەوەدا زیاد دەبێت و دەتوانیت بە دوگمەی قەڵەمەکە (<Edit2 size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />) ناوەکەیان لە ئەپەکەدا دەستکاری بکەیت.
+            <div style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: '1.6', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+              <Info size={16} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong>چۆنیەتی بەستنەوە:</strong> پێویست بە هیچ Chat ID و ژمارەیەک ناکات! تەنها ئەم بەستەرەی سەرەوە بنێرە بۆ هەر کەسێک کە دەتەوێت باکئەپی مارکێت وەربگرێت (شەریک، بەڕێوەبەر، ژمێریار). هەر کە لە تێلیگرام دوگمەی <strong>Start</strong> دادەگرن، ناویان بە شێوەیەکی ئۆتۆماتیکی لەم لیستەی سەرەوەدا زیاد دەبێت و دەتوانیت بە دوگمەی قەڵەمەکە (<Edit2 size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />) ناوەکەیان لە ئەپەکەدا دەستکاری بکەیت.
+              </div>
             </div>
           </div>
 
           {/* Clean Naming & Folder Preview */}
           <div style={{ padding: '0.8rem 1rem', background: 'rgba(56, 189, 248, 0.04)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.12)', marginBottom: '1.2rem', fontSize: '0.82rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-              <span style={{ color: '#94a3b8' }}>📁 بوخچە لە تێلیگرام: <strong style={{ color: '#38bdf8' }}>POS_Backups_{new Date().toISOString().slice(0, 7)}/</strong></span>
-              <span style={{ color: '#94a3b8' }}>📄 ناوی فایلی باکئەپ: <strong style={{ color: '#34d399' }}>POS_Backup_{new Date().toISOString().slice(0, 10)}_...json</strong></span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Folder size={14} color="#38bdf8" /> بوخچە لە تێلیگرام: <strong style={{ color: '#38bdf8' }}>POS_Backups_{new Date().toISOString().slice(0, 7)}/</strong>
+              </span>
+              <span style={{ color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <FileText size={14} color="#34d399" /> ناوی فایلی باکئەپ: <strong style={{ color: '#34d399' }}>POS_Backup_{new Date().toISOString().slice(0, 10)}_...json</strong>
+              </span>
             </div>
           </div>
 
@@ -1735,7 +1743,7 @@ const Settings = () => {
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: telegramSettings?.activeCount ? 'linear-gradient(135deg, #0284c7, #229ED9)' : 'rgba(255,255,255,0.06)', color: telegramSettings?.activeCount ? 'white' : '#64748b', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: (!telegramSettings?.activeCount || telegramSending) ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: telegramSettings?.activeCount ? '0 4px 15px rgba(34, 158, 217, 0.3)' : 'none' }}
           >
             <Send size={18} className={telegramSending ? 'animate-spin' : ''} />
-            {telegramSending ? 'باکئەپ دەنێردرێت بۆ هەموو وەرگرەکان...' : `📤 ناردنی باکئەپ بۆ هەموو چاتە دیاریکراوەکان (${telegramSettings?.activeCount || 0} کەس)`}
+            {telegramSending ? 'باکئەپ دەنێردرێت بۆ هەموو وەرگرەکان...' : `ناردنی باکئەپ بۆ هەموو چاتە دیاریکراوەکان (${telegramSettings?.activeCount || 0} کەس)`}
           </button>
 
           {/* Last Sent Info */}
@@ -1759,7 +1767,7 @@ const Settings = () => {
         </div>
 
         {/* Local Computer Backup Card (Download & Restore) */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#10b981' }}>
