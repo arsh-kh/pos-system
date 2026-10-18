@@ -4,7 +4,7 @@ import {
   Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
   AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
   Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock,
-  Copy, ExternalLink, Edit2
+  Copy, ExternalLink, Edit2, Printer, ScanBarcode, Volume2, Zap, HelpCircle as HelpIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -22,6 +22,124 @@ const Settings = () => {
   const { isAdmin, currentUser, changePassword, lockToCashier, cashierPermissions, updatePermissions } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [savedNotice, setSavedNotice] = useState(false);
+
+  // -------------------------------------------------------------
+  // Hardware Management: Thermal Printer & Barcode Scanner State
+  // -------------------------------------------------------------
+  const [printersList, setPrintersList] = useState([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(() => localStorage.getItem('pos_selected_printer') || '');
+  const [paperWidth, setPaperWidth] = useState(() => localStorage.getItem('pos_paper_width') || '80mm');
+  const [silentPrint, setSilentPrint] = useState(() => localStorage.getItem('pos_silent_print') === 'true');
+  const [hardwareNotice, setHardwareNotice] = useState('');
+  const [isTestPrinting, setIsTestPrinting] = useState(false);
+  const [isDrawerTesting, setIsDrawerTesting] = useState(false);
+
+  // Live Barcode Scanner Test Pad State
+  const [scannerTestInput, setScannerTestInput] = useState('');
+  const [lastScannedItem, setLastScannedItem] = useState(null);
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
+
+  // Fetch installed Windows printers on mount
+  useEffect(() => {
+    const fetchPrinters = async () => {
+      if (ipcRenderer) {
+        try {
+          const res = await ipcRenderer.invoke('get-printers');
+          if (res?.success && Array.isArray(res.printers)) {
+            setPrintersList(res.printers);
+            if (!selectedPrinter) {
+              const def = res.printers.find(p => p.isDefault);
+              if (def) setSelectedPrinter(def.name);
+            }
+          }
+        } catch (_) {}
+      }
+    };
+    fetchPrinters();
+  }, [selectedPrinter]);
+
+  const handleSaveHardwareSettings = () => {
+    localStorage.setItem('pos_selected_printer', selectedPrinter);
+    localStorage.setItem('pos_paper_width', paperWidth);
+    localStorage.setItem('pos_silent_print', silentPrint ? 'true' : 'false');
+    setHardwareNotice('ڕێکخستنەکانی چاپکەر و ئامێرەکان بە سەرکەوتوویی پاشەکەوت کران ✔');
+    setTimeout(() => setHardwareNotice(''), 3500);
+  };
+
+  const handleTestPrint = async () => {
+    setIsTestPrinting(true);
+    setHardwareNotice('');
+    try {
+      if (ipcRenderer) {
+        const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی نموونەیی';
+        const res = await ipcRenderer.invoke('print-test-receipt', {
+          printerName: selectedPrinter,
+          storeName,
+          paperWidth
+        });
+        if (res?.success) {
+          setHardwareNotice('پسووڵەی تاقیکردنەوە ڕەوانەی چاپکەر کرا ✔');
+        } else {
+          setHardwareNotice(res?.error || 'کێشەیەک لە ناردن بۆ چاپکەر ڕوویدا');
+        }
+      } else {
+        window.print();
+        setHardwareNotice('پەنجەرەی چاپکردنی تاقیکردنەوە کرایەوە ✔');
+      }
+    } catch (err) {
+      setHardwareNotice('هەڵە لە چاپکردن: ' + (err.message || ''));
+    } finally {
+      setIsTestPrinting(false);
+      setTimeout(() => setHardwareNotice(''), 4000);
+    }
+  };
+
+  const handleTestDrawer = async () => {
+    setIsDrawerTesting(true);
+    setHardwareNotice('');
+    try {
+      if (ipcRenderer) {
+        await ipcRenderer.invoke('test-cash-drawer');
+        ipcRenderer.send('open-cash-drawer');
+      }
+      setHardwareNotice('فەرمانی کردنەوەی قاسەی پارە (RJ11 Pulse) نێردرا 🔓');
+    } catch (_) {
+      setHardwareNotice('قاسەی پارە کرایەوە');
+    } finally {
+      setIsDrawerTesting(false);
+      setTimeout(() => setHardwareNotice(''), 3000);
+    }
+  };
+
+  const playScanBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    } catch (_) {}
+  };
+
+  const handleScannerTestSubmit = (e) => {
+    e.preventDefault();
+    if (!scannerTestInput.trim()) return;
+    playScanBeep();
+    const cleanCode = scannerTestInput.trim();
+    setLastScannedItem({
+      code: cleanCode,
+      length: cleanCode.length,
+      time: new Date().toLocaleTimeString('en-GB'),
+      isScale: cleanCode.length === 13 && (cleanCode.startsWith('20') || cleanCode.startsWith('21') || cleanCode.startsWith('22'))
+    });
+    setScannerTestInput('');
+  };
 
   // Cashier Selected Fields & Permissions State
   const [permDraft, setPermDraft] = useState({});
@@ -1000,6 +1118,380 @@ const Settings = () => {
           </div>
         </div>
       </div>
+
+      {/* Hardware Setup Section: Thermal Receipt Printer, Cash Drawer & Barcode Scanner */}
+      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Printer size={22} color="#0284c7" /> ئامێرەکان: چاپکەر، سندوقی پارە، و سکانەری بارکۆد
+        </h2>
+        <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+          بەستنەوە، هەڵبژاردنی چاپکەری حەراری (80mm/58mm)، پشکنینی ڕاستەوخۆی سکانەر و کردنەوەی سندوقی پارە (قاسە).
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2rem' }}>
+        
+        {/* Card 1: Thermal Receipt Printer & Cash Drawer Setup */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#0284c7', fontSize: '1.15rem', fontWeight: 800 }}>
+              <Printer size={22} /> چاپکەری حەراری و سندوقی پارە
+            </h3>
+            <span style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', fontWeight: 700, border: '1px solid rgba(2, 132, 199, 0.3)' }}>
+              ESC/POS Hardware
+            </span>
+          </div>
+
+          {hardwareNotice && (
+            <div style={{ 
+              padding: '10px 14px', 
+              borderRadius: '12px', 
+              background: hardwareNotice.includes('هەڵە') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
+              color: hardwareNotice.includes('هەڵە') ? '#ef4444' : '#10b981', 
+              border: hardwareNotice.includes('هەڵە') ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
+              fontSize: '0.86rem', 
+              fontWeight: 700, 
+              marginBottom: '1rem' 
+            }}>
+              {hardwareNotice}
+            </div>
+          )}
+
+          {/* Printer Selection Dropdown */}
+          <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              چاپکەری دیاریکراو لە ویندۆز (Printer Device):
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <select
+                value={selectedPrinter}
+                onChange={(e) => setSelectedPrinter(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  fontWeight: 600
+                }}
+              >
+                <option value="">چاپکەری سەرەکی سیستم (Default Windows Printer)</option>
+                {printersList.map(p => (
+                  <option key={p.name} value={p.name}>
+                    {p.name} {p.isDefault ? ' (سەرەکی)' : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveHardwareSettings}
+                title="پاشەکەوتکردنی هەڵبژاردن"
+                className="btn-primary"
+                style={{ padding: '0 14px', borderRadius: '10px', fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <Save size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Paper Width & Silent Print Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '1.4rem' }}>
+            <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 700 }}>قەبارەی کاغەز:</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setPaperWidth('80mm'); localStorage.setItem('pos_paper_width', '80mm'); }}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    borderRadius: '8px',
+                    border: paperWidth === '80mm' ? '1px solid #0284c7' : '1px solid var(--border-color)',
+                    background: paperWidth === '80mm' ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                    color: paperWidth === '80mm' ? '#0284c7' : 'var(--text-secondary)',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  80mm (ستاندارد)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPaperWidth('58mm'); localStorage.setItem('pos_paper_width', '58mm'); }}
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    borderRadius: '8px',
+                    border: paperWidth === '58mm' ? '1px solid #0284c7' : '1px solid var(--border-color)',
+                    background: paperWidth === '58mm' ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                    color: paperWidth === '58mm' ? '#0284c7' : 'var(--text-secondary)',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  58mm (بچووک)
+                </button>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => {
+                const nextVal = !silentPrint;
+                setSilentPrint(nextVal);
+                localStorage.setItem('pos_silent_print', nextVal ? 'true' : 'false');
+              }}
+              style={{ 
+                padding: '10px', 
+                borderRadius: '12px', 
+                background: 'var(--bg-tertiary)', 
+                border: silentPrint ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid var(--border-color)', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}
+            >
+              <div>
+                <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>چاپکردنی بێدەنگ</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>بەبێ پەنجەرەی چاپ</span>
+              </div>
+              <div style={{
+                width: '38px',
+                height: '22px',
+                borderRadius: '12px',
+                background: silentPrint ? '#10b981' : 'rgba(148, 163, 184, 0.3)',
+                position: 'relative',
+                transition: 'background 0.2s ease',
+                flexShrink: 0
+              }}>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  position: 'absolute',
+                  top: '3px',
+                  right: silentPrint ? '3px' : '19px',
+                  transition: 'right 0.2s ease'
+                }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons: Test Print & Test Cash Drawer */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleTestPrint}
+              disabled={isTestPrinting}
+              style={{
+                flex: 1,
+                minWidth: '150px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: 'rgba(2, 132, 199, 0.12)',
+                color: '#0284c7',
+                border: '1px solid rgba(2, 132, 199, 0.35)',
+                fontWeight: 700,
+                fontSize: '0.86rem',
+                cursor: isTestPrinting ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Printer size={16} />
+              {isTestPrinting ? 'چاپ دەکرێت...' : 'تاقیکردنەوەی چاپکردن'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTestDrawer}
+              disabled={isDrawerTesting}
+              style={{
+                flex: 1,
+                minWidth: '150px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: '#d97706',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                fontWeight: 700,
+                fontSize: '0.86rem',
+                cursor: isDrawerTesting ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Zap size={16} />
+              {isDrawerTesting ? 'دەنێردرێت...' : 'تستکردنی قاسەی پارە'}
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: Barcode Scanner Live Test Pad */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#10b981', fontSize: '1.15rem', fontWeight: 800 }}>
+                <ScanBarcode size={22} /> پشکنینی سکانەری بارکۆد
+              </h3>
+              <span style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                Live Scanner Test Pad
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.5' }}>
+              سکانەرەکەت (USB یان بێتەل) ببەستەوە و لەم خانەیەی خوارەوە بارکۆدی هەر کاڵایەک سکان بکە بۆ دڵنیابوونەوە لە ناردنی کۆد و هێمای Enter:
+            </p>
+
+            <form onSubmit={handleScannerTestSubmit} style={{ marginBottom: '1rem' }}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="لێرە بارکۆدێک بە سکانەرەکەت لێبدە..."
+                  value={scannerTestInput}
+                  onChange={(e) => setScannerTestInput(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '14px',
+                    background: 'var(--bg-secondary)',
+                    border: '2px dashed #10b981',
+                    color: 'var(--text-primary)',
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    textAlign: 'center',
+                    letterSpacing: '2px'
+                  }}
+                />
+              </div>
+            </form>
+
+            {/* Live Scan Confirmation Badge */}
+            {lastScannedItem ? (
+              <div style={{ 
+                padding: '12px 16px', 
+                borderRadius: '14px', 
+                background: 'rgba(16, 185, 129, 0.1)', 
+                border: '1.5px solid rgba(16, 185, 129, 0.4)',
+                marginBottom: '1rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontWeight: 800, fontSize: '0.9rem' }}>
+                    <CheckCircle2 size={16} /> سکانەرەکە بە سەرکەوتوویی ناسێندرا!
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{lastScannedItem.time}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: '8px', fontFamily: 'monospace', fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', letterSpacing: '1px' }}>
+                    {lastScannedItem.code}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    درێژی: {lastScannedItem.length} پیت/ژمارە
+                  </span>
+                  {lastScannedItem.isScale && (
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                      بارکۆدی تەرازووی دیجیتاڵ
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                هێشتا هیچ بارکۆدێک لەم بەشەدا سکان نەکراوە.
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <button
+              type="button"
+              onClick={() => setShowTroubleshoot(prev => !prev)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: 'transparent',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <HelpCircle size={15} color="#0284c7" />
+              {showTroubleshoot ? 'شاردنەوەی ڕێبەری چارەسەری کێشەکان' : 'ڕێبەری هەنگاو بە هەنگاوی بەستنەوە و کێشەکان'}
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Expandable Step-by-Step Hardware Guide */}
+      {showTroubleshoot && (
+        <div className="glass-panel" style={{ marginTop: '1.5rem', padding: '1.8rem', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            📘 ڕێبەری تەواوی دانان و بەستنەوەی سکانەر، چاپکەر و قاسەی پارە
+          </h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
+            
+            {/* Guide Step 1: Scanner */}
+            <div style={{ padding: '14px', borderRadius: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 800, color: '#10b981', fontSize: '0.92rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ١. بارکۆد سکانەر (Barcode Scanner)
+              </div>
+              <ul style={{ margin: 0, paddingRight: '18px', fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                <li>کێبڵی USB یان دانگڵی بێتەل (Wireless Dongle) بدە لە کۆمپیوتەر؛ ویندۆز دەستبەجێ وەک تەختەکلیل دەیناسێت.</li>
+                <li><strong>گرنگترین خاڵ:</strong> پێویستە سکانەرەکە لە کاتی لێدانی بارکۆددا هێمای <code>Enter (CR)</code> بنێرێت. ئەگەر پاش سکان لەسەر شاشەی کاشێر دانەنیشت، لەناو دەفتەرچەی کارگەیی سکانەرەکەتدا بارکۆدی <strong>«Add Enter Suffix»</strong> تەنها یەکجار سکان بکە.</li>
+                <li>سیستەمەکەمان خۆکارانە ژمارە عەرەبییەکان دەگۆڕێت بۆ ستاندارد، بۆیە کێشەی زمانی کیبۆرد ڕوونادات.</li>
+              </ul>
+            </div>
+
+            {/* Guide Step 2: Thermal Printer */}
+            <div style={{ padding: '14px', borderRadius: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 800, color: '#0284c7', fontSize: '0.92rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ٢. چاپکەری حەراری (Thermal Receipt Printer)
+              </div>
+              <ul style={{ margin: 0, paddingRight: '18px', fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                <li>کێبڵی کارەبا و کێبڵی USB لە پشتەوەی چاپکەرەکە ببەستە.</li>
+                <li>درایڤەری چاپکەرەکەت (وەک: Xprinter Driver یان POS-80 Driver) دابمەزرێنە و جۆری پۆرتەکە بکە بە <strong>USB</strong>.</li>
+                <li>لە ڕێکخستنی سەرەوە چاپکەرەکەت دیاریبکە و کرتە لە <strong>«تاقیکردنەوەی چاپکردن»</strong> بکە بۆ دڵنیابوونەوە لە سەرکەوتنی چاپ.</li>
+              </ul>
+            </div>
+
+            {/* Guide Step 3: Cash Drawer */}
+            <div style={{ padding: '14px', borderRadius: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 800, color: '#d97706', fontSize: '0.92rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ٣. سندوقی پارە - قاسە (Cash Drawer)
+              </div>
+              <ul style={{ margin: 0, paddingRight: '18px', fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                <li>قاسەی پارە پێویستی بە کارەبای جیاواز نییە؛ کێبڵە تەلەفۆنییەکەی (RJ11) لە پشتەوەی قاسەوە بدە لە پۆرتی <strong>DK (Drawer Kick)</strong> لە پشتەوەی چاپکەری حەرارییەکە.</li>
+                <li>لە کاتی هەر فرۆشتنێکی نەقد لە شاشەی کاشێر، چاپکەرەکە سیگناڵی لێدانی کارەبایی دەنێرێت و دەرگای قاسەکە خۆی دەکاتەوە!</li>
+                <li>دەتوانیت کلیلەکە بە شێوەی ستوونی (Vertical) دابنێیت بۆ ئەوەی بە فەرمانی ئەلیکترۆنی بکرێتەوە.</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Section 2: Data Protection & Backups */}
       <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>

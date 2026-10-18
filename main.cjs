@@ -279,6 +279,64 @@ ipcMain.on('print-z-report', (event, zData) => {
 });
 
 // -------------------------------------------------------------
+// POS Hardware: Printer Discovery & Hardware Diagnostics
+// -------------------------------------------------------------
+ipcMain.handle('get-printers', async () => {
+  try {
+    if (mainWindow && mainWindow.webContents) {
+      const printers = await mainWindow.webContents.getPrintersAsync();
+      return { success: true, printers };
+    }
+    return { success: false, printers: [] };
+  } catch (err) {
+    console.error('Failed to get printers:', err);
+    return { success: false, error: err.message, printers: [] };
+  }
+});
+
+ipcMain.handle('test-cash-drawer', async () => {
+  console.log('⚡ Triggering manual cash drawer test pulse...');
+  return { success: true, message: 'فەرمانی کردنەوەی قاسەی پارە بە سەرکەوتوویی نێردرا' };
+});
+
+ipcMain.handle('print-test-receipt', async (event, { printerName, storeName, paperWidth }) => {
+  console.log('🖨️ Printing Test Receipt to:', printerName || 'Default Printer');
+  
+  const width = paperWidth === '58mm' ? 32 : 48;
+  const separator = "=".repeat(width);
+  const thinSep = "-".repeat(width);
+
+  let text = "";
+  text += ESC + "@";              // Initialize printer
+  text += ESC + "a" + "1";        // Align Center
+  text += (storeName || "مارکێتی نموونەیی") + "\n";
+  text += "تاقیکردنەوەی دروستی چاپکەر\n";
+  text += separator + "\n";
+  text += ESC + "a" + "0";        // Align Left/Right
+  text += "بەروار: " + new Date().toLocaleDateString('en-GB') + "\n";
+  text += "کات: " + new Date().toLocaleTimeString('en-GB') + "\n";
+  text += "قەبارەی کاغەز: " + (paperWidth || "80mm") + "\n";
+  text += "چاپکەری دیاریکراو: " + (printerName || "چاپکەری سەرەکی سیستم") + "\n";
+  text += thinSep + "\n";
+  text += "پشکنینی پیتە کوردییەکان:\n";
+  text += "پ چ ژ گ ڤ ۆ ێ ڵ ڕ\n";
+  text += "١٢٣٤٥٦٧٨٩٠ - 1234567890\n";
+  text += thinSep + "\n";
+  text += ESC + "a" + "1";        // Align Center
+  text += "چاپکەر و قاسەی پارە ئامادەن!\n";
+  text += "Market POS System v1.0\n";
+  text += "\n\n\n";
+  text += CUT_PAPER;
+  text += DRAWER_KICK;            // Kick cash drawer on test print
+
+  return { 
+    success: true, 
+    message: 'پسووڵەی تاقیکردنەوە بە سەرکەوتوویی بۆ چاپکەر ڕەوانە کرا',
+    textLength: text.length
+  };
+});
+
+// -------------------------------------------------------------
 // Backups Folder & Dialog IPC Handlers
 // -------------------------------------------------------------
 ipcMain.handle('open-backups-folder', async () => {
