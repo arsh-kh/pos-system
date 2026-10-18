@@ -148,9 +148,10 @@ const ThisMonth = () => {
           <h3>کۆی فرۆشتنی ئەم مانگە</h3>
           <div className="value highlight" style={{ color: '#38bdf8' }}>{totalSales.toLocaleString()} دینار</div>
           {monthOverMonthDelta !== null ? (
-            <div className="sub-text" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: Number(monthOverMonthDelta) >= 0 ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
+            <div className="sub-text" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: Number(monthOverMonthDelta) >= 0 ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
               {Number(monthOverMonthDelta) >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-              {Number(monthOverMonthDelta) >= 0 ? `+${monthOverMonthDelta}%` : `${monthOverMonthDelta}%`} گۆڕانکاری لە چاو مانگی ڕابردوو
+              <span dir="ltr">{Number(monthOverMonthDelta) >= 0 ? `+${monthOverMonthDelta}%` : `${monthOverMonthDelta}%`}</span>
+              <span>گۆڕانکاری لە چاو مانگی ڕابردوو</span>
             </div>
           ) : (
             <div className="sub-text" style={{ color: 'var(--text-secondary)' }}>
@@ -163,7 +164,7 @@ const ThisMonth = () => {
         <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
           <h3>قازانجی سافی ڕاستەقینە</h3>
           <div className="value success" style={{ color: '#10b981' }}>{netProfit.toLocaleString()} دینار</div>
-          <div className="sub-text" style={{ color: '#94a3b8' }}>
+          <div className="sub-text" style={{ color: 'var(--text-secondary)' }}>
             دوای داشکاندنی خەرجی و زیانەکان
           </div>
         </div>
@@ -251,7 +252,7 @@ const ThisMonth = () => {
         ) : (
           <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={processedDailyData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+              <AreaChart data={processedDailyData} margin={{ top: 20, right: 30, left: 35, bottom: 5 }}>
                 <defs>
                   <linearGradient id="colorSalesMonth" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.8}/>
@@ -264,7 +265,7 @@ const ThisMonth = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
                 <XAxis dataKey="formattedDate" stroke="var(--text-secondary)" />
-                <YAxis stroke="var(--text-secondary)" />
+                <YAxis stroke="var(--text-secondary)" width={75} tickFormatter={(v) => Number(v) >= 1000000 ? `${(Number(v)/1000000).toFixed(1)}M` : (Number(v) >= 1000 ? `${(Number(v)/1000).toFixed(0)}K` : v)} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', color: 'var(--text-primary)' }}
                   formatter={(val) => [`${Number(val).toLocaleString()} دینار`]}
@@ -318,11 +319,11 @@ const ThisMonth = () => {
                           </span>
                         ) : isUp ? (
                           <span style={{ color: '#10b981', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: '6px' }}>
-                            <ArrowUpRight size={14} /> +{d.changePercent}%
+                            <ArrowUpRight size={14} /> <span dir="ltr">+{d.changePercent}%</span>
                           </span>
                         ) : (
                           <span style={{ color: '#ef4444', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.1)', padding: '4px 10px', borderRadius: '6px' }}>
-                            <ArrowDownRight size={14} /> {d.changePercent}%
+                            <ArrowDownRight size={14} /> <span dir="ltr">{d.changePercent}%</span>
                           </span>
                         )}
                       </td>

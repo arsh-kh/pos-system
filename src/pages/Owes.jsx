@@ -559,7 +559,7 @@ const Owes = () => {
                       title="کەمکردنەوە بە ٢٥٠ دینار"
                       style={{ width: '48px', height: '52px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      -٢٥٠
+                      <span dir="ltr" style={{ display: 'inline-block' }}>-250</span>
                     </button>
 
                     <input 
@@ -582,7 +582,7 @@ const Owes = () => {
                       title="زیادکردن بە ٢٥٠ دینار"
                       style={{ width: '48px', height: '52px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      +٢٥٠
+                      <span dir="ltr" style={{ display: 'inline-block' }}>+250</span>
                     </button>
                   </div>
 
@@ -605,7 +605,7 @@ const Owes = () => {
                         }}
                         style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
                       >
-                        +{amt.toLocaleString()}
+                        <span dir="ltr" style={{ display: 'inline-block' }}>+{amt.toLocaleString()}</span>
                       </button>
                     ))}
                   </div>

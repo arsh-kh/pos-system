@@ -1167,7 +1167,7 @@ const Cashier = () => {
           </div>
 
           {/* Quick Products Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '2px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 2px' }}>
             {filteredProducts.map(p => {
               const promo = activePromotions[p.id];
               const isOutOfStock = p.stock <= 0;
@@ -1179,42 +1179,59 @@ const Cashier = () => {
                   onClick={() => addToCart(p, 1, 'PIECE')}
                   className={`pos-product-card ${promo ? 'has-promo' : ''}`}
                   style={{
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: promo ? '1.5px solid var(--warning-color)' : '1px solid var(--border-color)',
+                    padding: '12px 14px',
+                    borderRadius: '14px',
+                    border: promo ? '1.5px solid rgba(217, 119, 6, 0.45)' : '1px solid var(--border-color)',
                     background: promo ? 'linear-gradient(180deg, rgba(217, 119, 6, 0.08) 0%, var(--bg-secondary) 100%)' : 'var(--bg-secondary)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    minHeight: '130px',
+                    minHeight: '165px',
                     boxSizing: 'border-box',
                     cursor: 'pointer',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'visible',
+                    boxShadow: promo ? '0 2px 8px rgba(217, 119, 6, 0.12)' : '0 1px 3px rgba(0, 0, 0, 0.04)'
                   }}
                 >
                   {/* Top Meta: Stock & Promo Tag */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <div style={{ fontSize: '0.72rem', color: isOutOfStock ? '#d97706' : 'var(--text-muted)', fontWeight: isOutOfStock ? 700 : 500 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', minHeight: '22px' }}>
+                    <div style={{ fontSize: '0.73rem', fontWeight: 600 }}>
                       {isOutOfStock ? (
-                        <span style={{ background: 'var(--warning-light)', color: '#d97706', padding: '1px 5px', borderRadius: '4px' }}>⚠️ تەواوبوو</span>
+                        <span style={{ 
+                          background: 'rgba(239, 68, 68, 0.12)', 
+                          color: '#dc2626', 
+                          border: '1px solid rgba(239, 68, 68, 0.3)', 
+                          padding: '2px 7px', 
+                          borderRadius: '6px' 
+                        }}>
+                          ⚠️ تەواوبوو
+                        </span>
                       ) : (
-                        <span>کۆگا: {p.stock}</span>
+                        <span style={{ 
+                          background: 'var(--bg-tertiary)', 
+                          color: 'var(--text-secondary)', 
+                          border: '1px solid var(--border-color)', 
+                          padding: '2px 7px', 
+                          borderRadius: '6px' 
+                        }}>
+                          کۆگا: {p.stock}
+                        </span>
                       )}
                     </div>
 
                     {promo && (
                       <span style={{ 
-                        background: 'rgba(217, 119, 6, 0.12)', 
-                        color: '#d97706', 
-                        border: '1px solid rgba(217, 119, 6, 0.35)', 
-                        padding: '1px 6px', 
-                        borderRadius: '4px', 
-                        fontSize: '0.7rem', 
+                        background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
+                        color: '#ffffff', 
+                        padding: '2px 8px', 
+                        borderRadius: '6px', 
+                        fontSize: '0.72rem', 
                         fontWeight: 800,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '2px'
+                        gap: '3px',
+                        boxShadow: '0 2px 4px rgba(217, 119, 6, 0.25)'
                       }}>
                         <Tag size={10} /> ئۆفەر
                       </span>
@@ -1224,16 +1241,16 @@ const Cashier = () => {
                   {/* Product Title */}
                   <div style={{ 
                     fontWeight: 700, 
-                    fontSize: '0.88rem', 
+                    fontSize: '0.92rem', 
                     display: '-webkit-box', 
                     WebkitLineClamp: 2, 
                     WebkitBoxOrient: 'vertical', 
                     overflow: 'hidden', 
-                    lineHeight: '1.35',
-                    minHeight: '2.5em',
+                    lineHeight: '1.4',
+                    minHeight: '2.8em',
                     wordBreak: 'break-word',
                     color: 'var(--text-primary)',
-                    margin: '2px 0 6px 0'
+                    margin: '2px 0 8px 0'
                   }}>
                     {p.name}
                   </div>
@@ -1241,25 +1258,25 @@ const Cashier = () => {
                   {/* Pricing and Action Strip */}
                   <div style={{ marginTop: 'auto' }}>
                     {/* Price Row */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
                       {promo ? (
                         <>
-                          <span style={{ color: '#d97706', fontWeight: 900, fontSize: '1.05rem', lineHeight: '1' }}>
+                          <span style={{ color: '#d97706', fontWeight: 900, fontSize: '1.18rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
                             {Number(promo.promo_price).toLocaleString()} د.ع
                           </span>
-                          <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through', fontSize: '0.74rem' }}>
+                          <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through', fontSize: '0.78rem', fontWeight: 500 }}>
                             {Number(p.selling_price).toLocaleString()}
                           </span>
                         </>
                       ) : (
-                        <span style={{ color: 'var(--accent-hover)', fontWeight: 900, fontSize: '1.08rem', lineHeight: '1' }}>
+                        <span style={{ color: 'var(--accent-hover)', fontWeight: 900, fontSize: '1.2rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
                           {Number(p.selling_price).toLocaleString()} د.ع
                         </span>
                       )}
                     </div>
 
                     {/* Unit & Carton Buttons */}
-                    <div style={{ display: 'flex', gap: '5px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1268,17 +1285,20 @@ const Cashier = () => {
                         }}
                         style={{
                           flex: 1,
-                          padding: '4px 6px',
-                          borderRadius: '6px',
+                          height: '34px',
+                          padding: '0 10px',
+                          borderRadius: '8px',
                           background: 'var(--accent-light)',
                           color: 'var(--accent-color)',
                           border: '1px solid rgba(37, 99, 235, 0.25)',
-                          fontSize: '0.74rem',
-                          fontWeight: 700,
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'center'
+                          justifyContent: 'center',
+                          gap: '3px',
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         +١ {p.unit || 'دانە'}
@@ -1294,21 +1314,23 @@ const Cashier = () => {
                           title={`زیادکردنی ١ کارتۆن (${p.units_per_box || 1} دانە) بە نرخی ${Number(p.wholesale_price).toLocaleString()} د.ع`}
                           style={{
                             flex: 1,
-                            padding: '4px 6px',
-                            borderRadius: '6px',
+                            height: '34px',
+                            padding: '0 8px',
+                            borderRadius: '8px',
                             background: 'rgba(2, 132, 199, 0.1)',
                             border: '1px solid rgba(2, 132, 199, 0.35)',
                             color: '#0284c7',
-                            fontSize: '0.72rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '2px'
+                            gap: '3px',
+                            whiteSpace: 'nowrap'
                           }}
                         >
-                          <Package size={11} /> کارتۆن
+                          <Package size={12} /> کارتۆن
                         </button>
                       )}
                     </div>
@@ -1646,7 +1668,7 @@ const Cashier = () => {
                       title="-250"
                       style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--warning-light)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#b45309', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
                     >
-                      -٢٥٠
+                      <span dir="ltr" style={{ display: 'inline-block' }}>-250</span>
                     </button>
 
                     <input
@@ -1670,7 +1692,7 @@ const Cashier = () => {
                       title="+250"
                       style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--warning-light)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#b45309', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
                     >
-                      +٢٥٠
+                      <span dir="ltr" style={{ display: 'inline-block' }}>+250</span>
                     </button>
                   </div>
 
@@ -1983,7 +2005,7 @@ const Cashier = () => {
                   flexShrink: 0
                 }}
               >
-                {discountType === 'AMOUNT' ? '-٢٥٠' : '-٥٪'}
+                <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '-250' : '-5%'}</span>
               </button>
 
               <input 
@@ -2025,7 +2047,7 @@ const Cashier = () => {
                   flexShrink: 0
                 }}
               >
-                {discountType === 'AMOUNT' ? '+٢٥٠' : '+٥٪'}
+                <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '+250' : '+5%'}</span>
               </button>
 
               {calculatedDiscount > 0 && (
@@ -2282,7 +2304,7 @@ const Cashier = () => {
                     }}
                     style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    -٢٥٠
+                    <span dir="ltr" style={{ display: 'inline-block' }}>-250</span>
                   </button>
                   <input 
                     type="number" 
@@ -2303,7 +2325,7 @@ const Cashier = () => {
                     }}
                     style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    +٢٥٠
+                    <span dir="ltr" style={{ display: 'inline-block' }}>+250</span>
                   </button>
                 </div>
                 {/* Fast Dinar Presets */}
@@ -2428,7 +2450,7 @@ const Cashier = () => {
                     }}
                     style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    -٢٥٠
+                    <span dir="ltr" style={{ display: 'inline-block' }}>-250</span>
                   </button>
                   <input 
                     type="number" 
@@ -2448,7 +2470,7 @@ const Cashier = () => {
                     }}
                     style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    +٢٥٠
+                    <span dir="ltr" style={{ display: 'inline-block' }}>+250</span>
                   </button>
                 </div>
               </div>
@@ -2660,7 +2682,7 @@ const Cashier = () => {
                     }}
                     style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    -٢٥٠
+                    <span dir="ltr" style={{ display: 'inline-block' }}>-250</span>
                   </button>
                   <input 
                     type="number" 
@@ -2681,7 +2703,7 @@ const Cashier = () => {
                     }}
                     style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    +٢٥٠
+                    <span dir="ltr" style={{ display: 'inline-block' }}>+250</span>
                   </button>
                 </div>
 

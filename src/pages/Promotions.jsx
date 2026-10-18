@@ -539,7 +539,7 @@ const Promotions = () => {
                     }}
                     style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    {formData.discount_type === 'FIXED_PRICE' ? '-٢٥٠' : '-٥٪'}
+                    <span dir="ltr" style={{ display: 'inline-block' }}>{formData.discount_type === 'FIXED_PRICE' ? '-250' : '-5%'}</span>
                   </button>
                   <input 
                     type="number" 
@@ -563,7 +563,7 @@ const Promotions = () => {
                     }}
                     style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                   >
-                    {formData.discount_type === 'FIXED_PRICE' ? '+٢٥٠' : '+٥٪'}
+                    <span dir="ltr" style={{ display: 'inline-block' }}>{formData.discount_type === 'FIXED_PRICE' ? '+250' : '+5%'}</span>
                   </button>
                 </div>
 

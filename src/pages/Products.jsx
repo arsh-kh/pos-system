@@ -377,7 +377,7 @@ const Products = () => {
             gap: '6px'
           }}
         >
-          هەموو کاڵاکان ({products.length})
+          هەموو دۆخەکان ({products.length})
         </button>
 
         <button
@@ -461,18 +461,18 @@ const Products = () => {
 
       {/* Products Table */}
       <div className="glass-panel" style={{ padding: '1px', borderRadius: '16px', overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
+        <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
           <thead style={{ background: 'var(--bg-tertiary)' }}>
             <tr>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ناوی کاڵا</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کەتەگۆری</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>بارکۆد (دانە / کارتۆن)</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی کڕین (دینار)</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی فرۆشتن (تاک)</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی جوملە (کارتۆن)</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کۆگا</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>بەرواری بەسەرچوون</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کردارەکان</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>ناوی کاڵا</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کەتەگۆری</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>بارکۆد (دانە / کارتۆن)</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی کڕین (دینار)</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی فرۆشتن (تاک)</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی جوملە (کارتۆن)</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کۆگا</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>بەرواری بەسەرچوون</th>
+              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کردارەکان</th>
             </tr>
           </thead>
           <tbody>
@@ -482,14 +482,14 @@ const Products = () => {
               <tr><td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ کاڵایەک نەدۆزرایەوە</td></tr>
             ) : (
               filteredProducts.map(p => (
-                <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
-                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{p.name}</td>
-                  <td style={{ padding: '16px 20px' }}>
+                <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='var(--bg-tertiary)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
+                  <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>{p.name}</td>
+                  <td style={{ padding: '12px 14px' }}>
                     <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}>
                       {p.category_name || 'بێ جۆر'}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: 'bold' }}>{p.barcode}</div>
                     {p.box_barcode && (
                       <div style={{ fontFamily: 'monospace', color: '#0284c7', fontSize: '0.75rem', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -497,25 +497,25 @@ const Products = () => {
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '16px 20px', color: '#94a3b8' }}>
+                  <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>
                     {Number(p.cost_price).toLocaleString()} دینار
                   </td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     <div style={{ color: '#10b981', fontWeight: 'bold' }}>{Number(p.selling_price).toLocaleString()} دینار</div>
                   </td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     {p.wholesale_price > 0 ? (
                       <div>
                         <div style={{ color: '#0284c7', fontWeight: 'bold' }}>{Number(p.wholesale_price).toLocaleString()} دینار</div>
-                        <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                        <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                           کارتۆنی {p.units_per_box ? Number(p.units_per_box) : 1} دانەیی
                         </small>
                       </div>
                     ) : (
-                      <span style={{ color: '#64748b' }}>-</span>
+                      <span style={{ color: 'var(--text-muted)' }}>-</span>
                     )}
                   </td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     {(() => {
                       const threshold = p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? Number(p.low_stock_threshold) : 5;
                       const isLow = Number(p.stock) <= threshold;
@@ -549,9 +549,9 @@ const Products = () => {
                       );
                     })()}
                   </td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '12px 14px' }}>
                     {(() => {
-                      if (!p.expiry_date) return <span style={{ color: '#64748b' }}>-</span>;
+                      if (!p.expiry_date) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
                       const now = new Date();
                       now.setHours(0,0,0,0);
                       const exp = new Date(p.expiry_date);
@@ -572,48 +572,50 @@ const Products = () => {
                         );
                       } else {
                         return (
-                          <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                             {dateStr}
                           </span>
                         );
                       }
                     })()}
                   </td>
-                  <td style={{ padding: '16px 20px', display: 'flex', gap: '8px' }}>
-                    {/* FIFO Batches Button */}
-                    <button 
-                      title="وەجبەکانی FIFO و تێچوون" 
-                      onClick={() => openBatchesModal(p)} 
-                      style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      <Layers size={16} /> وەجبەکان
-                    </button>
-                    {/* Print Barcode Label Button */}
-                    <button 
-                      title="چاپی لەزگەی بارکۆد" 
-                      onClick={() => openPrintModal(p)} 
-                      style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
-                    >
-                      <Printer size={16} /> چاپ
-                    </button>
-                    {/* Edit Button */}
-                    <button 
-                      title="دەستکاریکردن"
-                      onClick={() => openEditModal(p)} 
-                      style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    {/* Delete Button (Admin Only) */}
-                    {isAdmin && (
+                  <td style={{ padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {/* FIFO Batches Button */}
                       <button 
-                        title="سڕینەوە"
-                        onClick={() => handleDelete(p.id)} 
-                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        title="وەجبەکانی FIFO و تێچوون" 
+                        onClick={() => openBatchesModal(p)} 
+                        style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
                       >
-                        <Trash2 size={16} />
+                        <Layers size={14} /> وەجبەکان
                       </button>
-                    )}
+                      {/* Print Barcode Label Button */}
+                      <button 
+                        title="چاپی لەزگەی بارکۆد" 
+                        onClick={() => openPrintModal(p)} 
+                        style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '0.78rem' }}
+                      >
+                        <Printer size={14} /> چاپ
+                      </button>
+                      {/* Edit Button */}
+                      <button 
+                        title="دەستکاریکردن"
+                        onClick={() => openEditModal(p)} 
+                        style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: 'none', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      {/* Delete Button (Admin Only) */}
+                      {isAdmin && (
+                        <button 
+                          title="سڕینەوە"
+                          onClick={() => handleDelete(p.id)} 
+                          style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -829,12 +831,32 @@ const Products = () => {
                 </div>
               </div>
 
-              <button 
-                type="submit" 
-                style={{ marginTop: '0.5rem', width: '100%', padding: '15px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59,130,246,0.4)' }}
-              >
-                پاشەکەوتکردن
-              </button>
+              <div style={{ 
+                position: 'sticky', 
+                bottom: '-1rem', 
+                margin: '1rem -1rem -1rem -1rem', 
+                padding: '12px 16px', 
+                background: 'var(--bg-secondary)', 
+                borderTop: '1px solid var(--border-color)', 
+                display: 'flex', 
+                gap: '10px', 
+                zIndex: 10,
+                boxShadow: '0 -4px 12px rgba(0,0,0,0.08)'
+              }}>
+                <button 
+                  type="submit" 
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'var(--accent-color)', color: 'white', border: 'none', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}
+                >
+                  پاشەکەوتکردن
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)}
+                  style={{ padding: '12px 20px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  پاشگەزبوونەوە
+                </button>
+              </div>
             </form>
           </div>
         </div>
