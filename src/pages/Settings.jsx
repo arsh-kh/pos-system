@@ -771,148 +771,19 @@ const Settings = () => {
             </form>
           </div>
         </div>
+      </div>
 
-        {/* Database Health & Stats Card */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#38bdf8' }}>
-              <HardDrive size={24} /> تەندروستی داتابەیس
-            </h3>
-            <button 
-              onClick={fetchBackupData}
-              disabled={statsLoading}
-              title="نوێکردنەوەی ئامارەکان"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <RefreshCw size={14} className={statsLoading ? 'animate-spin' : ''} /> نوێکردنەوە
-            </button>
-          </div>
+      {/* Section 2: Data Protection & Backups */}
+      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Shield size={22} color="var(--accent-color)" /> پاراستن و باکئەپی داتاکان
+        </h2>
+        <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+          هەموو فرۆشتن و داتاکانی مارکێت بە تەواوی پارێزراون. دەتوانیت لە ڕێگەی تێلیگرامەوە بە ئۆتۆماتیکی باکئەپ وەربگریت یان لەسەر کۆمپیوتەر دایگریت.
+        </p>
+      </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.2rem' }}>
-            <div style={{ padding: '1rem', background: 'rgba(56,189,248,0.05)', borderRadius: '14px', border: '1px solid rgba(56,189,248,0.15)' }}>
-              <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>کۆی خشتەکان</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>
-                {backupStats ? `${backupStats.totalTables} خشتە` : '...'}
-              </div>
-            </div>
-            <div style={{ padding: '1rem', background: 'rgba(16,185,129,0.05)', borderRadius: '14px', border: '1px solid rgba(16,185,129,0.15)' }}>
-              <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>کۆی تۆمارەکان (دێڕ)</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
-                {backupStats ? Number(backupStats.totalRows).toLocaleString() : '...'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ padding: '0.9rem 1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem', color: '#94a3b8' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#cbd5e1', marginBottom: '4px' }}>
-              <Clock size={15} color="#38bdf8" /> دوایین باکئەپی سەر سێرڤەر:
-            </div>
-            {backupStats?.latestBackup ? (
-              <span style={{ color: '#10b981', fontWeight: 'bold' }}>
-                {new Date(backupStats.latestBackup.createdAt).toLocaleString('en-GB')} ({Math.round(backupStats.latestBackup.sizeBytes / 1024)} KB)
-              </span>
-            ) : (
-              <span>هیچ باکئەپێک هێشتا وەرنەگیراوە</span>
-            )}
-          </div>
-        </div>
-
-        {/* Download Backup Card */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem', color: '#10b981' }}>
-            <Download size={24} /> داگرتنی باکئەپی تەواو
-          </h3>
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-            داگرتنی باکئەپێکی دەستبەجێ بە فۆرماتی JSON کە تەواوی پێکهاتە (Schemas) و داتای ٢٣ خشتەکەی داتابەیس دەگرێتەوە: کاڵاکان، وەجبەکانی FIFO، فرۆشتن، قەرزەکان، خەرجییەکان و هەژمارەکان.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button 
-              onClick={handleDownloadBackup} 
-              disabled={backupLoading}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1.1rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '16px', fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(16,185,129,0.1)' }}
-            >
-              <Download size={20} /> {backupLoading ? 'کۆکردنەوەی داتابەیس... چاوەڕوان بە' : 'داگرتنی باکئەپی داتابەیس (JSON)'}
-            </button>
-
-            {ipcRenderer && (
-              <button
-                onClick={handleNativeSaveBackup}
-                disabled={backupLoading}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0.85rem', background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '14px', fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                <Save size={18} /> پاشەکەوتکردن لە کۆمپیوتەر یان فلاش (Save Dialog)
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Restore Backup Card */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem', color: '#f59e0b' }}>
-            <Upload size={24} /> هێنانەوەی باکئەپ (Restore)
-          </h3>
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-            هەڵبژاردنی پەڕگەیەکی باکئەپی کۆن بۆ گەڕاندنەوەی سەرجەم پێکهاتە و داتاکانی فرۆشتن، مەخزەن و قەرزەکان بە شێوازێکی تەواو پارێزراو بە Transaction.
-          </p>
-
-          <label 
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1.25rem', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', border: '1px dashed rgba(245, 158, 11, 0.4)', borderRadius: '16px', fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s', boxSizing: 'border-box' }}
-          >
-            <FileJson size={22} /> هەڵبژاردنی فایلی باکئەپ (.json)
-            <input 
-              type="file" 
-              accept=".json" 
-              onChange={handleFileSelect} 
-              style={{ display: 'none' }} 
-            />
-          </label>
-        </div>
-
-        {/* Cloud & Offline Sync Card */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#38bdf8' }}>
-              <Cloud size={24} /> هاوکاتکردنی کلاود و دەرەوەی هێڵ
-            </h3>
-            {syncData && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '10px', background: syncData.isOnline ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', color: syncData.isOnline ? '#34d399' : '#f87171', border: `1px solid ${syncData.isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`, fontSize: '0.8rem', fontWeight: 'bold' }}>
-                {syncData.isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
-                {syncData.isOnline ? 'سەرهێڵ' : 'دەرەوەی هێڵ'}
-              </span>
-            )}
-          </div>
-
-          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.2rem', lineHeight: '1.5' }}>
-            هاوکاتکردنی خۆکاری فرۆشتن، مەخزەن و داتاکان لەگەڵ سێرڤەری کلاود. لە نەبوونی ئینتەرنێتدا سیستەم ١٠٠٪ بە شێوازی دەرەوەی هێڵ بەردەوام دەبێت.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.2rem' }}>
-            <div style={{ padding: '0.8rem', background: 'rgba(245, 158, 11, 0.08)', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>چاوەڕوانکراوی هاوکات</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#fbbf24', marginTop: '2px' }}>
-                {syncData?.pendingCount || 0} پسووڵە
-              </div>
-            </div>
-            <div style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>هاوکاتکراوەکان</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#34d399', marginTop: '2px' }}>
-                {syncData?.syncedCount || 0} تۆمار
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button
-              onClick={handleTriggerSyncNow}
-              disabled={syncLoading}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#0f172a', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: syncLoading ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
-            >
-              <RefreshCw size={18} className={syncLoading ? 'animate-spin' : ''} />
-              {syncLoading ? 'هاوکات دەکرێت...' : 'هاوکاتکردنی دەستبەجێ (Sync Now)'}
-            </button>
-          </div>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2rem' }}>
 
         {/* Telegram Cloud Backup Card (Multiple Recipients & Clean Folder Naming) */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
@@ -1167,273 +1038,88 @@ const Settings = () => {
           </div>
         </div>
 
-      </div>
-
-      {/* Local Server Snapshots Section */}
-      <div className="glass-panel mt-8" style={{ padding: '2rem', borderRadius: '24px', marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+        {/* Local Computer Backup Card (Download & Restore) */}
+        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: 'var(--accent-hover)' }}>
-              <Database size={22} /> کۆپییە پارێزراوەکانی سەر سێرڤەر ({localSnapshots.length} کۆپی)
-            </h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
-              کۆپیی یەدەگی لۆکاڵی لەسەر خودی ئەم کۆمپیوتەرە (بەبێ پێویستی بە ئینتەرنێت). لە کاتی تێکچوونی داتابەیس یان سڕینەوەی بە هەڵە، دەتوانیت بە یەک کلیک داتاکان بگەڕێنیتەوە بۆ کاتی دروستکردنی ئەو کۆپییە.
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#10b981' }}>
+                <HardDrive size={24} /> باکئەپ لەسەر کۆمپیوتەر
+              </h3>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                <CheckCircle2 size={13} /> پارێزراوە ({backupStats?.totalTables || 23} خشتە)
+              </span>
+            </div>
+
+            <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.25rem', lineHeight: '1.6' }}>
+              دەتوانیت هەر کاتێک بتەوێت کۆپییەکی تەواوی داتاکانی فرۆشتن و مەخزەن دابگریتە سەر کۆمپیوتەرەکەت یان فلاش، یاخود لە کاتی کڕینی کۆمپیوتەری نوێدا فایلەکە بهێنیتەوە.
             </p>
-          </div>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleCreateManualSnapshot}
-              disabled={snapshotCreating}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 18px', background: 'rgba(37, 99, 235, 0.15)', color: 'var(--accent-hover)', border: '1px solid rgba(37, 99, 235, 0.35)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s' }}
-            >
-              <PlusCircle size={18} /> {snapshotCreating ? 'دروست دەکرێت...' : 'دروستکردنی کۆپی ئێستا'}
-            </button>
+            {/* Quick Stats Pill */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '0.9rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>کۆی تۆمارەکان (دێڕ)</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981', marginTop: '2px' }}>
+                  {backupStats ? Number(backupStats.totalRows).toLocaleString() : '...'}
+                </div>
+              </div>
+              <div style={{ padding: '0.9rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>دوایین باکئەپ</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>
+                  {backupStats?.latestBackup ? new Date(backupStats.latestBackup.createdAt).toLocaleDateString('en-GB') : 'ئەمڕۆ'}
+                </div>
+              </div>
+            </div>
 
-            {ipcRenderer && (
-              <button
-                onClick={handleOpenBackupsFolder}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', background: 'rgba(255, 255, 255, 0.06)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' }}
+            {/* Download Options */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }}>
+              <button 
+                onClick={handleDownloadBackup} 
+                disabled={backupLoading}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '14px', fontSize: '0.96rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
               >
-                <FolderOpen size={18} /> کردنەوەی بوخچە لە کۆمپیوتەر
+                <Download size={18} /> {backupLoading ? 'کۆکردنەوەی داتابەیس...' : 'داگرتنی باکئەپ بۆ ناو کۆمپیوتەر (JSON)'}
               </button>
-            )}
-          </div>
-        </div>
 
-        {localSnapshots.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-            هیچ کۆپییەکی یەدەگ لەسەر سێرڤەر پاشەکەوت نەکراوە. دەتوانیت بە دوگمەی سەرەوە کۆپییەک دروست بکەیت.
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-              <thead style={{ background: 'var(--bg-tertiary)' }}>
-                <tr>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ناوی پەڕگە</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>جۆر / تێبینی</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بەروار و کات</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>قەبارە</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>کردار</th>
-                </tr>
-              </thead>
-              <tbody>
-                {localSnapshots.map((snap, idx) => {
-                  const isAuto = snap.metadata?.type === 'AUTO_DAILY_SNAPSHOT' || snap.filename.includes('_auto_');
-                  const isManual = snap.metadata?.type === 'MANUAL_SERVER_SNAPSHOT' || snap.filename.includes('_manual_');
-                  return (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38bdf8', fontSize: '0.88rem' }}>
-                        {snap.filename}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                        {isAuto ? (
-                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '3px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
-                            خۆکار (Auto)
-                          </span>
-                        ) : isManual ? (
-                          <span style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', padding: '3px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
-                            دەستی (Manual)
-                          </span>
-                        ) : (
-                          <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '3px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
-                            داگیراو (Export)
-                          </span>
-                        )}
-                        {snap.metadata?.note && (
-                          <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '4px' }}>
-                            {snap.metadata.note}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: '0.88rem', color: '#cbd5e1' }}>
-                        {new Date(snap.createdAt).toLocaleString('en-GB')}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: '#94a3b8' }}>
-                        {Math.round(snap.sizeBytes / 1024)} KB
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
-                          <a 
-                            href={`http://localhost:3001/api/backup/download-snapshot/${snap.filename}`}
-                            download
-                            title="داگرتن بۆ سەر کۆمپیوتەر"
-                            style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', textDecoration: 'none', fontSize: '0.82rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          >
-                            <Download size={14} /> داگرتن
-                          </a>
-                          <button 
-                            onClick={() => handleSelectLocalSnapshot(snap)}
-                            title="هێنانەوەی ئەم باکئەپە بۆ ناو داتابەیس"
-                            style={{ padding: '6px 12px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold' }}
-                          >
-                            هێنانەوە
-                          </button>
-                          <button 
-                            onClick={() => handleSendSnapshotToTelegram(snap.filename)}
-                            disabled={telegramSendSnapLoading === snap.filename}
-                            title="ناردنی ئەم باکئەپە بۆ سەر تێلیگرامی خاوەنکار"
-                            style={{ padding: '6px 10px', borderRadius: '8px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', cursor: telegramSendSnapLoading === snap.filename ? 'not-allowed' : 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          >
-                            <Send size={13} className={telegramSendSnapLoading === snap.filename ? 'animate-spin' : ''} />
-                            {telegramSendSnapLoading === snap.filename ? 'دەچێت...' : 'تێلیگرام'}
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteSnapshot(snap.filename)}
-                            title="سڕینەوەی ئەم کۆپییە"
-                            style={{ padding: '6px 8px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Cloud Sync Queue Management Section */}
-      <div className="glass-panel mt-8" style={{ padding: '2rem', borderRadius: '24px', marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
-          <div>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#38bdf8' }}>
-              <Cloud size={22} /> ڕیزبەندی هاوکاتکردنی کلاود (Cloud Sync Queue)
-            </h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
-              ئەو پسووڵە، فرۆشتن، و چالاکییانەی لە کاتی بڕانی ئینتەرنێتدا ئەنجام دراون و لە چاوەڕوانیدان تاوەکو هێڵ پەیدا ببێت و ڕاستەوخۆ بگەنە کلاود:
-            </p>
+              {ipcRenderer && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={handleNativeSaveBackup}
+                    disabled={backupLoading}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0.8rem', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    <Save size={15} /> پاشەکەوتکردن لە فلاش (Save As)
+                  </button>
+                  <button
+                    onClick={handleOpenBackupsFolder}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0.8rem 14px', background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', fontSize: '0.85rem', cursor: 'pointer' }}
+                    title="کردنەوەی بوخچەی باکئەپ لە کۆمپیوتەر"
+                  >
+                    <FolderOpen size={15} /> بوخچە
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleCleanupSynced}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', fontSize: '0.85rem', cursor: 'pointer' }}
+          {/* Restore Section */}
+          <div style={{ paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.84rem', color: '#f59e0b', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Upload size={16} /> هێنانەوەی باکئەپ لە کۆمپیوتەرەوە:
+            </div>
+            <label 
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0.9rem', background: 'rgba(245, 158, 11, 0.08)', color: '#fbbf24', border: '1px dashed rgba(245, 158, 11, 0.35)', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', boxSizing: 'border-box' }}
             >
-              <Trash2 size={14} /> پاککردنەوەی کۆنەکان
-            </button>
-          </div>
-        </div>
-
-        {/* Sync Settings Bar */}
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem' }}>
-          <div style={{ flex: 1, minWidth: '260px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>ناونیشانی سێرڤەری کلاود (Cloud URL):</label>
-            <input 
-              type="text" 
-              value={cloudUrlInput}
-              onChange={e => setCloudUrlInput(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '18px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#cbd5e1' }}>
+              <FileJson size={18} /> هەڵبژاردنی فایلی باکئەپ (.json)
               <input 
-                type="checkbox" 
-                checked={autoSyncToggle} 
-                onChange={e => setAutoSyncToggle(e.target.checked)} 
+                type="file" 
+                accept=".json" 
+                onChange={handleFileSelect} 
+                style={{ display: 'none' }} 
               />
-              هاوکاتکردنی خۆکار لە باکگراوند (Auto-Sync)
             </label>
-
-            <button
-              onClick={handleSaveSyncSettings}
-              disabled={syncSaving}
-              style={{ padding: '8px 16px', borderRadius: '8px', background: '#38bdf8', color: '#0f172a', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' }}
-            >
-              {syncSaving ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردن'}
-            </button>
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
-          {['ALL', 'PENDING', 'SYNCED', 'FAILED'].map(f => {
-            const labels = { ALL: 'هەمووی', PENDING: 'چاوەڕوان', SYNCED: 'هاوکاتکراو', FAILED: 'شکستهێناو' };
-            const isActive = syncFilter === f;
-            return (
-              <button
-                key={f}
-                onClick={() => setSyncFilter(f)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '10px',
-                  background: isActive ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.04)',
-                  color: isActive ? '#38bdf8' : '#94a3b8',
-                  border: `1px solid ${isActive ? '#38bdf8' : 'rgba(255,255,255,0.08)'}`,
-                  fontSize: '0.85rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                {labels[f]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Queue Items Table */}
-        {(!syncData?.recentQueue || syncData.recentQueue.length === 0) ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-            هیچ تۆمارێک لە ڕیزبەندی هاوکاتکردندا نییە
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-              <thead style={{ background: 'var(--bg-tertiary)' }}>
-                <tr>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>جۆری کردە</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ناسنامەی تۆمار</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>دۆخ</th>
-                  <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>کات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {syncData.recentQueue
-                  .filter(item => syncFilter === 'ALL' || item.status === syncFilter)
-                  .map((item, idx) => {
-                    const typeLabels = {
-                      SALE: 'فرۆشتن',
-                      RETURN: 'گەڕاندنەوە',
-                      DAMAGE: 'زیانەکان',
-                      INVENTORY_AUDIT: 'جەردی کۆگا',
-                      VENDOR_RETURN: 'گەڕاندنەوە بۆ کۆمپانیا',
-                      PRODUCT: 'کاڵا'
-                    };
-                    const statusColors = {
-                      PENDING: { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', label: 'لە چاوەڕوانیدایە' },
-                      SYNCED: { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', label: 'هاوکات کرا' },
-                      SYNCING: { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'دەگوازرێتەوە' },
-                      FAILED: { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171', label: 'شکست' }
-                    };
-                    const s = statusColors[item.status] || statusColors.PENDING;
-                    return (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#f1f5f9' }}>
-                          {typeLabels[item.entity_type] || item.entity_type}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38bdf8', fontSize: '0.9rem' }}>
-                          #{item.entity_id}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{ padding: '4px 10px', borderRadius: '8px', background: s.bg, color: s.text, fontWeight: 'bold', fontSize: '0.82rem' }}>
-                            {s.label}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.88rem', color: '#cbd5e1' }}>
-                          {new Date(item.created_at).toLocaleString('en-GB')}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* Pre-flight Restore Modal */}
