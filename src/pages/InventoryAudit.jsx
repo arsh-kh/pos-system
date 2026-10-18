@@ -845,7 +845,7 @@ const InventoryAudit = () => {
           <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h2 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1.05rem', margin: 0, color: '#10b981', fontWeight: 800 }}>
-                <ClipboardCheck size={20} /> پسووڵەی جەردی کۆگا
+                <ClipboardCheck size={20} /> وەسڵی جەردی کۆگا
               </h2>
               <button onClick={() => setSelectedVoucher(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
@@ -856,7 +856,7 @@ const InventoryAudit = () => {
             <div id="audit-voucher-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '20px 18px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '12px', marginBottom: '12px' }}>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#047857' }}>پسووڵەی فەرمیی جەردی کۆگا و ڕەفەکان</h4>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#047857' }}>وەسڵی فەرمیی جەردی کۆگا و ڕەفەکان</h4>
                 <div style={{ fontSize: '12px' }}>ژمارەی تۆمار: #{selectedVoucher.id}</div>
               </div>
 
@@ -936,7 +936,7 @@ const InventoryAudit = () => {
                 onClick={printVoucher}
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
               >
-                <Printer size={18} /> چاپکردنی پسووڵە
+                <Printer size={18} /> چاپکردنی وەسڵ
               </button>
               <button 
                 onClick={() => setSelectedVoucher(null)}

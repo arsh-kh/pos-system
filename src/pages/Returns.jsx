@@ -562,7 +562,7 @@ const Returns = () => {
           <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', margin: 0, color: '#f87171', fontWeight: 800 }}>
-                <Receipt size={20} /> پسووڵەی گەڕاندنەوەی کاڵا
+                <Receipt size={20} /> وەسڵی گەڕاندنەوەی کاڵا
               </h2>
               <button onClick={() => setSelectedReceipt(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
@@ -573,8 +573,8 @@ const Returns = () => {
             <div id="refund-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '20px 18px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '12px', marginBottom: '12px' }}>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#b91c1c' }}>پسووڵەی گەڕاندنەوەی کاڵا</h4>
-                <div style={{ fontSize: '12px' }}>بۆ پسووڵەی ژمارە: #{selectedReceipt.sale_id}</div>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#b91c1c' }}>وەسڵی گەڕاندنەوەی کاڵا</h4>
+                <div style={{ fontSize: '12px' }}>بۆ وەسڵی ژمارە: #{selectedReceipt.sale_id}</div>
               </div>
 
               <div style={{ fontSize: '11px', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
@@ -640,7 +640,7 @@ const Returns = () => {
                 onClick={printReceipt}
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
               >
-                <Printer size={18} /> چاپکردنی پسووڵە
+                <Printer size={18} /> چاپکردنی وەسڵ
               </button>
               <button 
                 onClick={() => setSelectedReceipt(null)}

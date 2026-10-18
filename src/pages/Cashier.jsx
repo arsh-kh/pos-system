@@ -2299,7 +2299,7 @@ const Cashier = () => {
           <div className="receipt-divider"></div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>ژمارەی پسووڵە:</span>
+            <span>ژمارەی وەسڵ:</span>
             <span>#{printedReceipt.saleId}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2343,7 +2343,7 @@ const Cashier = () => {
                 <span>{printedReceipt.subtotal.toLocaleString()} دینار</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#333' }}>
-                <span>داشکاندنی پسووڵە:</span>
+                <span>داشکاندنی وەسڵ:</span>
                 <span>-{printedReceipt.discount.toLocaleString()} دینار</span>
               </div>
               <div className="receipt-divider"></div>
@@ -2382,7 +2382,7 @@ const Cashier = () => {
           )}
 
           <div className="receipt-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>سوپاس بۆ سەردانەکەتان</div>
+          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>وەسڵی فەرمیی فرۆشتن • سوپاس بۆ سەردانەکەتان</div>
         </div>
       )}
 

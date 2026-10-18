@@ -468,13 +468,26 @@ input[type="number"] {
   }
 }
 
-/* Global Print Normalization */
+/* Global Print Normalization - Ensure ALL Prints are Pure "وەسڵ" */
 @media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
   body {
-    background: transparent !important;
+    background: #ffffff !important;
     color: #000000 !important;
   }
-  .no-print {
+  /* Never show browser navigation, userbar, app headers, buttons, inputs, charts in print */
+  .no-print,
+  .user-bar,
+  .dashboard-page > .header,
+  nav,
+  button,
+  input,
+  select,
+  textarea,
+  .recharts-responsive-container {
     display: none !important;
   }
 }

@@ -1164,11 +1164,11 @@ const Purchases = () => {
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{storeName}</div>
           <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>
           <div className="purchase-divider"></div>
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>پسووڵەی کڕینی کاڵا</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>وەسڵی کڕینی کاڵا</div>
           <div className="purchase-divider"></div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>ژمارەی پسووڵە:</span>
+            <span>ژمارەی وەسڵ:</span>
             <span style={{ fontWeight: 'bold', direction: 'ltr' }}>{printedInvoice.invoiceNumber}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1239,7 +1239,7 @@ const Purchases = () => {
           )}
 
           <div className="purchase-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '6px' }}>بەشی کۆگا و کڕینەکان</div>
+          <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '6px' }}>وەسڵی فەرمیی کڕین • بەشی کۆگا</div>
         </div>
       )}
 

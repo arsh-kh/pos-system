@@ -28,6 +28,8 @@ import {
   ArrowDownLeft,
   CheckCircle2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 // Safe Electron IPC Detection for Hardware Thermal Printing
@@ -48,8 +50,12 @@ const RANGES = [
 ];
 
 const ThisMonth = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const printAreaRef = useRef(null);
+
+  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی زیرەک';
+  const storePhone = localStorage.getItem('pos_store_phone') || '0750 000 0000';
 
   // Time-Range State
   const [selectedRange, setSelectedRange] = useState('month');
@@ -163,7 +169,7 @@ const ThisMonth = () => {
               cursor: 'pointer'
             }}
           >
-            <Printer size={16} /> چاپکردنی ڕاپۆرت
+            <Printer size={16} /> چاپکردنی وەسڵی دارایی
           </button>
         </div>
       </div>
@@ -315,7 +321,7 @@ const ThisMonth = () => {
             {/* Card 2: Net Profit (FIFO Engine) */}
             <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '20px', borderTop: '4px solid #10b981', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)' }}>قازانجی پوخت (Net Profit)</span>
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)' }}>قازانجی پوختەی خاوێن</span>
                 <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <TrendingUp size={18} />
                 </div>
@@ -327,7 +333,7 @@ const ThisMonth = () => {
                 <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '6px', background: profitMargin >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: profitMargin >= 0 ? '#10b981' : '#ef4444', fontWeight: 800 }}>
                   ڕێژەی قازانج: {profitMargin}%
                 </span>
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>FIFO Landed Cost</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>تێچووی کۆگا و گەیشتن</span>
               </div>
             </div>
 
@@ -513,6 +519,151 @@ const ThisMonth = () => {
           </div>
         </>
       )}
+
+      {/* Hidden Thermal Financial Report Slip (Targeted by @media print) */}
+      <div id="financial-report-slip">
+        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{storeName}</div>
+        <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', margin: '4px 0' }}>وەسڵی پوختەی دارایی و فرۆشتن</div>
+        <div style={{ textAlign: 'center', fontSize: '11px', color: '#444' }}>ماوە: {reportData?.range_label || 'دیارینەکراو'}</div>
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+        
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>بەروار و کات:</span>
+          <span>{formatDateTime(new Date(), { twelveHour: true })}</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>دەرکەر:</span>
+          <span>{user?.username || 'خاوەنکار'}</span>
+        </div>
+
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+        
+        {/* Main Financial Metrics */}
+        <div style={{ fontSize: '12px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
+          <span>کۆی فرۆشتنی پوخت:</span>
+          <span>{totalSales.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>ژمارەی پسووڵەکان:</span>
+          <span>{totalInvoices.toLocaleString()} پسووڵە</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>تێکڕای پسووڵە:</span>
+          <span>{avgInvoice.toLocaleString()} دینار</span>
+        </div>
+        {totalDiscounts > 0 && (
+          <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0', color: '#444' }}>
+            <span>کۆی داشکاندن:</span>
+            <span>{totalDiscounts.toLocaleString()} دینار</span>
+          </div>
+        )}
+
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+
+        {/* Payment Methods */}
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>نەقد (کاش):</span>
+          <span>{cashCollected.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>فرۆش بە قەرز:</span>
+          <span>{debtIssued.toLocaleString()} دینار</span>
+        </div>
+
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+
+        {/* Expenses & Losses */}
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>خەرجییە گشتییەکان:</span>
+          <span>-{totalExpenses.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>زیان و فەوتانی کاڵا:</span>
+          <span>-{totalDamagesLoss.toLocaleString()} دینار</span>
+        </div>
+        {totalRefunded > 0 && (
+          <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+            <span>گەڕاوەی کڕیاران:</span>
+            <span>-{totalRefunded.toLocaleString()} دینار</span>
+          </div>
+        )}
+
+        <div className="receipt-divider" style={{ borderBottom: '2px dashed #000', margin: '6px 0' }}></div>
+
+        {/* Net Profit Final */}
+        <div style={{ fontSize: '13px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', margin: '4px 0' }}>
+          <span>قازانجی پوختەی خاوێن:</span>
+          <span>{netProfit.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>ڕێژەی قازانج:</span>
+          <span>{profitMargin}%</span>
+        </div>
+
+        {/* Top 5 Products */}
+        {topProducts.length > 0 && (
+          <>
+            <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', margin: '4px 0', textAlign: 'center' }}>پڕفرۆشترین کاڵاکان</div>
+            {topProducts.slice(0, 5).map((p, idx) => (
+              <div key={idx} style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                <span>{idx + 1}. {p.name}</span>
+                <span>{p.total_quantity} دانە ({p.total_revenue.toLocaleString()} د.ع)</span>
+              </div>
+            ))}
+          </>
+        )}
+
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '8px 0' }}></div>
+        <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '6px', color: '#555' }}>
+          وەسڵی فەرمیی دارایی • چاپکرا لە ڕێگەی سیستەمی مارکێت
+        </div>
+      </div>
+
+      {/* Scoped Thermal Print Style */}
+      <style>{`
+        #financial-report-slip {
+          display: none;
+        }
+        @media print {
+          @page {
+            margin: 0;
+            size: 80mm auto;
+          }
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+          }
+          /* Hide EVERYTHING on the entire page */
+          body * {
+            visibility: hidden !important;
+          }
+          /* Only display the financial report slip */
+          #financial-report-slip, #financial-report-slip * {
+            visibility: visible !important;
+          }
+          #financial-report-slip {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+            font-size: 12px !important;
+            color: #000000 !important;
+            background: #ffffff !important;
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: monospace, Tahoma, sans-serif !important;
+            box-sizing: border-box !important;
+          }
+        }
+      `}</style>
 
     </div>
   );

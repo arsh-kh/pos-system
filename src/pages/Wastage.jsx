@@ -916,7 +916,7 @@ const Wastage = () => {
           <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem', margin: 0, color: '#f87171', fontWeight: 800 }}>
-                <PackageX size={18} /> پسووڵەی فەوتان و زیانی کاڵا
+                <PackageX size={18} /> وەسڵی فەوتان و زیانی کاڵا
               </h2>
               <button onClick={() => setSelectedReceipt(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16} />
@@ -927,7 +927,7 @@ const Wastage = () => {
             <div id="damage-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '16px 14px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold', color: '#b91c1c' }}>پسووڵەی کاڵای فەوتاو و زیانلێکەوتوو</h4>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold', color: '#b91c1c' }}>وەسڵی کاڵای فەوتاو و زیانلێکەوتوو</h4>
                 <div style={{ fontSize: '11px' }}>ژمارەی تۆمار: #{selectedReceipt.id}</div>
               </div>
 
@@ -996,7 +996,7 @@ const Wastage = () => {
                 onClick={printReceipt}
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.86rem' }}
               >
-                <Printer size={16} /> چاپکردنی پسووڵە
+                <Printer size={16} /> چاپکردنی وەسڵ
               </button>
               <button 
                 onClick={() => setSelectedReceipt(null)}

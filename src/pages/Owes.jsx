@@ -696,7 +696,7 @@ const Owes = () => {
                       <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>جۆری مامەڵە</th>
                       <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>بڕی پارە (دینار)</th>
                       <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>بەروار و کات</th>
-                      <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>پسووڵەی وەرگرتن</th>
+                      <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>وەسڵی وەرگرتن</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -742,7 +742,7 @@ const Owes = () => {
                                 })}
                                 style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
                               >
-                                <Printer size={15} /> چاپی پسووڵە
+                                <Printer size={15} /> چاپکردنی وەسڵ
                               </button>
                             )}
                           </td>
@@ -799,7 +799,7 @@ const Owes = () => {
           <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>
           <div className="voucher-divider"></div>
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-            {printVoucher.isStatement ? 'پسووڵەی لێدوانی قەرزی کڕیار' : 'پسووڵەی وەرگرتنی پارەی قەرز'}
+            {printVoucher.isStatement ? 'وەسڵی حسابی قەرزی کڕیار' : 'وەسڵی وەرگرتنی پارەی قەرز'}
           </div>
           <div className="voucher-divider"></div>
           

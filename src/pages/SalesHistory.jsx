@@ -208,7 +208,7 @@ const SalesHistory = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
             <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
               <tr>
-                <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 700 }}>ژمارەی پسووڵە</th>
+                <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 700 }}>ژمارەی وەسڵ</th>
                 <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 700 }}>کڕیار</th>
                 <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 700 }}>شێوازی پارەدان</th>
                 <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 700 }}>ژمارەی کاڵا</th>
@@ -256,10 +256,10 @@ const SalesHistory = () => {
                       </button>
                       <button 
                         onClick={() => openSaleDetails(s.id, true)}
-                        title="چاپکردنەوەی خێرای پسووڵە"
+                        title="چاپکردنەوەی خێرای وەسڵ"
                         style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
-                        <Printer size={14} /> چاپکردنەوە
+                        <Printer size={14} /> چاپکردنی وەسڵ
                       </button>
                     </td>
                   </tr>
@@ -387,7 +387,7 @@ const SalesHistory = () => {
           <div className="receipt-divider"></div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>ژمارەی پسووڵە:</span>
+            <span>ژمارەی وەسڵ:</span>
             <span>#{reprintReceipt.id}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -441,7 +441,7 @@ const SalesHistory = () => {
           )}
 
           <div className="receipt-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>پسووڵەی فرۆشتن (لەپێشینە)</div>
+          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>وەسڵی فەرمیی فرۆشتن (چاپکراوە)</div>
         </div>
       )}
 

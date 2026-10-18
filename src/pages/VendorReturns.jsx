@@ -1120,7 +1120,7 @@ const VendorReturns = () => {
             <div id="rtv-voucher-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '16px 14px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 'bold' }}>مارکێتی زیرەک</h3>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold', color: '#0284c7' }}>پسووڵەی گەڕاندنەوەی کاڵا بۆ مەندوب (RTV)</h4>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 'bold', color: '#0284c7' }}>وەسڵی گەڕاندنەوەی کاڵا بۆ مەندوب</h4>
                 <div style={{ fontSize: '11px' }}>ژمارەی تۆمار: #{selectedReceipt.id}</div>
               </div>
 
@@ -1201,7 +1201,7 @@ const VendorReturns = () => {
                 onClick={printVoucher}
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: 'var(--accent-color)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.86rem' }}
               >
-                <Printer size={16} /> چاپکردنی پسووڵە
+                <Printer size={16} /> چاپکردنی وەسڵ
               </button>
               <button 
                 onClick={() => setSelectedReceipt(null)}
