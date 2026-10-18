@@ -3,7 +3,8 @@ import {
   Moon, Sun, Database, Shield, CheckCircle2, AlertTriangle, 
   Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
   AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
-  Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock
+  Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock,
+  Copy, ExternalLink, Edit2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
@@ -54,9 +55,9 @@ const Settings = () => {
   const [telegramSendSnapLoading, setTelegramSendSnapLoading] = useState(null);
   const [telegramNotice, setTelegramNotice] = useState(null);
   const [telegramCheckingPair, setTelegramCheckingPair] = useState(false);
-  const [newRecipientName, setNewRecipientName] = useState('');
-  const [newRecipientChatId, setNewRecipientChatId] = useState('');
-  const [addingRecipient, setAddingRecipient] = useState(false);
+  const [editingRecipientId, setEditingRecipientId] = useState(null);
+  const [editingRecipientName, setEditingRecipientName] = useState('');
+  const [copiedBotLink, setCopiedBotLink] = useState(false);
 
   // Restore Modal State
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
@@ -116,6 +117,10 @@ const Settings = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchBackupData();
+      const interval = setInterval(() => {
+        fetchBackupData();
+      }, 7000);
+      return () => clearInterval(interval);
     }
   }, [isAdmin]);
 
@@ -305,37 +310,39 @@ const Settings = () => {
     }
   };
 
-  // Add New Recipient
-  const handleAddRecipient = async (e) => {
-    e.preventDefault();
-    if (!newRecipientChatId.trim()) {
-      alert('تکایە Chat ID یان Group ID بنووسە');
-      return;
-    }
-    setAddingRecipient(true);
-    setTelegramNotice(null);
+  // Copy Telegram Bot Invite Link
+  const handleCopyBotLink = () => {
+    const link = `https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`;
+    navigator.clipboard.writeText(link);
+    setCopiedBotLink(true);
+    setTimeout(() => setCopiedBotLink(false), 3000);
+  };
+
+  // Start Editing Recipient Name
+  const handleStartEditRecipient = (r) => {
+    setEditingRecipientId(r.id);
+    setEditingRecipientName(r.recipient_name);
+  };
+
+  // Save Recipient Name
+  const handleSaveRecipientName = async (id) => {
+    if (!editingRecipientName.trim()) return;
     try {
-      const res = await fetch('http://localhost:3001/api/backup/telegram/recipients', {
-        method: 'POST',
+      const res = await fetch(`http://localhost:3001/api/backup/telegram/recipients/${id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: newRecipientChatId.trim(),
-          recipient_name: newRecipientName.trim()
-        })
+        body: JSON.stringify({ recipient_name: editingRecipientName.trim() })
       });
       const data = await res.json();
       if (data.status === 'SUCCESS') {
-        setTelegramNotice({ type: 'success', message: data.message });
-        setNewRecipientName('');
-        setNewRecipientChatId('');
+        setEditingRecipientId(null);
         fetchBackupData();
+        setTelegramNotice({ type: 'success', message: 'ناوی وەرگر بە سەرکەوتوویی نوێکرایەوە' });
       } else {
-        setTelegramNotice({ type: 'error', message: data.message || 'هەڵە لە زیادکردن' });
+        alert(data.message);
       }
     } catch (err) {
-      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
-    } finally {
-      setAddingRecipient(false);
+      alert('هەڵە لە نوێکردنەوەی ناو: ' + err.message);
     }
   };
 
@@ -968,7 +975,8 @@ const Settings = () => {
                       background: r.is_active ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.02)',
                       border: `1px solid ${r.is_active ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)'}`,
                       borderRadius: '12px',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s',
+                      gap: '12px'
                     }}
                   >
                     <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', flex: 1 }}>
@@ -978,14 +986,51 @@ const Settings = () => {
                         onChange={() => handleToggleRecipient(r.id)}
                         style={{ width: '17px', height: '17px', cursor: 'pointer', accentColor: '#10b981' }}
                       />
-                      <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: r.is_active ? '#34d399' : '#94a3b8' }}>
-                          {r.recipient_name}
+                      {editingRecipientId === r.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.preventDefault()}>
+                          <input
+                            type="text"
+                            value={editingRecipientName}
+                            onChange={e => setEditingRecipientName(e.target.value)}
+                            placeholder="ناوی نوێ بنووسە"
+                            style={{ padding: '4px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid #38bdf8', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveRecipientName(r.id)}
+                            style={{ padding: '4px 8px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                          >
+                            <Check size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingRecipientId(null)}
+                            style={{ padding: '4px 8px', background: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                          >
+                            <X size={13} />
+                          </button>
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
-                          ID: {r.chat_id}
+                      ) : (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: r.is_active ? '#34d399' : '#94a3b8' }}>
+                              {r.recipient_name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); handleStartEditRecipient(r); }}
+                              title="دەستکاریکردنی ناوی ئەم کەسە"
+                              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', padding: '2px' }}
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            ID: {r.chat_id}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </label>
 
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -1012,38 +1057,64 @@ const Settings = () => {
             )}
           </div>
 
-          {/* Add New Recipient Form */}
-          <form onSubmit={handleAddRecipient} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.2rem' }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 'bold', color: '#38bdf8', marginBottom: '8px' }}>
-              ➕ زیادکردنی چات / کەسێکی تر بۆ وەرگرتنی باکئەپ:
+          {/* Automatic Telegram Bot Invite & Pairing */}
+          <div style={{ padding: '1.2rem', background: 'rgba(34, 158, 217, 0.05)', borderRadius: '16px', border: '1px solid rgba(34, 158, 217, 0.2)', marginBottom: '1.2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Send size={18} color="#38bdf8" />
+                <span style={{ fontSize: '0.92rem', fontWeight: 'bold', color: '#38bdf8' }}>
+                  داوەتکردنی کەسی نوێ بۆ وەرگرتنی باکئەپ لە تێلیگرام:
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleCopyBotLink}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    background: copiedBotLink ? 'rgba(16, 185, 129, 0.2)' : 'rgba(34, 158, 217, 0.2)',
+                    color: copiedBotLink ? '#34d399' : '#38bdf8',
+                    border: `1px solid ${copiedBotLink ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 158, 217, 0.4)'}`,
+                    borderRadius: '10px',
+                    fontSize: '0.84rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {copiedBotLink ? <CheckCircle2 size={15} /> : <Copy size={15} />}
+                  {copiedBotLink ? 'لینکەکە کۆپیکرا!' : 'کۆپیکردنی لینکی بۆت'}
+                </button>
+
+                <a
+                  href={`https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    background: 'linear-gradient(135deg, #229ED9, #0284c7)',
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    fontSize: '0.84rem',
+                    fontWeight: 'bold',
+                    textDecoration: 'none'
+                  }}
+                >
+                  <ExternalLink size={15} /> کردنەوە لە تێلیگرام
+                </a>
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="text"
-                placeholder="ناوی کەسەکە (نموونە: شەریک)"
-                value={newRecipientName}
-                onChange={e => setNewRecipientName(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-              />
-              <input
-                type="text"
-                placeholder="Chat ID (نموونە: 1796577602)"
-                value={newRecipientChatId}
-                onChange={e => setNewRecipientChatId(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-              />
-              <button
-                type="submit"
-                disabled={addingRecipient}
-                style={{ padding: '8px 14px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', cursor: addingRecipient ? 'not-allowed' : 'pointer' }}
-              >
-                {addingRecipient ? 'دەکرێت...' : '+ زیادکردن'}
-              </button>
+
+            <div style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: '1.6' }}>
+              💡 <strong>چۆنیەتی بەستنەوە:</strong> پێویست بە هیچ Chat ID و ژمارەیەک ناکات! تەنها ئەم بەستەرەی سەرەوە بنێرە بۆ هەر کەسێک کە دەتەوێت باکئەپی مارکێت وەربگرێت (شەریک، بەڕێوەبەر، ژمێریار). هەر کە لە تێلیگرام دوگمەی <strong>Start</strong> دادەگرن، ناویان بە شێوەیەکی ئۆتۆماتیکی لەم لیستەی سەرەوەدا زیاد دەبێت و دەتوانیت بە دوگمەی قەڵەمەکە (<Edit2 size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />) ناوەکەیان لە ئەپەکەدا دەستکاری بکەیت.
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '6px' }}>
-              💡 یان هەر کەسێک لە تێلیگرامەوە بچێتە ناو <strong>@cashier_system_bot</strong> و Start لێبدات، خۆکارانە ناوی لەم لیستەدا تۆمار دەبێت!
-            </div>
-          </form>
+          </div>
 
           {/* Clean Naming & Folder Preview */}
           <div style={{ padding: '0.8rem 1rem', background: 'rgba(56, 189, 248, 0.04)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.12)', marginBottom: '1.2rem', fontSize: '0.82rem' }}>
@@ -1106,7 +1177,7 @@ const Settings = () => {
               <Database size={22} /> کۆپییە پارێزراوەکانی سەر سێرڤەر ({localSnapshots.length} کۆپی)
             </h3>
             <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
-              سیستەم بە بەردەوامی و لەکاتی داگرتنیشدا، کۆپی لەسەر سێرڤەر تۆمار دەکات بۆ پاراستنی هەمیشەیی.
+              کۆپیی یەدەگی لۆکاڵی لەسەر خودی ئەم کۆمپیوتەرە (بەبێ پێویستی بە ئینتەرنێت). لە کاتی تێکچوونی داتابەیس یان سڕینەوەی بە هەڵە، دەتوانیت بە یەک کلیک داتاکان بگەڕێنیتەوە بۆ کاتی دروستکردنی ئەو کۆپییە.
             </p>
           </div>
 
@@ -1233,7 +1304,7 @@ const Settings = () => {
               <Cloud size={22} /> ڕیزبەندی هاوکاتکردنی کلاود (Cloud Sync Queue)
             </h3>
             <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '6px 0 0' }}>
-              هەموو فرۆشتن، گەڕاندنەوە، زیان، و جەردێک لە کاتی نەبوونی ئینتەرنێتدا لەم ڕیزبەندییەدا کۆدەبنەوە و بە سەرهێڵبوون دەنێردرێن:
+              ئەو پسووڵە، فرۆشتن، و چالاکییانەی لە کاتی بڕانی ئینتەرنێتدا ئەنجام دراون و لە چاوەڕوانیدان تاوەکو هێڵ پەیدا ببێت و ڕاستەوخۆ بگەنە کلاود:
             </p>
           </div>
 

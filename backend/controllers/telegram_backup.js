@@ -339,6 +339,24 @@ exports.deleteRecipient = async (req, res) => {
 };
 
 /**
+ * Update / Rename Recipient
+ * PUT /api/backup/telegram/recipients/:id
+ */
+exports.updateRecipient = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { recipient_name } = req.body;
+        if (!recipient_name || !recipient_name.trim()) {
+            return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوێک بنووسە' });
+        }
+        await db.query('UPDATE Telegram_Recipients SET recipient_name = ? WHERE id = ?', [recipient_name.trim(), id]);
+        res.json({ status: 'SUCCESS', message: 'ناوی وەرگر بە سەرکەوتوویی نوێکرایەوە' });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
  * Test Specific Recipient Ping
  * POST /api/backup/telegram/recipients/:id/test
  */

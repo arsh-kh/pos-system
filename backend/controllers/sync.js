@@ -14,46 +14,48 @@ const safeJsonStringify = (data) => {
     });
 };
 
+let cachedNetStatus = null;
+let lastNetCheckTime = 0;
+
 /**
- * Fast Network Connectivity Probe
- * Checks real internet reachability via Google / Cloudflare public DNS (53)
- * with a strict 1500ms timeout so it never blocks.
+ * Fast & Reliable Network Connectivity Probe
+ * Checks true internet reachability via HTTPS endpoints (Telegram API / Cloudflare / Google)
+ * avoiding ISP port 53 firewall blocks, with a 6-second short cache.
  */
 const checkRealInternetConnectivity = async () => {
-    return new Promise((resolve) => {
-        const socket = new net.Socket();
-        socket.setTimeout(1500);
+    const now = Date.now();
+    if (cachedNetStatus !== null && (now - lastNetCheckTime < 6000)) {
+        return cachedNetStatus;
+    }
 
-        // Probe Cloudflare / Google DNS on port 53
-        socket.connect(53, '1.1.1.1', () => {
-            socket.destroy();
-            resolve(true);
-        });
+    const testEndpoints = [
+        'https://api.telegram.org',
+        'http://www.google.com/generate_204',
+        'https://1.1.1.1'
+    ];
 
-        socket.on('error', () => {
-            socket.destroy();
-            // Fallback probe Google DNS
-            const fallbackSocket = new net.Socket();
-            fallbackSocket.setTimeout(1500);
-            fallbackSocket.connect(53, '8.8.8.8', () => {
-                fallbackSocket.destroy();
-                resolve(true);
+    for (const endpoint of testEndpoints) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(endpoint, {
+                method: 'HEAD',
+                signal: controller.signal
             });
-            fallbackSocket.on('error', () => {
-                fallbackSocket.destroy();
-                resolve(false);
-            });
-            fallbackSocket.on('timeout', () => {
-                fallbackSocket.destroy();
-                resolve(false);
-            });
-        });
+            clearTimeout(timeoutId);
+            if (res.status >= 200 && res.status < 500) {
+                cachedNetStatus = true;
+                lastNetCheckTime = now;
+                return true;
+            }
+        } catch (_) {
+            // Try next endpoint fallback
+        }
+    }
 
-        socket.on('timeout', () => {
-            socket.destroy();
-            resolve(false);
-        });
-    });
+    cachedNetStatus = false;
+    lastNetCheckTime = now;
+    return false;
 };
 
 /**
