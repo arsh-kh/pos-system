@@ -131,6 +131,27 @@ exports.getOverview = async (req, res) => {
             FROM Sales
         `);
 
+        // Lifetime returns, expenses, and damages
+        const [lifetimeRefunds] = await db.query(`
+            SELECT 
+                COALESCE(SUM(r.refunded_amount), 0) as total_refunded,
+                COALESCE(SUM(r.refunded_amount - (r.quantity * r.units_multiplier * COALESCE(p.cost_price, 0))), 0) as returned_profit
+            FROM Returns r
+            LEFT JOIN Products p ON r.product_id = p.id
+        `);
+        const [lifetimeExpenses] = await db.query("SELECT COALESCE(SUM(amount), 0) as total_expenses FROM Expenses");
+        const [lifetimeDamages] = await db.query("SELECT COALESCE(SUM(total_cost_loss), 0) as total_damages_loss FROM Damages");
+
+        const rawLifetimeSales = Number(lifetimeRows[0].lifetime_sales) || 0;
+        const rawLifetimeProfit = Number(lifetimeRows[0].lifetime_profit) || 0;
+        const lifetimeRefunded = Number(lifetimeRefunds[0]?.total_refunded) || 0;
+        const lifetimeReturnedProfit = Math.max(0, Number(lifetimeRefunds[0]?.returned_profit) || 0);
+        const lifetimeExpensesAmount = Number(lifetimeExpenses[0]?.total_expenses) || 0;
+        const lifetimeDamagesLoss = Number(lifetimeDamages[0]?.total_damages_loss) || 0;
+
+        const netLifetimeSales = Math.max(0, rawLifetimeSales - lifetimeRefunded);
+        const netLifetimeProfit = rawLifetimeProfit - lifetimeReturnedProfit - lifetimeExpensesAmount - lifetimeDamagesLoss;
+
         // 2. Month-by-month breakdown
         const [monthsRows] = await db.query(`
             SELECT 
@@ -159,8 +180,13 @@ exports.getOverview = async (req, res) => {
             status: 'SUCCESS',
             data: {
                 lifetime: {
-                    sales: Number(lifetimeRows[0].lifetime_sales) || 0,
-                    profit: Number(lifetimeRows[0].lifetime_profit) || 0,
+                    sales: netLifetimeSales,
+                    profit: netLifetimeProfit,
+                    raw_sales: rawLifetimeSales,
+                    raw_profit: rawLifetimeProfit,
+                    total_refunded: lifetimeRefunded,
+                    total_expenses: lifetimeExpensesAmount,
+                    total_damages: lifetimeDamagesLoss,
                     invoices: Number(lifetimeRows[0].lifetime_invoices) || 0
                 },
                 total_months_count: totalMonthsCount,

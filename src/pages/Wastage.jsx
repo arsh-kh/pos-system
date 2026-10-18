@@ -270,7 +270,7 @@ const Wastage = () => {
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 2px 0', color: '#f87171', fontSize: '1.25rem', fontWeight: 800 }}>
             <PackageX size={22} color="#ef4444" />
-            تۆمارکردنی زیان و فەوتانی کاڵا (Wastage & Damage)
+            تۆمارکردنی زیان و فەوتانی کاڵا
           </h1>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             تۆمارکردنی کاڵای بەسەرچوو، شکاو و تێکچوو بۆ دەرکردن لە مەخزەن و دیاریکردنی زەرەری دارایی

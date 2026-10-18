@@ -70,6 +70,11 @@ exports.addDebtTransaction = async (req, res) => {
             return res.status(400).json({ status: 'ERROR', message: 'بڕی پارە دەبێت ژمارەیەکی دروست و زیاتر لە سفر بێت' });
         }
 
+        const [cust] = await db.query('SELECT id FROM Customers WHERE id = ?', [id]);
+        if (cust.length === 0) {
+            return res.status(404).json({ status: 'ERROR', message: 'کڕیارەکە نەدۆزرایەوە' });
+        }
+
         const defaultNote = cleanType === 'PAY' ? 'دانەوەی قەرز بە دەستی' : 'زیادکردنی قەرز بە دەستی';
         const [result] = await db.query(
             'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',

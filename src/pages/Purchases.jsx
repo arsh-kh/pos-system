@@ -379,7 +379,7 @@ const Purchases = () => {
             border: '1px solid rgba(239, 68, 68, 0.3)'
           }}
         >
-          <RotateCcw size={18} /> گەڕاندنەوە بۆ کۆمپانیاکان (Purchase Returns)
+          <RotateCcw size={18} /> گەڕاندنەوە بۆ کۆمپانیاکان
         </a>
       </div>
 

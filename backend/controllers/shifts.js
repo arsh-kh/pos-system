@@ -271,6 +271,12 @@ exports.getZReport = async (req, res) => {
             [openedAt, closedAt]
         );
 
+        const [debtRepayRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as debt_repaid FROM Customer_Debts WHERE transaction_type = 'PAY' AND sale_id IS NULL AND created_at >= ? AND created_at <= ?",
+            [openedAt, closedAt]
+        );
+        const debtRepaidCash = Number(debtRepayRows[0].debt_repaid) || 0;
+
         const [refundRows] = await db.query(
             "SELECT COALESCE(SUM(refunded_amount), 0) as cash_refunds, COUNT(id) as refund_count FROM Returns WHERE refund_method = 'CASH' AND created_at >= ? AND created_at <= ?",
             [openedAt, closedAt]
@@ -294,9 +300,10 @@ exports.getZReport = async (req, res) => {
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
         const grossProfit = Number(profitRows[0].total_profit) || 0;
         const netProfit = grossProfit - expensesPaid;
-        const expectedCash = Number(shift.expected_cash) || (openingCash + cashSales - cashRefunds - expensesPaid);
-        const actualCash = Number(shift.actual_cash) || expectedCash;
-        const difference = Number(shift.difference) || (actualCash - expectedCash);
+        const calculatedExpected = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
+        const expectedCash = (shift.expected_cash !== null && shift.expected_cash !== undefined) ? Number(shift.expected_cash) : calculatedExpected;
+        const actualCash = (shift.actual_cash !== null && shift.actual_cash !== undefined) ? Number(shift.actual_cash) : expectedCash;
+        const difference = (shift.difference !== null && shift.difference !== undefined) ? Number(shift.difference) : (actualCash - expectedCash);
 
         const zReportData = {
             shift_id: shift.id,
@@ -308,6 +315,7 @@ exports.getZReport = async (req, res) => {
             total_sales: totalSales,
             cash_sales: cashSales,
             debt_sales: debtSales,
+            debt_repaid_cash: debtRepaidCash,
             cash_refunds: cashRefunds,
             expenses_paid: expensesPaid,
             expected_cash: expectedCash,

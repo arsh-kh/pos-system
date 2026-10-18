@@ -193,6 +193,12 @@ exports.deleteProduct = async (req, res) => {
 
         res.json({ status: 'SUCCESS', message: 'Product deleted successfully' });
     } catch (error) {
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+            return res.status(400).json({ 
+                status: 'ERROR', 
+                message: 'ناتوانرێت ئەم کاڵایە بسڕدرێتەوە چونکە لە پسووڵەکانی پێشووی فرۆشتن یان کڕیندا بوونی هەیە. دەتوانیت مەوجودەکەی بکەیت بە ٠.' 
+            });
+        }
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };

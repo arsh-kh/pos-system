@@ -300,7 +300,7 @@ const VendorReturns = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: '#0ea5e9', fontSize: '1.25rem', fontWeight: 800 }}>
             <Truck size={22} color="#0ea5e9" />
-            گەڕاندنەوە بۆ کۆمپانیا و مەندوب (RTV)
+            گەڕاندنەوە بۆ کۆمپانیا و مەندوب
           </h1>
           <span style={{ 
             background: 'var(--accent-light)', 

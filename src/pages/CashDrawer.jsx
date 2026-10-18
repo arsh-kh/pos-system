@@ -138,7 +138,7 @@ const CashDrawer = () => {
             }}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)', transition: 'all 0.15s ease' }}
           >
-            <Printer size={20} /> 🖨️ چاپکردنی ڕاپۆرتی ئەمڕۆ (Print Day)
+            <Printer size={20} /> چاپکردنی ڕاپۆرتی ئەمڕۆ
           </button>
 
           {/* 1-Click Close & Reset Day (No modal interrogation) */}

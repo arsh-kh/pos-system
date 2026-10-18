@@ -219,12 +219,20 @@ const Cashier = () => {
         barcodeInputRef.current?.focus();
       } else if (e.key === 'F2') {
         e.preventDefault();
+        if (!allowCustomPrice) {
+          alert('دەستکاریکردنی نرخ و کاڵای دەستی لەلایەن بەڕێوەبەرەوە قفڵ کراوە');
+          return;
+        }
         setIsQuickItemModalOpen(prev => !prev);
       } else if (e.key === 'F3') {
         e.preventDefault();
         setIsScaleModalOpen(prev => !prev);
       } else if (e.key === 'F4') {
         e.preventDefault();
+        if (!allowManualDiscount) {
+          alert('داشکاندنی دەستی لەلایەن بەڕێوەبەرەوە بۆ کاشێر قفڵ کراوە');
+          return;
+        }
         discountInputRef.current?.focus();
       } else if (e.key === 'F6' || (e.ctrlKey && e.key === '1')) {
         e.preventDefault();
@@ -343,6 +351,16 @@ const Cashier = () => {
     setCart(prev => prev.filter(item => item.cartKey !== key && item.barcode !== key));
   };
 
+  const updateItemPrice = (key, newPrice) => {
+    if (!allowCustomPrice) {
+      alert('بەڕێوەبەر دەستکاریکردنی نرخی فرۆشتنی بۆ کاشێر قفڵ کردووە');
+      return;
+    }
+    const parsed = Math.max(0, parseInt(newPrice) || 0);
+    if (parsed <= 0) return;
+    setCart(prev => prev.map(item => (item.cartKey === key || item.barcode === key) ? { ...item, price: parsed } : item));
+  };
+
   const clearCart = () => {
     if (!allowClearCart) {
       alert('بەڕێوەبەر بەتاڵکردنەوەی گشتی سەبەتەی قفڵ کردووە');
@@ -361,6 +379,10 @@ const Cashier = () => {
   // Add Quick Custom Item
   const handleAddQuickCustomItem = (e) => {
     e.preventDefault();
+    if (!allowCustomPrice) {
+      alert('بەڕێوەبەر زیادکردنی کاڵای دەستی یان نرخی دەستی بۆ کاشێر قفڵ کردووە');
+      return;
+    }
     const price = Math.max(0, parseInt(quickItemPrice) || 0);
     if (price <= 0) {
       alert('تکایە نرخێکی دروست بنووسە');
@@ -732,6 +754,15 @@ const Cashier = () => {
   // Process Checkout
   const handleCheckout = async (forcePrint = null) => {
     if (cart.length === 0) return alert('عەرەبانەی کڕین واڵایە!');
+    if (paymentMode === 'DEBT' && !allowDebtSale) {
+      return alert('بەڕێوەبەر فرۆشتن بە قەرزی بۆ کاشێر قفڵ کردووە');
+    }
+    if (paymentMode === 'SPLIT' && !allowSplitPayment) {
+      return alert('بەڕێوەبەر پارەدانی تێکەڵی بۆ کاشێر قفڵ کردووە');
+    }
+    if (calculatedDiscount > 0 && !allowManualDiscount) {
+      return alert('بەڕێوەبەر داشکاندنی دەستی بۆ کاشێر قفڵ کردووە');
+    }
     if ((paymentMode === 'DEBT' || paymentMode === 'SPLIT') && !selectedCustomerId) {
       return alert('تکایە سەرەتا کڕیارێک دیاریبکە بۆ فرۆشتن بە قەرز یان فرە-جۆر (تێکەڵ)');
     }
@@ -1017,25 +1048,27 @@ const Cashier = () => {
             <Printer size={12} /> چاپکردنەوە (F8)
           </button>
 
-          <button 
-            type="button" 
-            onClick={() => navigate('/shifts')}
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '5px', 
-              background: 'var(--success-light)', 
-              color: 'var(--success-color)', 
-              border: '1px solid rgba(16, 185, 129, 0.3)', 
-              borderRadius: '6px', 
-              padding: '4px 10px', 
-              fontSize: '0.78rem', 
-              cursor: 'pointer',
-              fontWeight: 700
-            }}
-          >
-            <Lock size={12} /> قاسە و شیفت
-          </button>
+          {canCashier('shifts') && (
+            <button 
+              type="button" 
+              onClick={() => navigate('/shifts')}
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '5px', 
+                background: 'var(--success-light)', 
+                color: 'var(--success-color)', 
+                border: '1px solid rgba(16, 185, 129, 0.3)', 
+                borderRadius: '6px', 
+                padding: '4px 10px', 
+                fontSize: '0.78rem', 
+                cursor: 'pointer',
+                fontWeight: 700
+              }}
+            >
+              <Lock size={12} /> قاسە و شیفت
+            </button>
+          )}
 
           <button 
             type="button" 
@@ -1058,25 +1091,27 @@ const Cashier = () => {
             <Unlock size={12} /> قاسی پارە (F10)
           </button>
 
-          <button 
-            type="button" 
-            onClick={() => navigate('/promotions')}
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '5px', 
-              background: 'rgba(217, 119, 6, 0.12)', 
-              color: '#d97706', 
-              border: '1px solid rgba(217, 119, 6, 0.35)', 
-              borderRadius: '6px', 
-              padding: '4px 10px', 
-              fontSize: '0.78rem', 
-              cursor: 'pointer',
-              fontWeight: 700
-            }}
-          >
-            <Tag size={12} /> ئۆفەرەکان
-          </button>
+          {canCashier('promotions') && (
+            <button 
+              type="button" 
+              onClick={() => navigate('/promotions')}
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '5px', 
+                background: 'rgba(217, 119, 6, 0.12)', 
+                color: '#d97706', 
+                border: '1px solid rgba(217, 119, 6, 0.35)', 
+                borderRadius: '6px', 
+                padding: '4px 10px', 
+                fontSize: '0.78rem', 
+                cursor: 'pointer',
+                fontWeight: 700
+              }}
+            >
+              <Tag size={12} /> ئۆفەرەکان
+            </button>
+          )}
 
           <button 
             type="button" 
