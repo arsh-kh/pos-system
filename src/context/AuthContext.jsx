@@ -4,18 +4,18 @@ import axios from 'axios';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Default user state stored in localStorage; defaults safely to CASHIER
+  // Session user state: null on fresh startup, requiring mandatory username & password
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('pos_user');
+    const saved = sessionStorage.getItem('pos_user') || localStorage.getItem('pos_user');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.role) return parsed;
+        if (parsed && parsed.role && parsed.username) return parsed;
       } catch {
-        return { username: 'کاشێری گشتی', role: 'CASHIER' };
+        return null;
       }
     }
-    return { username: 'کاشێری گشتی', role: 'CASHIER' };
+    return null;
   });
 
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }) => {
   // Sync axios headers whenever currentUser changes
   useEffect(() => {
     if (currentUser) {
+      sessionStorage.setItem('pos_user', JSON.stringify(currentUser));
       localStorage.setItem('pos_user', JSON.stringify(currentUser));
       axios.defaults.headers.common['x-user-name'] = currentUser.username;
       axios.defaults.headers.common['x-user-role'] = currentUser.role;
@@ -60,6 +61,13 @@ export const AuthProvider = ({ children }) => {
       } else {
         delete axios.defaults.headers.common['Authorization'];
       }
+    } else {
+      sessionStorage.removeItem('pos_user');
+      localStorage.removeItem('pos_user');
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+      delete axios.defaults.headers.common['x-user-name'];
+      delete axios.defaults.headers.common['x-user-role'];
     }
   }, [currentUser]);
 
@@ -83,13 +91,12 @@ export const AuthProvider = ({ children }) => {
   const canCashier = (permissionKey) => {
     if (currentUser?.role === 'ADMIN') return true;
     if (!cashierPermissions?.map || Object.keys(cashierPermissions.map).length === 0) {
-      // Safe fallback while loading
       return true;
     }
     return Boolean(cashierPermissions.map[permissionKey]);
   };
 
-  // Login handler
+  // Mandatory Login handler (Username + Password)
   const login = async (username, password) => {
     setIsSubmitting(true);
     setLoginError('');
@@ -102,12 +109,15 @@ export const AuthProvider = ({ children }) => {
       if (res.data.status === 'SUCCESS') {
         const { token, user } = res.data;
         localStorage.setItem('token', token);
+        sessionStorage.setItem('pos_user', JSON.stringify(user));
         setCurrentUser(user);
         setIsSwitchModalOpen(false);
-        return { success: true };
+        fetchPermissions();
+        return { success: true, user };
       }
+      return { success: false, message: res.data?.message || 'ناوی بەکارهێنەر یان وشەی نهێنی هەڵەیە' };
     } catch (err) {
-      const msg = err.response?.data?.message || 'ناو یان وشەی نهێنی هەڵەیە';
+      const msg = err.response?.data?.message || 'ناوی بەکارهێنەر یان وشەی نهێنی هەڵەیە';
       setLoginError(msg);
       return { success: false, message: msg };
     } finally {
@@ -134,34 +144,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Switch role: only CASHIER shifts can switch fast without password
-  const switchUserFast = (role, customName = null) => {
-    if (role === 'ADMIN') {
-      setIsSwitchModalOpen(true);
-      return;
-    }
-    const newName = customName || 'کاشێری سەرەکی';
-    const newUser = { username: newName, role: 'CASHIER' };
-    setCurrentUser(newUser);
-    localStorage.setItem('pos_user', JSON.stringify(newUser));
-    setIsSwitchModalOpen(false);
-  };
-
-  // Lock admin session and revert to cashier
-  const lockToCashier = () => {
-    localStorage.removeItem('token');
-    const cashierUser = { username: 'کاشێری گشتی', role: 'CASHIER' };
-    setCurrentUser(cashierUser);
-    localStorage.setItem('pos_user', JSON.stringify(cashierUser));
-    setIsSwitchModalOpen(false);
-  };
-
+  // Switch User / Logout: prompts for username & password
   const logout = () => {
-    lockToCashier();
+    sessionStorage.removeItem('pos_user');
+    localStorage.removeItem('pos_user');
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    delete axios.defaults.headers.common['x-user-name'];
+    delete axios.defaults.headers.common['x-user-role'];
+    setCurrentUser(null);
+    setIsSwitchModalOpen(false);
+  };
+
+  const lockToCashier = () => {
+    logout();
+  };
+
+  const switchUserFast = () => {
+    logout();
   };
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const isCashier = currentUser?.role === 'CASHIER';
+  const isAuthenticated = Boolean(currentUser);
 
   return (
     <AuthContext.Provider
@@ -169,6 +174,7 @@ export const AuthProvider = ({ children }) => {
         currentUser,
         isAdmin,
         isCashier,
+        isAuthenticated,
         login,
         logout,
         lockToCashier,

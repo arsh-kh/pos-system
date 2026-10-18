@@ -15,7 +15,9 @@ import {
   RotateCcw, 
   Percent,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
@@ -33,8 +35,23 @@ const ACTION_LABELS = {
   EXPENSE_DELETE: 'سڕینەوەی خەرجی 🗑️',
   SHIFT_OPEN: 'کردنەوەی شیفت 🔓',
   SHIFT_CLOSE: 'داخستنی شیفت 🔒',
-  DISCOUNT_APPLIED: 'داشکاندنی دەستی %'
+  DISCOUNT_APPLIED: 'داشکاندنی دەستی %',
+  LOGIN_SUCCESS: 'چوونەژوورەوەی سەرکەوتوو 🟢',
+  LOGIN_FAILED: 'هەوڵی چوونەژوورەوەی هەڵە 🔴',
+  USER_CREATE: 'دروستکردنی کاشێر 👤',
+  USER_UPDATE: 'دەستکاری کاشێر ✏️',
+  USER_DELETE: 'سڕینەوەی کاشێر 🗑️',
+  PERMISSIONS_UPDATE: 'دەستکاری دەسەڵاتەکان 🛡️'
 };
+
+const DATE_PRESETS = [
+  { key: 'ALL', label: 'هەموو بەروارەکان' },
+  { key: 'today', label: 'ئەمڕۆ' },
+  { key: 'yesterday', label: 'دوێنێ' },
+  { key: 'last_7_days', label: '٧ ڕۆژی ڕابردوو' },
+  { key: 'last_30_days', label: '٣٠ ڕۆژی ڕابردوو' },
+  { key: 'this_month', label: 'ئەم مانگە' },
+];
 
 const AuditLogs = () => {
   const { isAdmin } = useAuth();
@@ -44,6 +61,7 @@ const AuditLogs = () => {
   const [loading, setLoading] = useState(true);
 
   // Filters
+  const [datePreset, setDatePreset] = useState('ALL');
   const [actionFilter, setActionFilter] = useState('ALL');
   const [userFilter, setUserFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +72,7 @@ const AuditLogs = () => {
     try {
       setLoading(true);
       const params = {};
+      if (datePreset !== 'ALL') params.preset = datePreset;
       if (actionFilter !== 'ALL') params.action_type = actionFilter;
       if (userFilter !== 'ALL') params.username = userFilter;
       if (searchQuery) params.search = searchQuery;
@@ -75,21 +94,39 @@ const AuditLogs = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [actionFilter, userFilter, startDate, endDate]);
+  }, [datePreset, actionFilter, userFilter, startDate, endDate]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     fetchLogs();
   };
 
+  const handlePresetSelect = (presetKey) => {
+    setDatePreset(presetKey);
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const handleCustomDateChange = (start, end) => {
+    setDatePreset('CUSTOM');
+    if (start !== undefined) setStartDate(start);
+    if (end !== undefined) setEndDate(end);
+  };
+
   const filteredLogs = logs.filter(log => {
     if (!searchQuery) return true;
-    return kurdishSearchMatch([log.details, log.username, log.entity_id, ACTION_LABELS[log.action_type]], searchQuery);
+    return kurdishSearchMatch([
+      log.details, 
+      log.username, 
+      log.entity_id, 
+      ACTION_LABELS[log.action_type] || log.action_type,
+      log.entity_name
+    ], searchQuery);
   });
 
   if (!isAdmin) {
     return (
-      <div className="dashboard-page p-8" style={{ textAlign: 'center', paddingTop: '80px' }}>
+      <div className="dashboard-page p-8" style={{ textAlign: 'center', paddingTop: '80px', direction: 'rtl' }}>
         <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
           <AlertTriangle size={40} color="#f87171" />
         </div>
@@ -102,15 +139,15 @@ const AuditLogs = () => {
   }
 
   return (
-    <div className="dashboard-page p-8">
+    <div className="dashboard-page p-8" style={{ direction: 'rtl' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.8rem', margin: 0 }}>
-            <ShieldCheck color="var(--accent-color)" size={32} /> تۆماری چاودێری و چالاکییەکان (Audit Logs)
+            <ShieldCheck color="#2563eb" size={32} /> تۆماری چاودێری و چالاکییەکان (Audit Logs)
           </h1>
           <p className="text-secondary" style={{ marginTop: '6px' }}>
-            چاودێریکردنی هەموو دەستکارییەکان: کێ چی گۆڕیوە، کەی، و بەراوردی نرخی پێشوو بەرامبەر نوێ.
+            چاودێریکردنی تەواوی هەنگاوەکان: کێ چی گۆڕیوە، کەی، چوونەژوورەوەی کاشێرەکان و بەراوردی نرخی پێشوو بەرامبەر نوێ.
           </p>
         </div>
 
@@ -134,17 +171,17 @@ const AuditLogs = () => {
 
       {/* KPI Stats Grid */}
       <div className="stats-grid mb-8">
-        <div className="stat-card glass-panel" style={{ background: 'rgba(2, 132, 199, 0.08)', borderColor: 'rgba(2, 132, 199, 0.25)' }}>
+        <div className="stat-card glass-panel" style={{ background: 'rgba(37, 99, 235, 0.08)', borderColor: 'rgba(37, 99, 235, 0.25)' }}>
           <h3>کۆی گشتی چالاکییەکان</h3>
-          <div className="value" style={{ color: '#0284c7' }}>
+          <div className="value" style={{ color: '#2563eb' }}>
             {stats.total_logs || 0} کردار
           </div>
           <div className="sub-text">تۆمارکراو لە داتابەیسدا</div>
         </div>
 
-        <div className="stat-card glass-panel" style={{ background: 'rgba(56, 189, 248, 0.08)', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
+        <div className="stat-card glass-panel" style={{ background: 'rgba(2, 132, 199, 0.08)', borderColor: 'rgba(2, 132, 199, 0.25)' }}>
           <h3>گۆڕانکارییەکانی نرخ</h3>
-          <div className="value" style={{ color: '#38bdf8' }}>
+          <div className="value" style={{ color: '#0284c7' }}>
             {stats.price_changes || 0} دەستکاری
           </div>
           <div className="sub-text">نرخی کڕین یان فرۆشتن</div>
@@ -152,18 +189,67 @@ const AuditLogs = () => {
 
         <div className="stat-card glass-panel" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.25)' }}>
           <h3>سڕینەوەی تۆمارەکان</h3>
-          <div className="value" style={{ color: '#f87171' }}>
+          <div className="value" style={{ color: '#ef4444' }}>
             {stats.deletions || 0} سڕینەوە
           </div>
-          <div className="sub-text">کاڵا، فرۆشتن یان خەرجی</div>
+          <div className="sub-text">کاڵا، فرۆشتن یان کاشێر</div>
         </div>
 
-        <div className="stat-card glass-panel" style={{ background: 'rgba(244, 63, 94, 0.08)', borderColor: 'rgba(244, 63, 94, 0.25)' }}>
+        <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
           <h3>گەڕاندنەوە لە کڕیار</h3>
-          <div className="value" style={{ color: '#fb7185' }}>
+          <div className="value" style={{ color: '#10b981' }}>
             {stats.returns_count || 0} گەڕاندنەوە
           </div>
           <div className="sub-text">بڕی پارەی دراوەتەوە</div>
+        </div>
+      </div>
+
+      {/* Date Presets Toolbar (ئەمڕۆ، دوێنێ، ٧ ڕۆژ، ئەم مانگە) */}
+      <div className="glass-panel" style={{ padding: '12px 18px', borderRadius: '16px', marginBottom: '1rem', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)', marginLeft: '10px' }}>
+          <Clock size={16} color="var(--accent-color)" /> فلتەری کات:
+        </div>
+        
+        {DATE_PRESETS.map((p) => {
+          const isSelected = datePreset === p.key;
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => handlePresetSelect(p.key)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '10px',
+                border: isSelected ? '1.5px solid var(--accent-color)' : '1px solid var(--border-color)',
+                background: isSelected ? 'var(--accent-light)' : 'var(--bg-tertiary)',
+                color: isSelected ? 'var(--accent-color)' : 'var(--text-primary)',
+                fontWeight: isSelected ? 800 : 600,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+
+        {/* Custom Date Pickers */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: 'auto' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>لە:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => handleCustomDateChange(e.target.value, undefined)}
+            style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+          />
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>تا:</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => handleCustomDateChange(undefined, e.target.value)}
+            style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+          />
         </div>
       </div>
 
@@ -184,7 +270,7 @@ const AuditLogs = () => {
           </div>
           <button 
             type="submit" 
-            style={{ padding: '0 16px', borderRadius: '10px', background: '#38bdf8', color: '#0f172a', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+            style={{ padding: '0 16px', borderRadius: '10px', background: '#2563eb', color: '#ffffff', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
           >
             گەڕان
           </button>
@@ -206,7 +292,7 @@ const AuditLogs = () => {
 
         {/* User Filter Dropdown */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بەکارهێنەر:</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>بەکارهێنەر (کاشێر/ئەدمین):</span>
           <select 
             value={userFilter}
             onChange={e => setUserFilter(e.target.value)}
@@ -249,6 +335,7 @@ const AuditLogs = () => {
                 const isPriceChange = log.action_type === 'PRICE_CHANGE';
                 const isStockAdjust = log.action_type === 'STOCK_ADJUSTMENT';
                 const isDelete = log.action_type.includes('DELETE');
+                const isAuth = log.action_type.startsWith('LOGIN');
                 const isCashierUser = log.user_role === 'CASHIER';
 
                 let oldValObj = null;
@@ -302,14 +389,18 @@ const AuditLogs = () => {
                               ? 'rgba(56, 189, 248, 0.2)' 
                               : isStockAdjust 
                                 ? 'rgba(217, 119, 6, 0.18)' 
-                                : 'var(--bg-tertiary)',
+                                : isAuth
+                                  ? 'rgba(99, 102, 241, 0.18)'
+                                  : 'var(--bg-tertiary)',
                           color: isDelete 
                             ? '#f87171' 
                             : isPriceChange 
-                              ? '#38bdf8' 
+                              ? '#0284c7' 
                               : isStockAdjust 
                                 ? '#d97706' 
-                                : 'var(--text-primary)',
+                                : isAuth
+                                  ? '#6366f1'
+                                  : 'var(--text-primary)',
                           border: '1px solid var(--border-color)'
                         }}
                       >
@@ -334,7 +425,7 @@ const AuditLogs = () => {
                           <span style={{ color: 'var(--text-secondary)', textDecoration: 'line-through' }}>
                             {Number(oldValObj.selling_price || 0).toLocaleString()} د.ع
                           </span>
-                          <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>➔</span>
+                          <span style={{ color: '#0284c7', fontWeight: 'bold' }}>➔</span>
                           <span style={{ color: '#10b981', fontWeight: 'bold' }}>
                             {Number(newValObj.selling_price || 0).toLocaleString()} د.ع
                           </span>

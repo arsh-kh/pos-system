@@ -23,7 +23,8 @@ const testFiles = [
     'test_telegram_nightly.js',
     'test_cashier_permissions.js',
     'test_full_lifecycle_e2e.js',
-    'test_analytics_ranges.js'
+    'test_analytics_ranges.js',
+    'test_multi_cashier_and_audit.js'
 ];
 
 async function runMasterSuite() {

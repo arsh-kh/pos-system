@@ -6,29 +6,82 @@ const { logAuditAction } = require('../middleware/auditLogger');
 exports.login = async (req, res) => {
     const { username, password } = req.body;
 
+    if (!username || !password) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە' });
+    }
+
     try {
-        const [users] = await db.query('SELECT * FROM Users WHERE username = ?', [username]);
+        const [users] = await db.query('SELECT * FROM Users WHERE username = ?', [username.trim()]);
         if (users.length === 0) {
+            await logAuditAction({
+                req,
+                action_type: 'LOGIN_FAILED',
+                entity_name: 'Users',
+                username: username.trim(),
+                user_role: 'CASHIER',
+                details: `هەوڵی چوونەژوورەوەی سەرکەوتوونەبوو بە ناوی: ${username}`
+            });
             return res.status(401).json({ status: 'ERROR', message: 'ناوی بەکارهێنەر یان وشەی نهێنی هەڵەیە' });
         }
 
         const user = users[0];
-        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (user.is_active === 0) {
+            await logAuditAction({
+                req,
+                action_type: 'LOGIN_FAILED',
+                entity_name: 'Users',
+                entity_id: user.id,
+                username: user.username,
+                user_role: user.role,
+                user_id: user.id,
+                details: `هەوڵی چوونەژوورەوە بۆ هەژماری ناچالاککراو: ${user.username}`
+            });
+            return res.status(403).json({ status: 'ERROR', message: 'ئەم هەژمارە ناچالاک کراوە لە لایەن بەڕێوەبەرەوە' });
+        }
+
+        const isMatch = await bcrypt.compare(password.trim(), user.password);
 
         if (!isMatch) {
+            await logAuditAction({
+                req,
+                action_type: 'LOGIN_FAILED',
+                entity_name: 'Users',
+                entity_id: user.id,
+                username: user.username,
+                user_role: user.role,
+                user_id: user.id,
+                details: `وشەی نهێنی هەڵە بۆ بەکارهێنەر: ${user.username}`
+            });
             return res.status(401).json({ status: 'ERROR', message: 'ناوی بەکارهێنەر یان وشەی نهێنی هەڵەیە' });
         }
 
         const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role },
+            { id: user.id, username: user.username, role: user.role, full_name: user.full_name },
             process.env.JWT_SECRET || 'fallback_secret',
             { expiresIn: '12h' }
         );
 
+        await logAuditAction({
+            req,
+            action_type: 'LOGIN_SUCCESS',
+            entity_name: 'Users',
+            entity_id: user.id,
+            username: user.username,
+            user_role: user.role,
+            user_id: user.id,
+            details: `چوونەژوورەوەی سەرکەوتوو: ${user.full_name || user.username} (${user.role === 'ADMIN' ? 'ئەدمین' : 'کاشێر'})`
+        });
+
         res.json({
             status: 'SUCCESS',
             token,
-            user: { id: user.id, username: user.username, role: user.role }
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                full_name: user.full_name || user.username,
+                role: user.role 
+            }
         });
     } catch (error) {
         console.error('Login Error:', error);

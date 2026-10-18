@@ -23,6 +23,7 @@ import SalesHistory from './pages/SalesHistory';
 import TotalSales from './pages/TotalSales';
 import Settings from './pages/Settings';
 import AuditLogs from './pages/AuditLogs';
+import Login from './pages/Login';
 import './Layout.css';
 
 // PageWrapper adds back nav and top user status bar
@@ -49,6 +50,8 @@ const PageWrapper = ({ children }) => {
 };
 
 function AppContent() {
+  const { currentUser } = useAuth();
+
   useEffect(() => {
     const savedTheme = localStorage.getItem('pos_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -60,6 +63,11 @@ function AppContent() {
       document.body.classList.remove('theme-light');
     }
   }, []);
+
+  // Mandatory Authentication: If no user is logged in, show Login page!
+  if (!currentUser) {
+    return <Login />;
+  }
 
   return (
     <PageWrapper>

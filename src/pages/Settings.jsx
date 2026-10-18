@@ -5,8 +5,10 @@ import {
   AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
   Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock,
   Copy, ExternalLink, Edit2, Printer, ScanBarcode, Volume2, Zap, HelpCircle as HelpIcon,
-  Bot, Info, BookOpen, FileText, Folder
+  Bot, Info, BookOpen, FileText, Folder,
+  Users, UserPlus, KeyRound, UserCheck, UserX
 } from 'lucide-react';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
@@ -167,6 +169,121 @@ const Settings = () => {
       setTimeout(() => setPermNotice(''), 3000);
     } else {
       alert(res?.message || 'هەڵە لە نوێکردنەوەی دەسەڵاتەکان');
+    }
+  };
+
+  // Multi-Cashier Accounts Management State
+  const [cashiersList, setCashiersList] = useState([]);
+  const [loadingCashiers, setLoadingCashiers] = useState(false);
+  const [showAddCashierModal, setShowAddCashierModal] = useState(false);
+  const [showEditCashierModal, setShowEditCashierModal] = useState(false);
+  const [selectedCashier, setSelectedCashier] = useState(null);
+  const [newCashierForm, setNewCashierForm] = useState({ username: '', full_name: '', password: '' });
+  const [editCashierPassword, setEditCashierPassword] = useState('');
+  const [editCashierFullName, setEditCashierFullName] = useState('');
+  const [cashierNotice, setCashierNotice] = useState('');
+  const [cashierError, setCashierError] = useState('');
+  const [cashierSubmitting, setCashierSubmitting] = useState(false);
+
+  const fetchCashiersList = async () => {
+    try {
+      setLoadingCashiers(true);
+      const res = await axios.get('http://localhost:3001/api/users/cashiers');
+      if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
+        setCashiersList(res.data.data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch cashiers:', err.message);
+    } finally {
+      setLoadingCashiers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCashiersList();
+  }, []);
+
+  const handleCreateCashier = async (e) => {
+    e.preventDefault();
+    if (!newCashierForm.username.trim() || !newCashierForm.password) {
+      setCashierError('تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە');
+      return;
+    }
+    setCashierSubmitting(true);
+    setCashierError('');
+    try {
+      const res = await axios.post('http://localhost:3001/api/users/cashiers', {
+        username: newCashierForm.username.trim(),
+        full_name: newCashierForm.full_name.trim() || newCashierForm.username.trim(),
+        password: newCashierForm.password
+      });
+      if (res.data?.status === 'SUCCESS') {
+        setShowAddCashierModal(false);
+        setNewCashierForm({ username: '', full_name: '', password: '' });
+        setCashierNotice('کاشێری نوێ بە سەرکەوتوویی زیادکرا');
+        setTimeout(() => setCashierNotice(''), 3500);
+        fetchCashiersList();
+      }
+    } catch (err) {
+      setCashierError(err.response?.data?.message || 'هەڵە لە دروستکردنی کاشێر');
+    } finally {
+      setCashierSubmitting(false);
+    }
+  };
+
+  const handleUpdateCashier = async (e) => {
+    e.preventDefault();
+    if (!selectedCashier) return;
+    setCashierSubmitting(true);
+    setCashierError('');
+    try {
+      const body = { full_name: editCashierFullName };
+      if (editCashierPassword.trim()) {
+        body.password = editCashierPassword.trim();
+      }
+      const res = await axios.put(`http://localhost:3001/api/users/cashiers/${selectedCashier.id}`, body);
+      if (res.data?.status === 'SUCCESS') {
+        setShowEditCashierModal(false);
+        setSelectedCashier(null);
+        setEditCashierPassword('');
+        setCashierNotice('زانیارییەکانی کاشێر بە سەرکەوتوویی نوێکرانەوە');
+        setTimeout(() => setCashierNotice(''), 3500);
+        fetchCashiersList();
+      }
+    } catch (err) {
+      setCashierError(err.response?.data?.message || 'هەڵە لە نوێکردنەوەی کاشێر');
+    } finally {
+      setCashierSubmitting(false);
+    }
+  };
+
+  const handleToggleCashierActive = async (cashier) => {
+    try {
+      const newActive = cashier.is_active === 1 ? 0 : 1;
+      const res = await axios.put(`http://localhost:3001/api/users/cashiers/${cashier.id}`, {
+        is_active: newActive
+      });
+      if (res.data?.status === 'SUCCESS') {
+        fetchCashiersList();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'هەڵە لە گۆڕینی دۆخی کاشێر');
+    }
+  };
+
+  const handleDeleteCashier = async (cashier) => {
+    if (!window.confirm(`ئایا دڵنیایت لە سڕینەوەی هەژماری کاشێر: ${cashier.full_name || cashier.username}؟`)) {
+      return;
+    }
+    try {
+      const res = await axios.delete(`http://localhost:3001/api/users/cashiers/${cashier.id}`);
+      if (res.data?.status === 'SUCCESS') {
+        setCashierNotice('هەژماری کاشێر بە سەرکەوتوویی سڕایەوە');
+        setTimeout(() => setCashierNotice(''), 3500);
+        fetchCashiersList();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'هەڵە لە کاتی سڕینەوەی کاشێر');
     }
   };
 
@@ -919,6 +1036,348 @@ const Settings = () => {
           </div>
         </div>
       </div>
+
+      {/* Section 1.4: Multi-Cashier Accounts Management (بەڕێوەبردنی کاشێرەکان و بەکارهێنەران) */}
+      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={22} color="#2563eb" /> بەڕێوەبردنی کاشێرەکان (Cashier Accounts Management)
+            </h2>
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+              دروستکردنی هەژماری جیاواز بۆ هەر کاشێرێک بە ناوی بەکارهێنەر و وشەی نهێنی تایبەت، بۆ چاودێری و وردبینی تەواو.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {cashierNotice && (
+              <span style={{ fontSize: '0.85rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>
+                {cashierNotice}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setCashierError('');
+                setShowAddCashierModal(true);
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 18px', borderRadius: '12px',
+                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                color: '#ffffff', border: 'none', fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                fontSize: '0.88rem'
+              }}
+            >
+              <UserPlus size={18} /> زیادکردنی کاشێری نوێ
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '24px', marginBottom: '2.5rem' }}>
+        {loadingCashiers ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+            کاشێرەکان باردەکرێن...
+          </div>
+        ) : cashiersList.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+            هیچ کاشێرێک نەدۆزرایەوە
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+            {cashiersList.map((cashier) => {
+              const isActive = cashier.is_active === 1;
+              return (
+                <div
+                  key={cashier.id}
+                  style={{
+                    padding: '1.2rem',
+                    borderRadius: '16px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    opacity: isActive ? 1 : 0.65,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: isActive ? 'rgba(37, 99, 235, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: isActive ? '#2563eb' : '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Users size={20} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-primary)' }}>
+                          {cashier.full_name || cashier.username}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          ناوی بەکارهێنەر: <strong style={{ color: 'var(--text-primary)' }}>{cashier.username}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <span style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: isActive ? '#10b981' : '#ef4444',
+                      border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                    }}>
+                      {isActive ? 'چالاک' : 'ناچالاک'}
+                    </span>
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {/* Change Password Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCashier(cashier);
+                          setEditCashierFullName(cashier.full_name || cashier.username);
+                          setEditCashierPassword('');
+                          setCashierError('');
+                          setShowEditCashierModal(true);
+                        }}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          background: 'var(--bg-secondary)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="دەستکاری ناو و وشەی نهێنی"
+                      >
+                        <KeyRound size={13} /> گۆڕینی وشەی نهێنی
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCashier(cashier)}
+                        style={{
+                          padding: '5px 8px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          color: '#ef4444',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        title="سڕینەوەی کاشێر"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    {/* Toggle Active Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCashierActive(cashier)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        background: isActive ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: isActive ? '#dc2626' : '#10b981',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {isActive ? 'ناچالاککردن' : 'چالاککردنەوە'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Add Cashier Modal */}
+      {showAddCashierModal && (
+        <div className="pos-modal-overlay" onClick={() => setShowAddCashierModal(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()} style={{ direction: 'rtl' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UserPlus size={20} color="#2563eb" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>زیادکردنی کاشێری نوێ</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowAddCashierModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {cashierError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '8px 12px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.84rem' }}>
+                {cashierError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateCashier}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                  ناوی تەواو (بۆ ناسینەوە)
+                </label>
+                <input
+                  type="text"
+                  placeholder="بۆ نموونە: ئاراس کەریم"
+                  value={newCashierForm.full_name}
+                  onChange={e => setNewCashierForm({ ...newCashierForm, full_name: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                  ناوی بەکارهێنەر (Username) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="بۆ نموونە: cashier3"
+                  value={newCashierForm.username}
+                  onChange={e => setNewCashierForm({ ...newCashierForm, username: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                  وشەی نهێنی (Password) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="وشەی نهێنی بۆ کاشێر دیاری بکە..."
+                  value={newCashierForm.password}
+                  onChange={e => setNewCashierForm({ ...newCashierForm, password: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="submit"
+                  disabled={cashierSubmitting}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: cashierSubmitting ? 'not-allowed' : 'pointer' }}
+                >
+                  {cashierSubmitting ? 'تکایە چاوەڕوان بە...' : 'زیادکردنی کاشێر'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCashierModal(false)}
+                  style={{ padding: '11px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                >
+                  پاشگەزبوونەوە
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Cashier Modal */}
+      {showEditCashierModal && selectedCashier && (
+        <div className="pos-modal-overlay" onClick={() => setShowEditCashierModal(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()} style={{ direction: 'rtl' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <KeyRound size={20} color="#2563eb" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>دەستکاریکردنی کاشێر: {selectedCashier.username}</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowEditCashierModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {cashierError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '8px 12px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.84rem' }}>
+                {cashierError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateCashier}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                  ناوی تەواو
+                </label>
+                <input
+                  type="text"
+                  value={editCashierFullName}
+                  onChange={e => setEditCashierFullName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                  وشەی نهێنی نوێ (ئەگەر بە بەتاڵی جێیبهێڵیت، ناگۆڕدرێت)
+                </label>
+                <input
+                  type="password"
+                  placeholder="وشەی نهێنی نوێ بنووسە..."
+                  value={editCashierPassword}
+                  onChange={e => setEditCashierPassword(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="submit"
+                  disabled={cashierSubmitting}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: cashierSubmitting ? 'not-allowed' : 'pointer' }}
+                >
+                  {cashierSubmitting ? 'تکایە چاوەڕوان بە...' : 'پاشەکەوتکردن'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEditCashierModal(false)}
+                  style={{ padding: '11px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                >
+                  پاشگەزبوونەوە
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Section 1.5: Cashier Selected Fields & Permissions Management (دەسەڵاتەکانی کاشێر و دیاریکردنی خانەکان) */}
       <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>

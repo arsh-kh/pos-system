@@ -25,7 +25,8 @@ import {
   CheckCircle2,
   ArrowRight,
   Store,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
@@ -34,7 +35,7 @@ import './Dashboard.css';
 
 const Cashier = () => {
   const navigate = useNavigate();
-  const { currentUser, isAdmin, canCashier } = useAuth();
+  const { currentUser, isAdmin, canCashier, logout } = useAuth();
 
   // Permission Flags for Cashier
   const allowManualDiscount = canCashier ? canCashier('allow_manual_discount') : true;
@@ -988,7 +989,7 @@ const Cashier = () => {
 
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             <User size={13} />
-            <span>{currentUser?.username || 'کاشێری سەرەکی'}</span>
+            <span>{currentUser?.full_name || currentUser?.username || 'کاشێر'}</span>
           </div>
         </div>
 
@@ -1073,6 +1074,27 @@ const Cashier = () => {
             }}
           >
             <Tag size={12} /> ئۆفەرەکان
+          </button>
+
+          <button 
+            type="button" 
+            onClick={logout}
+            title="دەرچوون لە هەژمار و گەڕانەوە بۆ لۆگین"
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '5px', 
+              background: 'rgba(239, 68, 68, 0.12)', 
+              color: '#ef4444', 
+              border: '1px solid rgba(239, 68, 68, 0.35)', 
+              borderRadius: '6px', 
+              padding: '4px 10px', 
+              fontSize: '0.78rem', 
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+          >
+            <LogOut size={12} /> دەرچوون
           </button>
         </div>
       </header>

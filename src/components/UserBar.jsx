@@ -198,7 +198,7 @@ const UserBar = () => {
           >
             {isAdmin ? <Crown size={14} /> : <User size={14} />}
             <span>{isAdmin ? 'بەڕێوەبەر' : 'کاشێر'}:</span>
-            <span style={{ color: 'var(--text-primary)' }}>{currentUser?.username || 'کاشێری سەرەکی'}</span>
+            <span style={{ color: 'var(--text-primary)' }}>{currentUser?.full_name || currentUser?.username || 'بەکارهێنەر'}</span>
           </div>
 
           {!isAdmin && (
@@ -307,50 +307,27 @@ const UserBar = () => {
             {currentTheme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
 
-          {/* Login / Logout Button */}
-          {isAdmin ? (
-            <button
-              onClick={handleLogoutToCashier}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 16px',
-                borderRadius: '9999px',
-                background: 'var(--danger-light)',
-                color: 'var(--danger-color)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: '0.82rem'
-              }}
-            >
-              <LogOut size={14} /> دەرچوون لە ئەدمین
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setLoginError('');
-                setIsSwitchModalOpen(true);
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 16px',
-                borderRadius: '9999px',
-                background: 'var(--accent-gradient)',
-                color: '#ffffff',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                boxShadow: 'var(--btn-shadow)'
-              }}
-            >
-              <KeyRound size={14} /> چوونەژوورەوەی ئەدمین
-            </button>
-          )}
+          {/* Unified Sign Out Button */}
+          <button
+            onClick={logout}
+            title="دەرچوون لە هەژمار و گەڕانەوە بۆ لاپەڕەی چوونەژوورەوە"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#dc2626',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <LogOut size={14} /> دەرچوون
+          </button>
         </div>
       </header>
 

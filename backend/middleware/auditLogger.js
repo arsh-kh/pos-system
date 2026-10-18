@@ -11,13 +11,16 @@ const logAuditAction = async ({
   entity_id = null,
   old_value = null,
   new_value = null,
-  details = ''
+  details = '',
+  username: explicitUsername = null,
+  user_role: explicitUserRole = null,
+  user_id: explicitUserId = null
 }) => {
   try {
-    // 1. Resolve user info from JWT req.user or custom headers passed by client
-    let userId = req?.user?.id || null;
-    let username = req?.user?.username || req?.headers?.['x-user-name'] || 'کاشێری گشتی';
-    let userRole = req?.user?.role || req?.headers?.['x-user-role'] || 'CASHIER';
+    // 1. Resolve user info from explicit params, JWT req.user, or custom headers
+    let userId = explicitUserId || req?.user?.id || null;
+    let username = explicitUsername || req?.user?.username || req?.headers?.['x-user-name'] || 'کاشێری گشتی';
+    let userRole = explicitUserRole || req?.user?.role || req?.headers?.['x-user-role'] || 'CASHIER';
 
     // 2. Resolve IP Address
     const ipAddress = req?.headers?.['x-forwarded-for'] || req?.socket?.remoteAddress || req?.ip || '127.0.0.1';

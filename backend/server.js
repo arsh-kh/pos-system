@@ -117,6 +117,10 @@ app.use('/api/cloud-sync', syncRoutes);
 const permissionsRoutes = require('./routes/permissions');
 app.use('/api/permissions', permissionsRoutes);
 
+// Users & Multi-Cashier Management API (بەڕێوەبردنی کاشێرەکان و بەکارهێنەران)
+const usersRoutes = require('./routes/users');
+app.use('/api/users', usersRoutes);
+
 // Global Express Error Handler Middleware
 app.use((err, req, res, next) => {
     console.error('Global Express Error Caught:', err);
