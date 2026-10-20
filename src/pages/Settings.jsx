@@ -1513,16 +1513,19 @@ const Settings = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
             {[
-              { key: 'pos_cashier', label: 'فرۆشتن و کاشێر (POS)', desc: 'دەستڕاگەیشتن بە شاشەی سەرەکی فرۆشتن', color: '#2563eb' },
-              { key: 'pos_products', label: 'کۆگا و کاڵاکان', desc: 'بینین و گەڕان لە لیستی کاڵاکان', color: '#0284c7' },
-              { key: 'pos_returns', label: 'گەڕانەوەی کاڵا', desc: 'وەرگرتنەوەی پسوولە و کاڵای گەڕاوە', color: '#0d9488' },
-              { key: 'pos_cashdrawer', label: 'سندوقی پارە (قاسە)', desc: 'بینینی جووڵەی کاش و بەڵانس', color: '#10b981' },
-              { key: 'pos_owes', label: 'قەرز و کڕیاران', desc: 'بینینی لیستی قەرزارەکان و وەرگرتنەوە', color: '#d97706' },
-              { key: 'pos_expenses', label: 'خەرجییەکان', desc: 'تۆمارکردنی خەرجی ڕۆژانە', color: '#ea580c' },
-              { key: 'pos_damages', label: 'زیان و بەفیڕۆچوو', desc: 'تۆمارکردنی کاڵای بەسەرچوو یان شکاو', color: '#e11d48' },
-              { key: 'pos_purchases', label: 'کڕین و دابینکەران', desc: 'تۆمارکردنی پسوولەی کڕین لە مەندوب', color: '#7c3aed' },
-              { key: 'pos_reports', label: 'ڕاپۆرتە داراییەکان', desc: 'بینینی قازانج و ڕاپۆرتە گشتییەکان', color: '#6366f1' },
-              { key: 'pos_settings', label: 'ڕێکخستنەکان', desc: 'دەستکاریکردنی ڕێکخستنی سیستەم', color: '#64748b' }
+              { key: 'pos_cashier', label: 'شاشەی کاشێر و فرۆشتن (POS)', desc: 'دەستڕاگەیشتن بە شاشەی سەرەکی فرۆشتن', color: '#2563eb' },
+              { key: 'pos_shifts', label: 'قاسە و شیفتەکان', desc: 'چاودێری باڵانسی قاسە و داخستنی شیفت', color: '#10b981' },
+              { key: 'pos_returns', label: 'گەڕاندنەوەی کاڵا', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە', color: '#0d9488' },
+              { key: 'pos_owes', label: 'قەرزی کڕیاران', desc: 'قەرزی کڕیاران و وەرگرتنەوەی قیست', color: '#d97706' },
+              { key: 'inv_products', label: 'کاڵاکان و مەخزەن', desc: 'مەخزەن، نرخەکان و خوێندنەوەی بارکۆد', color: '#0284c7' },
+              { key: 'inv_needs', label: 'پێداویستییە کەمبووەکان', desc: 'لیستی کاڵا کەمبووەوەکانی مارکێت', color: '#0284c7' },
+              { key: 'inv_promotions', label: 'ئۆفەر و داشکاندن', desc: 'داشکاندن و ئۆفەری کاتی بۆ فرۆشتن', color: '#0284c7' },
+              { key: 'inv_purchases', label: 'پسووڵەی کڕین لە کۆمپانیا', desc: 'تۆمارکردنی کڕین لە دابینکەران', color: '#7c3aed' },
+              { key: 'inv_audit', label: 'جەردکردنی کۆگا', desc: 'پشکنینی مەخزەن و دۆزینەوەی نوقسانی', color: '#0284c7' },
+              { key: 'inv_vendor_returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', desc: 'گەڕاندنەوەی کاڵا بۆ مەندوب (RTV)', color: '#0284c7' },
+              { key: 'inv_wastage', label: 'زیان و فەوتانی کاڵا', desc: 'تۆمارکردنی کاڵای بەسەرچوو و شکاو', color: '#b91c1c' },
+              { key: 'mgmt_expenses', label: 'خەرجییەکانی مارکێت', desc: 'تۆمارکردنی خەرجی ڕۆژانەی مارکێت', color: '#b91c1c' },
+              { key: 'mgmt_history', label: 'مێژووی فرۆشتنە کۆنەکان', desc: 'گەڕان بەدوای پسووڵەکانی پێشوو', color: '#6366f1' }
             ].map(item => {
               const enabled = !!permDraft[item.key];
               return (

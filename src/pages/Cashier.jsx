@@ -1140,20 +1140,20 @@ const Cashier = () => {
       <div style={{ display: 'flex', gap: '10px', height: 'calc(100vh - 54px)', overflow: 'hidden' }}>
         
         {/* Products Catalog & Scan Input */}
-        <div style={{ flex: '1 1 50%', minWidth: '320px', display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
+        <div style={{ width: '370px', flex: '0 0 370px', display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
           
           {/* Top Barcode Input & Search Header */}
           <div style={{ 
             background: 'var(--bg-secondary)', 
             border: '1px solid var(--border-color)', 
-            padding: '6px 10px', 
+            padding: '6px 8px', 
             borderRadius: '10px', 
             display: 'flex', 
-            gap: '8px', 
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: '6px', 
             flexShrink: 0
           }}>
-            <form onSubmit={handleBarcodeSubmit} style={{ flex: '1 1 55%', display: 'flex', gap: '6px' }}>
+            <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '6px', width: '100%' }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <ScanBarcode size={17} color="var(--primary-color)" style={{ position: 'absolute', right: '10px', top: '8px' }} />
                 <input 
@@ -1171,29 +1171,31 @@ const Cashier = () => {
                     border: '1px solid var(--border-color)', 
                     color: 'var(--text-primary)', 
                     fontFamily: 'monospace', 
-                    fontSize: '0.88rem' 
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box'
                   }}
                 />
               </div>
               <button 
                 type="submit" 
                 className="btn-primary"
-                style={{ padding: '0 16px', borderRadius: '8px', fontWeight: 700, fontSize: '0.84rem' }}
+                style={{ padding: '0 14px', borderRadius: '8px', fontWeight: 700, fontSize: '0.84rem', flexShrink: 0 }}
               >
                 سکان
               </button>
             </form>
 
             <div style={{ 
-              flex: '1 1 45%', 
               display: 'flex', 
               alignItems: 'center', 
               background: 'var(--bg-tertiary)', 
-              padding: '5px 10px', 
+              padding: '6px 10px', 
               borderRadius: '8px', 
-              border: '1px solid var(--border-color)' 
+              border: '1px solid var(--border-color)',
+              width: '100%',
+              boxSizing: 'border-box'
             }}>
-              <Search size={15} color="var(--text-muted)" />
+              <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
               <input 
                 type="text" 
                 placeholder="گەڕان بە ناوی کاڵا..." 
@@ -1201,6 +1203,15 @@ const Cashier = () => {
                 onChange={(e) => setProductSearch(e.target.value)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '6px', outline: 'none', width: '100%', fontSize: '0.86rem', boxShadow: 'none', padding: 0 }}
               />
+              {productSearch && (
+                <button
+                  type="button"
+                  onClick={() => setProductSearch('')}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1250,8 +1261,8 @@ const Cashier = () => {
             })}
           </div>
 
-          {/* Quick Products Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 2px' }}>
+          {/* Quick Products Grid - EXACTLY 2 CARDS PER ROW */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 2px' }}>
             {filteredProducts.map(p => {
               const promo = activePromotions[p.id];
               const isOutOfStock = p.stock <= 0;
@@ -1428,8 +1439,8 @@ const Cashier = () => {
           </div>
         </div>
 
-        {/* Left Side (in RTL): Interactive Cart & Direct Checkout */}
-        <div style={{ flex: '0 0 49%', minWidth: '420px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Left Side (in RTL): Interactive Cart & Direct Checkout - Expanded towards Right */}
+        <div style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ 
             background: 'var(--bg-secondary)', 
             border: '1px solid var(--border-color)', 
