@@ -96,157 +96,71 @@ const Home = () => {
 
   return (
     <div className="home-container">
-      {/* Prominent Hero Cashier Launcher */}
-      {canCashier('pos_cashier') && (
-        <div 
-          onClick={() => navigate('/cashier')}
-          style={{
-            width: '100%',
-            maxWidth: '920px',
-            background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-            borderRadius: '24px',
-            padding: '1.5rem 2rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            color: '#ffffff',
-            cursor: 'pointer',
-            boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.4)',
-            marginBottom: '1.8rem',
-            transition: 'all 0.2s ease',
-            boxSizing: 'border-box'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '18px',
-              background: 'rgba(255, 255, 255, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <ShoppingCart size={34} color="#ffffff" />
-            </div>
-            <div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '9999px', background: 'rgba(255,255,255,0.2)', fontSize: '0.78rem', fontWeight: 'bold', marginBottom: '4px' }}>
-                <Sparkles size={13} /> دەستپێکردنی خێرا (POS)
-              </div>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>
-                کردنەوەی شاشەی کاشێر و فرۆشتن
-              </h2>
-              <p style={{ margin: '4px 0 0', opacity: 0.85, fontSize: '0.9rem' }}>
-                سکانی بارکۆد بە کەرتە چرکەیەک، پڕکردنی سەلە، و دەرکردنی پسووڵەی کڕیار
-              </p>
-            </div>
-          </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: '#ffffff',
-            color: '#1e3a8a',
-            padding: '10px 18px',
-            borderRadius: '14px',
-            fontWeight: 'bold',
-            fontSize: '0.95rem'
-          }}>
-            <span>دەستپێکردن</span>
-            <ArrowLeft size={18} />
-          </div>
+      {/* Clean Category Tabs for Admin */}
+      {isAdmin && (
+        <div style={{ width: '100%', maxWidth: '920px', display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
+          <button
+            onClick={() => setSelectedCategory('all')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: 'none',
+              background: selectedCategory === 'all' ? 'var(--accent-color)' : 'var(--bg-secondary)',
+              color: selectedCategory === 'all' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: 'bold',
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            هەموو بەشەکان ({allModules.length})
+          </button>
+          <button
+            onClick={() => setSelectedCategory('pos')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: 'none',
+              background: selectedCategory === 'pos' ? 'var(--accent-color)' : 'var(--bg-secondary)',
+              color: selectedCategory === 'pos' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: 'bold',
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            🛒 فرۆشتن و قاسە
+          </button>
+          <button
+            onClick={() => setSelectedCategory('inventory')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: 'none',
+              background: selectedCategory === 'inventory' ? 'var(--accent-color)' : 'var(--bg-secondary)',
+              color: selectedCategory === 'inventory' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: 'bold',
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            📦 کۆگا و کاڵاکان
+          </button>
+          <button
+            onClick={() => setSelectedCategory('management')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: 'none',
+              background: selectedCategory === 'management' ? 'var(--accent-color)' : 'var(--bg-secondary)',
+              color: selectedCategory === 'management' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: 'bold',
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            📊 ڕاپۆرت و بەڕێوەبردن
+          </button>
         </div>
       )}
-
-      {/* Instant Search Bar & Category Filter */}
-      <div style={{ width: '100%', maxWidth: '920px', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.8rem' }}>
-        <div className="home-search-wrapper" style={{ maxWidth: '100%', margin: 0 }}>
-          <Search size={18} className="search-icon" />
-          <input 
-            type="text"
-            placeholder="گەڕانی خێرا لە بەشەکاندا (کاشێر، کۆگا، قەرز، جەرد، خەرجی...)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="home-search-input"
-          />
-          {searchQuery && (
-            <button 
-              type="button" 
-              onClick={() => setSearchQuery('')}
-              className="search-clear-btn"
-              title="سڕینەوەی گەڕان"
-            >
-              <X size={15} />
-            </button>
-          )}
-        </div>
-
-        {/* Clean Category Tabs for Admin */}
-        {isAdmin && !searchQuery && (
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setSelectedCategory('all')}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '9999px',
-                border: 'none',
-                background: selectedCategory === 'all' ? 'var(--accent-color)' : 'var(--bg-secondary)',
-                color: selectedCategory === 'all' ? '#ffffff' : 'var(--text-secondary)',
-                fontWeight: 'bold',
-                fontSize: '0.82rem',
-                cursor: 'pointer'
-              }}
-            >
-              هەموو بەشەکان ({allModules.length})
-            </button>
-            <button
-              onClick={() => setSelectedCategory('pos')}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '9999px',
-                border: 'none',
-                background: selectedCategory === 'pos' ? 'var(--accent-color)' : 'var(--bg-secondary)',
-                color: selectedCategory === 'pos' ? '#ffffff' : 'var(--text-secondary)',
-                fontWeight: 'bold',
-                fontSize: '0.82rem',
-                cursor: 'pointer'
-              }}
-            >
-              🛒 فرۆشتن و قاسە
-            </button>
-            <button
-              onClick={() => setSelectedCategory('inventory')}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '9999px',
-                border: 'none',
-                background: selectedCategory === 'inventory' ? 'var(--accent-color)' : 'var(--bg-secondary)',
-                color: selectedCategory === 'inventory' ? '#ffffff' : 'var(--text-secondary)',
-                fontWeight: 'bold',
-                fontSize: '0.82rem',
-                cursor: 'pointer'
-              }}
-            >
-              📦 کۆگا و کاڵاکان
-            </button>
-            <button
-              onClick={() => setSelectedCategory('management')}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '9999px',
-                border: 'none',
-                background: selectedCategory === 'management' ? 'var(--accent-color)' : 'var(--bg-secondary)',
-                color: selectedCategory === 'management' ? '#ffffff' : 'var(--text-secondary)',
-                fontWeight: 'bold',
-                fontSize: '0.82rem',
-                cursor: 'pointer'
-              }}
-            >
-              📊 ڕاپۆرت و بەڕێوەبردن
-            </button>
-          </div>
-        )}
-      </div>
       
       {/* Cards Grid */}
       <div className="modules-grid" style={{ width: '100%', maxWidth: '920px' }}>

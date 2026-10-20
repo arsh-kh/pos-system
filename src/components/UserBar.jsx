@@ -175,30 +175,8 @@ const UserBar = () => {
               <Store size={16} />
             </div>
             <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-              {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
+              {localStorage.getItem('pos_store_name') && localStorage.getItem('pos_store_name') !== 'مارکێتی حاجی ئاکۆ' ? localStorage.getItem('pos_store_name') : 'مارکێتی شارەکام'}
             </span>
-          </div>
-
-          <div style={{ height: '18px', width: '1px', background: 'var(--border-color)' }} />
-
-          {/* User Badge */}
-          <div 
-            style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              padding: '4px 12px', 
-              borderRadius: '8px', 
-              background: isAdmin ? 'rgba(37, 99, 235, 0.12)' : 'var(--accent-light)',
-              border: isAdmin ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid rgba(14, 165, 233, 0.3)',
-              color: isAdmin ? '#1d4ed8' : 'var(--accent-color)',
-              fontWeight: 700,
-              fontSize: '0.8rem'
-            }}
-          >
-            {isAdmin ? <Crown size={14} /> : <User size={14} />}
-            <span>{isAdmin ? 'بەڕێوەبەر' : 'کاشێر'}:</span>
-            <span style={{ color: 'var(--text-primary)' }}>{currentUser?.full_name || currentUser?.username || 'بەکارهێنەر'}</span>
           </div>
 
           {!isAdmin && (

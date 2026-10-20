@@ -1013,13 +1013,6 @@ const Cashier = () => {
             <span>سەرەکی</span>
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-            <Store size={16} color="var(--primary-color)" />
-            <span>خاڵی فرۆشتن (کاشێر)</span>
-          </div>
-
-          <div style={{ height: '16px', width: '1px', background: 'var(--border-color)' }} />
-
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             <User size={13} />
             <span>{currentUser?.full_name || currentUser?.username || 'کاشێر'}</span>
@@ -1043,9 +1036,9 @@ const Cashier = () => {
               cursor: 'pointer',
               fontWeight: 700
             }}
-            title="چاپکردنەوەی دوایین پسووڵە (F8)"
+            title="چاپکردنەوەی دوایین پسووڵە"
           >
-            <Printer size={12} /> چاپکردنەوە (F8)
+            <Printer size={12} /> چاپکردنەوە
           </button>
 
           {canCashier('shifts') && (
@@ -1073,7 +1066,7 @@ const Cashier = () => {
           <button 
             type="button" 
             onClick={handleOpenCashDrawer}
-            title="کردنەوەی قاسی پارە (F10)"
+            title="کردنەوەی قاسی پارە"
             style={{ 
               display: 'inline-flex', 
               alignItems: 'center', 
@@ -1088,7 +1081,7 @@ const Cashier = () => {
               fontWeight: 700
             }}
           >
-            <Unlock size={12} /> قاسی پارە (F10)
+            <Unlock size={12} /> قاسی پارە
           </button>
 
           {canCashier('promotions') && (
@@ -1159,7 +1152,7 @@ const Cashier = () => {
                 <input 
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder="سکانکردنی بارکۆد (F1)..."
+                  placeholder="سکانکردنی بارکۆد..."
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   autoFocus
@@ -1465,7 +1458,7 @@ const Cashier = () => {
                 <button 
                   type="button" 
                   onClick={() => setIsScaleModalOpen(true)}
-                  title="تەرازوو و فرۆشتنی بە کێش (F3)"
+                  title="تەرازوو و فرۆشتنی بە کێش"
                   style={{ 
                     padding: '4px 10px', 
                     borderRadius: '6px', 
@@ -1480,14 +1473,14 @@ const Cashier = () => {
                     gap: '4px' 
                   }}
                 >
-                  <Scale size={13} /> تەرازوو (F3)
+                  <Scale size={13} /> تەرازوو
                 </button>
 
                 {allowCustomPrice && (
                   <button 
                     type="button" 
                     onClick={() => setIsQuickItemModalOpen(true)}
-                    title="کاڵای دەستی بێ بارکۆد (F2)"
+                    title="کاڵای دەستی بێ بارکۆد"
                     style={{ 
                       padding: '4px 10px', 
                       borderRadius: '6px', 
@@ -1502,7 +1495,7 @@ const Cashier = () => {
                       gap: '4px' 
                     }}
                   >
-                    <Zap size={13} /> دەستی (F2)
+                    <Zap size={13} /> دەستی
                   </button>
                 )}
 
@@ -1548,22 +1541,24 @@ const Cashier = () => {
                       fontSize: '0.8rem',
                       boxShadow: isActive ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
                     }}
-                    title={`سویچ بکە بۆ ${c.label} (${c.shortcut})`}
+                    title={`سویچ بکە بۆ ${c.label}`}
                   >
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
-                    <span style={{ 
-                      flexShrink: 0,
-                      fontSize: '0.7rem', 
-                      padding: '1px 6px', 
-                      borderRadius: '4px', 
-                      background: isActive 
-                        ? 'rgba(255, 255, 255, 0.25)' 
-                        : (hasItems ? 'rgba(245, 158, 11, 0.25)' : 'var(--bg-tertiary)'),
-                      color: isActive ? '#ffffff' : (hasItems ? '#b45309' : 'var(--text-secondary)'),
-                      fontWeight: 700
-                    }}>
-                      {itemCount > 0 ? `${itemCount}` : c.shortcut}
-                    </span>
+                    {itemCount > 0 && (
+                      <span style={{ 
+                        flexShrink: 0,
+                        fontSize: '0.7rem', 
+                        padding: '1px 6px', 
+                        borderRadius: '4px', 
+                        background: isActive 
+                          ? 'rgba(255, 255, 255, 0.25)' 
+                          : 'rgba(245, 158, 11, 0.25)',
+                        color: isActive ? '#ffffff' : '#b45309',
+                        fontWeight: 700
+                      }}>
+                        {itemCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -2325,7 +2320,7 @@ const Cashier = () => {
                 >
                   <Printer size={15} style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {isCheckingOut ? '...' : 'پارەدان و چاپ (F9)'}
+                    {isCheckingOut ? '...' : 'پارەدان و چاپ'}
                   </span>
                 </button>
               </div>
@@ -2438,7 +2433,7 @@ const Cashier = () => {
           <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
-                <Zap color="#f59e0b" size={22} /> فرۆشتنی کاڵای دەستی / خێرا (F2)
+                <Zap color="#f59e0b" size={22} /> فرۆشتنی کاڵای دەستی / خێرا
               </h2>
               <button onClick={() => setIsQuickItemModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16}/>
@@ -2565,7 +2560,7 @@ const Cashier = () => {
           <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 800 }}>
-                <Scale color="#0284c7" size={22} /> تەرازوو و فرۆشتنی بە کێش (F3)
+                <Scale color="#0284c7" size={22} /> تەرازوو و فرۆشتنی بە کێش
               </h2>
               <button onClick={() => setIsScaleModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16}/>

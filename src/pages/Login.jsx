@@ -10,7 +10,8 @@ import {
   Sun,
   Moon,
   Store,
-  Users
+  Users,
+  ChevronDown
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -144,73 +145,12 @@ const Login = () => {
           }}>
             <Store size={32} color="#ffffff" />
           </div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-            {localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ'}
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
+            مارکێتی شارەکەم
           </h1>
-          <div style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 700, direction: 'ltr', marginBottom: '8px' }}>
-            {localStorage.getItem('pos_store_phone') || '0772 979 0421'}
-          </div>
           <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>
             تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە بۆ چوونەژوورەوە
           </p>
-        </div>
-
-        {/* Quick User Selection Chips */}
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-            <Users size={14} /> هەڵبژاردنی خێرای هەژمار:
-          </div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {/* Admin Chip */}
-            <button
-              type="button"
-              onClick={() => selectUser('admin')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: username === 'admin' ? '1.5px solid #6366f1' : '1px solid var(--border-color)',
-                background: username === 'admin' ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-tertiary)',
-                color: username === 'admin' ? '#6366f1' : 'var(--text-primary)',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <ShieldCheck size={14} /> بەڕێوەبەر (Admin)
-            </button>
-
-            {/* Cashiers Chips */}
-            {cashiersList.map((c) => {
-              const isSelected = username === c.username;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => selectUser(c.username)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    border: isSelected ? '1.5px solid var(--accent-color)' : '1px solid var(--border-color)',
-                    background: isSelected ? 'var(--accent-light)' : 'var(--bg-tertiary)',
-                    color: isSelected ? 'var(--accent-color)' : 'var(--text-primary)',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <User size={13} /> {c.full_name || c.username}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* Error Alert */}
@@ -235,34 +175,54 @@ const Login = () => {
 
         {/* Login Form */}
         <form onSubmit={handleSubmit}>
-          {/* Username Input */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          {/* Username Dropdown Option Selector */}
+          <div style={{ marginBottom: '18px' }}>
+            <label htmlFor="pos-login-username" style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
               ناوی بەکارهێنەر (Username)
             </label>
             <div style={{ position: 'relative' }}>
-              <User size={17} color="var(--text-muted)" style={{ position: 'absolute', right: '12px', top: '12px' }} />
-              <input
+              <User size={17} color="var(--text-muted)" style={{ position: 'absolute', right: '12px', top: '13px', pointerEvents: 'none' }} />
+              <select
                 id="pos-login-username"
-                type="text"
                 required
                 autoFocus
-                placeholder="بۆ نموونە: admin یان cashier"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError('');
+                  const pwInput = document.getElementById('pos-login-password');
+                  if (pwInput) pwInput.focus();
+                }}
                 style={{
                   width: '100%',
-                  padding: '11px 38px 11px 12px',
+                  padding: '11px 38px 11px 36px',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
                   background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
+                  color: username ? 'var(--text-primary)' : 'var(--text-muted)',
                   fontSize: '0.92rem',
                   outline: 'none',
                   boxSizing: 'border-box',
-                  fontFamily: 'inherit'
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none'
                 }}
-              />
+              >
+                <option value="" disabled style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+                  ناوی بەکارهێنەر هەڵبژێرە...
+                </option>
+                <option value="admin" style={{ color: 'var(--text-primary)', background: 'var(--bg-secondary)' }}>
+                  بەڕێوەبەر (Admin)
+                </option>
+                {cashiersList.map((c) => (
+                  <option key={c.id || c.username} value={c.username} style={{ color: 'var(--text-primary)', background: 'var(--bg-secondary)' }}>
+                    {c.full_name ? `${c.full_name} (${c.username})` : c.username}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '14px', pointerEvents: 'none' }} />
             </div>
           </div>
 
