@@ -2056,11 +2056,11 @@ const Cashier = () => {
             </div>
 
             {/* Bottom: Totals Breakdown, Auto-Print & Checkout Buttons */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: 'auto' }}>
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: 'auto' }}>
               
               {/* Subtotal & Promo Savings */}
               {(totalPromotionalSavings > 0 || calculatedDiscount > 0) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                   <span>سەرەتایی: {subtotal.toLocaleString()} د.ع</span>
                   {totalPromotionalSavings > 0 && (
                     <span style={{ color: '#d97706', fontWeight: 700 }}>ئۆفەر: -{totalPromotionalSavings.toLocaleString()} د.ع</span>
@@ -2071,18 +2071,18 @@ const Cashier = () => {
                 </div>
               )}
 
-              {/* Big Grand Total Display */}
+              {/* Big Grand Total Display (Higher & Taller) */}
               <div style={{ 
                 background: 'var(--bg-tertiary)', 
-                padding: '14px 14px', 
+                padding: '16px 14px', 
                 borderRadius: '14px', 
                 border: '1.5px solid var(--border-color)', 
                 marginBottom: '10px',
                 textAlign: 'center',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)'
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
               }}>
                 <div style={{ 
-                  fontSize: '0.88rem', 
+                  fontSize: '0.9rem', 
                   color: 'var(--text-secondary)', 
                   fontWeight: 800, 
                   letterSpacing: '0.3px',
@@ -2101,13 +2101,76 @@ const Cashier = () => {
                 }} />
 
                 <div style={{ 
-                  fontSize: '1.85rem', 
+                  fontSize: '1.95rem', 
                   fontWeight: 900, 
                   color: paymentMode === 'DEBT' ? 'var(--danger-color)' : (paymentMode === 'SPLIT' ? 'var(--warning-color)' : 'var(--accent-hover)'),
                   lineHeight: '1.2'
                 }}>
                   {grandTotal.toLocaleString()} دینار
                 </div>
+              </div>
+
+              {/* Clean Discount Section Under Grand Total (Dinars only, no %, no +/- buttons) */}
+              <div style={{ 
+                background: 'var(--bg-tertiary)', 
+                padding: '7px 10px', 
+                borderRadius: '10px', 
+                border: '1px solid var(--border-color)', 
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  داشکاندن:
+                </span>
+                <input 
+                  type="number"
+                  min="0"
+                  max={subtotal > 0 ? subtotal : undefined}
+                  step="250"
+                  placeholder="بڕ بە دینار..."
+                  value={discountValue}
+                  onFocus={(e) => e.target.select()}
+                  onClick={(e) => e.target.select()}
+                  onChange={(e) => {
+                    setDiscountType('AMOUNT');
+                    setDiscountValue(e.target.value);
+                  }}
+                  style={{ 
+                    flex: 1, 
+                    minWidth: 0, 
+                    padding: '5px 8px', 
+                    borderRadius: '6px', 
+                    background: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)', 
+                    color: calculatedDiscount > 0 ? 'var(--danger-color)' : 'var(--text-primary)', 
+                    fontSize: '0.86rem', 
+                    fontWeight: 800, 
+                    textAlign: 'center', 
+                    outline: 'none' 
+                  }}
+                />
+                {calculatedDiscount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDiscountValue('')}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      background: 'var(--danger-light)',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      color: 'var(--danger-color)',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title="لابردنی داشکاندن"
+                  >
+                    سڕینەوە
+                  </button>
+                )}
               </div>
 
               {paymentMode === 'DEBT' && (
@@ -2136,14 +2199,14 @@ const Cashier = () => {
                 </span>
               </div>
 
-              {/* Dual Action Checkout Buttons (Side-by-Side Square POS Tiles) */}
+              {/* Dual Action Checkout Buttons (Side-by-Side Square POS Tiles - Taller 88px) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => handleCheckout(true)}
                   disabled={isCheckingOut || cart.length === 0}
                   style={{
-                    height: '76px',
+                    height: '88px',
                     borderRadius: '12px',
                     background: cart.length === 0 
                       ? 'var(--bg-tertiary)' 
@@ -2151,18 +2214,18 @@ const Cashier = () => {
                     color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
                     border: 'none',
                     fontWeight: 800,
-                    fontSize: '0.86rem',
+                    fontSize: '0.92rem',
                     cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '8px',
                     boxShadow: cart.length === 0 ? 'none' : '0 3px 8px rgba(0, 0, 0, 0.15)',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Printer size={22} style={{ flexShrink: 0 }} />
+                  <Printer size={24} style={{ flexShrink: 0 }} />
                   <span style={{ lineHeight: '1.1', textAlign: 'center' }}>{isCheckingOut ? '...' : 'پارەدان و چاپ'}</span>
                 </button>
 
@@ -2171,24 +2234,24 @@ const Cashier = () => {
                   onClick={() => handleCheckout(false)}
                   disabled={isCheckingOut || cart.length === 0}
                   style={{
-                    height: '76px',
+                    height: '88px',
                     borderRadius: '12px',
                     background: cart.length === 0 ? 'var(--bg-tertiary)' : 'var(--primary-color)',
                     color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
                     border: 'none',
                     fontWeight: 800,
-                    fontSize: '0.86rem',
+                    fontSize: '0.92rem',
                     cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '8px',
                     boxShadow: cart.length === 0 ? 'none' : '0 3px 8px rgba(37, 99, 235, 0.2)',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Banknote size={22} style={{ flexShrink: 0 }} />
+                  <Banknote size={24} style={{ flexShrink: 0 }} />
                   <span style={{ lineHeight: '1.1', textAlign: 'center' }}>{isCheckingOut ? '...' : 'فرۆشتن بێ چاپ'}</span>
                 </button>
               </div>
