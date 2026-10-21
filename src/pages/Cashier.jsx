@@ -68,11 +68,9 @@ const Cashier = () => {
   // Active Cart Updaters
   const updateActiveCart = (updater) => {
     setCarts(prevCarts => {
-      const updated = [...prevCarts];
-      const target = updated[activeCartIndex] || updated[0];
-      const newTarget = typeof updater === 'function' ? updater(target) : { ...target, ...updater };
-      updated[activeCartIndex] = newTarget;
-      return updated;
+      const target = prevCarts[activeCartIndex] || prevCarts[0];
+      const newTarget = typeof updater === 'function' ? updater({ ...target }) : { ...target, ...updater };
+      return prevCarts.map((c, idx) => idx === activeCartIndex ? newTarget : c);
     });
   };
 
@@ -276,30 +274,29 @@ const Cashier = () => {
       const existingIdx = prevCart.findIndex(item => (item.cartKey === cartKey) || (item.id === product.id && (item.unit_type || 'PIECE') === unitType));
 
       if (existingIdx >= 0) {
-        const updated = [...prevCart];
-        const newQty = Math.round((Number(updated[existingIdx].quantity) + Number(addQty)) * 1000) / 1000;
-        updated[existingIdx].quantity = Math.max(0.001, newQty);
-        return updated;
+        const currentItem = prevCart[existingIdx];
+        const newQty = Math.round((Number(currentItem.quantity) + Number(addQty)) * 1000) / 1000;
+        return prevCart.map((item, idx) => 
+          idx === existingIdx ? { ...item, quantity: Math.max(0.001, newQty) } : item
+        );
       } else {
-        return [
-          ...prevCart,
-          {
-            id: product.id,
-            cartKey: cartKey,
-            baseName: product.name,
-            name: isBox ? `${product.name} (کارتۆن - ${unitsPerBox} دانە)` : product.name,
-            barcode: product.barcode,
-            box_barcode: product.box_barcode,
-            price: effectivePrice,
-            single_price: singlePrice,
-            wholesale_price: Number(product.wholesale_price) || 0,
-            units_per_box: unitsPerBox,
-            unit_type: unitType,
-            stock: product.stock || 0,
-            quantity: Math.max(0.001, Number(addQty)),
-            unit: isBox ? 'کارتۆن' : (product.unit || 'دانە')
-          }
-        ];
+        const newItem = {
+          id: product.id,
+          cartKey: cartKey,
+          baseName: product.name,
+          name: isBox ? `${product.name} (کارتۆن - ${unitsPerBox} دانە)` : product.name,
+          barcode: product.barcode,
+          box_barcode: product.box_barcode,
+          price: effectivePrice,
+          single_price: singlePrice,
+          wholesale_price: Number(product.wholesale_price) || 0,
+          units_per_box: unitsPerBox,
+          unit_type: unitType,
+          stock: product.stock || 0,
+          quantity: Math.max(0.001, Number(addQty)),
+          unit: isBox ? 'کارتۆن' : (product.unit || 'دانە')
+        };
+        return [...prevCart, newItem];
       }
     });
   };
@@ -1341,7 +1338,6 @@ const Cashier = () => {
                     <div
                       key={p.id}
                       onClick={() => addToCart(p, 1, 'PIECE')}
-                      className="pos-product-card"
                       style={{
                         padding: '6px 8px',
                         borderRadius: '10px',
@@ -1352,6 +1348,8 @@ const Cashier = () => {
                         justifyContent: 'center',
                         textAlign: 'center',
                         height: '60px',
+                        minHeight: '60px',
+                        maxHeight: '60px',
                         boxSizing: 'border-box',
                         cursor: 'pointer',
                         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
@@ -1514,110 +1512,122 @@ const Cashier = () => {
 
 
 
-            {/* Cart Items List with Decimal & Multipliers */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px', paddingRight: '2px' }}>
-              {cart.length === 0 ? (
+            {/* Cart Items List: Clean Tabular View */}
+            {cart.length === 0 ? (
+              <div style={{ 
+                flex: 1, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '100%', 
+                minHeight: '280px' 
+              }}>
+                <ShoppingCart size={74} strokeWidth={1.4} style={{ opacity: 0.16, color: 'var(--text-muted)' }} />
+              </div>
+            ) : (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Table Header */}
                 <div style={{ 
-                  flex: 1, 
-                  display: 'flex', 
+                  display: 'grid', 
+                  gridTemplateColumns: '36px minmax(130px, 1fr) 125px 95px 110px 36px', 
+                  gap: '8px', 
                   alignItems: 'center', 
-                  justifyContent: 'center', 
-                  height: '100%', 
-                  minHeight: '280px' 
+                  padding: '7px 10px', 
+                  background: 'var(--bg-tertiary)', 
+                  borderRadius: '8px', 
+                  border: '1px solid var(--border-color)', 
+                  fontSize: '0.78rem', 
+                  fontWeight: 800, 
+                  color: 'var(--text-secondary)', 
+                  marginBottom: '5px',
+                  flexShrink: 0
                 }}>
-                  <ShoppingCart size={74} strokeWidth={1.4} style={{ opacity: 0.16, color: 'var(--text-muted)' }} />
+                  <span style={{ textAlign: 'center' }}>#</span>
+                  <span style={{ textAlign: 'right' }}>ناوی کاڵا</span>
+                  <span style={{ textAlign: 'center' }}>دانە</span>
+                  <span style={{ textAlign: 'center' }}>نرخ</span>
+                  <span style={{ textAlign: 'left' }}>کۆ</span>
+                  <span style={{ textAlign: 'center' }}></span>
                 </div>
-              ) : (
-                cart.map(item => {
-                  const pricing = getItemPricing(item);
-                  const lineTotal = pricing.lineTotal;
-                  const isKg = item.unit === 'کگم' || item.is_weighted;
-                  const itemKey = item.cartKey || item.barcode;
-                  return (
-                    <div 
-                      key={itemKey}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '16px',
-                        background: item.unit_type === 'BOX' ? 'rgba(2, 132, 199, 0.08)' : (pricing.hasPromo ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-tertiary)'),
-                        border: item.unit_type === 'BOX' ? '1.5px solid rgba(2, 132, 199, 0.35)' : (pricing.hasPromo ? '1.5px solid rgba(217, 119, 6, 0.35)' : '1px solid var(--border-color)'),
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.94rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+
+                {/* Table Rows */}
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', paddingRight: '2px' }}>
+                  {cart.map((item, index) => {
+                    const pricing = getItemPricing(item);
+                    const lineTotal = pricing.lineTotal;
+                    const isKg = item.unit === 'کگم' || item.is_weighted;
+                    const itemKey = item.cartKey || item.barcode;
+                    return (
+                      <div 
+                        key={itemKey}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '36px minmax(130px, 1fr) 125px 95px 110px 36px',
+                          gap: '8px',
+                          alignItems: 'center',
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          background: item.unit_type === 'BOX' 
+                            ? 'rgba(2, 132, 199, 0.08)' 
+                            : (pricing.hasPromo ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-tertiary)'),
+                          border: item.unit_type === 'BOX' 
+                            ? '1px solid rgba(2, 132, 199, 0.35)' 
+                            : (pricing.hasPromo ? '1px solid rgba(217, 119, 6, 0.35)' : '1px solid var(--border-color)'),
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        {/* # (ژمارەی ڕیز) */}
+                        <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          {index + 1}
+                        </div>
+
+                        {/* ناوی کاڵا */}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ 
+                            fontWeight: 800, 
+                            fontSize: '0.88rem', 
+                            color: 'var(--text-primary)', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis', 
+                            whiteSpace: 'nowrap' 
+                          }}>
                             {item.name}
+                          </div>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
                             {item.is_custom && (
-                              <span style={{ fontSize: '0.72rem', background: isKg ? 'rgba(2, 132, 199, 0.12)' : 'var(--warning-light)', color: isKg ? '#0284c7' : '#b45309', padding: '1px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                              <span style={{ fontSize: '0.68rem', background: isKg ? 'rgba(2, 132, 199, 0.12)' : 'var(--warning-light)', color: isKg ? '#0284c7' : '#b45309', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
                                 {isKg ? 'بە کێش' : 'دەستی'}
                               </span>
                             )}
-                            {item.unit_type === 'BOX' && (
-                              <span style={{ fontSize: '0.72rem', background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.35)', padding: '1px 8px', borderRadius: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Package size={11} /> کارتۆن ({item.units_per_box || 1} دانە)
-                              </span>
+                            {(item.units_per_box > 1 || item.wholesale_price > 0 || item.unit_type === 'BOX') && (
+                              <button
+                                type="button"
+                                onClick={() => setItemUnitType(itemKey, item.unit_type === 'BOX' ? 'PIECE' : 'BOX')}
+                                style={{
+                                  fontSize: '0.68rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid var(--border-color)',
+                                  background: item.unit_type === 'BOX' ? '#0284c7' : 'var(--bg-secondary)',
+                                  color: item.unit_type === 'BOX' ? '#ffffff' : 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  fontWeight: 700
+                                }}
+                                title="گۆڕین لە نێوان دانە و کارتۆن"
+                              >
+                                {item.unit_type === 'BOX' ? `کارتۆن (${item.units_per_box || 1})` : 'دانە'}
+                              </button>
                             )}
                             {pricing.hasPromo && item.unit_type !== 'BOX' && (
-                              <span style={{ fontSize: '0.72rem', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', border: '1px solid rgba(217, 119, 6, 0.35)', padding: '1px 8px', borderRadius: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Tag size={10} /> ئۆفەر
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                ئۆفەر
                               </span>
                             )}
                           </div>
-
-                          {/* Promotional Tiered Explanation */}
-                          {pricing.hasPromo && item.unit_type !== 'BOX' ? (
-                            <div style={{ marginTop: '4px' }}>
-                              {pricing.regularQty > 0 ? (
-                                <div style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 600 }}>
-                                  {pricing.promoQty} بە {pricing.promoPrice.toLocaleString()} د.ع (ئۆفەر) + {pricing.regularQty} بە {pricing.regularPrice.toLocaleString()} د.ع (ئاسایی)
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 600 }}>
-                                  {pricing.promoPrice.toLocaleString()} دینار (ئۆفەر)
-                                </div>
-                              )}
-                              {pricing.totalSavings > 0 && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--success-color)', fontWeight: 800, display: 'block', marginTop: '2px' }}>
-                                  پاشەکەوت: {pricing.totalSavings.toLocaleString()} دینار
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                              {item.price.toLocaleString()} دینار بۆ هەر {item.unit || 'دانە'}
-                              {item.unit_type === 'BOX' && (
-                                <span style={{ color: '#0284c7', marginRight: '6px', fontWeight: 600 }}>
-                                  (کۆگایی: {item.units_per_box || 1} دانە)
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
 
-                        <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontWeight: 800, color: item.unit_type === 'BOX' ? '#0284c7' : 'var(--accent-hover)', fontSize: '1.05rem' }}>
-                            {lineTotal.toLocaleString()} دینار
-                          </div>
-                          {allowDeleteItem && (
-                            <button 
-                              onClick={() => removeFromCart(itemKey)}
-                              style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '2px', marginTop: '2px' }}
-                              title="سڕینەوە"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Quantity Stepper & Unit Switcher & Quick Multipliers */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        
-                        {/* Stepper +/- */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-secondary)', borderRadius: '10px', padding: '3px 4px', border: '1px solid var(--border-color)' }}>
+                        {/* دانە */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
                           <button 
                             type="button"
                             onClick={() => {
@@ -1625,22 +1635,22 @@ const Cashier = () => {
                               const targetQty = Math.round((Number(item.quantity) - step) * 1000) / 1000;
                               updateQuantity(itemKey, Math.max(0, targetQty));
                             }}
-                            title={Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'سڕینەوە لە سەبەتە (0)' : 'کەمکردنەوە'}
+                            title="کەمکردنەوە"
                             style={{ 
-                              width: '32px', 
-                              height: '32px', 
-                              borderRadius: '8px', 
-                              background: Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'var(--danger-light)' : 'var(--bg-tertiary)', 
+                              width: '26px', 
+                              height: '26px', 
+                              borderRadius: '6px', 
+                              background: Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'var(--danger-light)' : 'var(--bg-secondary)', 
                               color: Number(item.quantity) <= (isKg ? 0.25 : 1) ? 'var(--danger-color)' : 'var(--text-primary)', 
-                              border: Number(item.quantity) <= (isKg ? 0.25 : 1) ? '1px solid rgba(239, 68, 68, 0.4)' : 'none', 
+                              border: '1px solid var(--border-color)', 
                               cursor: 'pointer', 
                               display: 'flex', 
                               alignItems: 'center', 
                               justifyContent: 'center',
-                              transition: 'all 0.15s ease'
+                              padding: 0
                             }}
                           >
-                            <Minus size={15} />
+                            <Minus size={13} />
                           </button>
                           
                           <input 
@@ -1649,7 +1659,18 @@ const Cashier = () => {
                             min="0"
                             value={item.quantity}
                             onChange={(e) => updateQuantity(itemKey, e.target.value)}
-                            style={{ width: '55px', textAlign: 'center', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.98rem', outline: 'none', padding: 0 }}
+                            style={{ 
+                              width: '44px', 
+                              padding: '2px 0', 
+                              textAlign: 'center', 
+                              background: 'var(--bg-secondary)', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '6px', 
+                              color: 'var(--text-primary)', 
+                              fontWeight: 800, 
+                              fontSize: '0.86rem', 
+                              outline: 'none' 
+                            }}
                           />
 
                           <button 
@@ -1661,119 +1682,62 @@ const Cashier = () => {
                             }}
                             title="زیادکردن"
                             style={{ 
-                              width: '32px', 
-                              height: '32px', 
-                              borderRadius: '8px', 
-                              background: 'var(--bg-tertiary)', 
+                              width: '26px', 
+                              height: '26px', 
+                              borderRadius: '6px', 
+                              background: 'var(--bg-secondary)', 
                               color: 'var(--text-primary)', 
-                              border: 'none', 
+                              border: '1px solid var(--border-color)', 
                               cursor: 'pointer', 
                               display: 'flex', 
                               alignItems: 'center', 
                               justifyContent: 'center',
-                              transition: 'all 0.15s ease'
+                              padding: 0
                             }}
                           >
-                            <Plus size={15} />
+                            <Plus size={13} />
                           </button>
                         </div>
 
-                        {/* Unit Switcher: دانە vs کارتۆن */}
-                        {(item.units_per_box > 1 || item.wholesale_price > 0 || item.unit_type === 'BOX') && (
-                          <div style={{ display: 'inline-flex', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
-                            <button
-                              type="button"
-                              onClick={() => setItemUnitType(itemKey, 'PIECE')}
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                background: item.unit_type !== 'BOX' ? 'var(--primary-color)' : 'transparent',
-                                color: item.unit_type !== 'BOX' ? '#ffffff' : 'var(--text-secondary)'
-                              }}
-                            >
-                              دانە
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setItemUnitType(itemKey, 'BOX')}
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                background: item.unit_type === 'BOX' ? '#0284c7' : 'transparent',
-                                color: item.unit_type === 'BOX' ? '#ffffff' : 'var(--text-secondary)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              <Package size={11} /> کارتۆن ({item.units_per_box || 1})
-                            </button>
-                          </div>
-                        )}
+                        {/* نرخ */}
+                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                          {item.price.toLocaleString()} د.ع
+                        </div>
 
-                        {/* Quick Presets Buttons with 0 to Clear easily */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                        {/* کۆ */}
+                        <div style={{ textAlign: 'left', fontWeight: 800, fontSize: '0.88rem', color: item.unit_type === 'BOX' ? '#0284c7' : 'var(--accent-hover)' }}>
+                          {lineTotal.toLocaleString()} د.ع
+                        </div>
+
+                        {/* کردار (سڕینەوە) */}
+                        <div style={{ textAlign: 'center' }}>
                           {allowDeleteItem && (
-                            <button
+                            <button 
                               type="button"
                               onClick={() => removeFromCart(itemKey)}
-                              title="سڕینەوەی خێرا لە سەبەتە (0)"
-                              style={{
-                                padding: '5px 9px',
-                                borderRadius: '8px',
-                                border: '1px solid rgba(239, 68, 68, 0.35)',
-                                background: 'var(--danger-light)',
-                                color: 'var(--danger-color)',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
+                              style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                color: 'var(--danger-color)', 
+                                cursor: 'pointer', 
+                                padding: '4px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '2px',
-                                transition: 'all 0.15s ease'
+                                justifyContent: 'center'
                               }}
+                              title="سڕینەوە"
                             >
-                              <Trash2 size={11} /> 0
+                              <Trash2 size={15} />
                             </button>
                           )}
-
-                          {(isKg ? [0.25, 0.5, 1, 2] : [1, 2, 5, 10, 20]).map(q => (
-                            <button
-                              type="button"
-                              key={q}
-                              onClick={() => updateQuantity(itemKey, q)}
-                              style={{
-                                padding: '5px 9px',
-                                borderRadius: '8px',
-                                border: Number(item.quantity) === q ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
-                                background: Number(item.quantity) === q ? 'var(--primary-color)' : 'var(--bg-secondary)',
-                                color: Number(item.quantity) === q ? '#ffffff' : 'var(--text-secondary)',
-                                fontSize: '0.76rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              {q} {isKg ? 'کگم' : ''}
-                            </button>
-                          ))}
                         </div>
 
                       </div>
-
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

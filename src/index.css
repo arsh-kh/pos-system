@@ -308,7 +308,6 @@ input[type="number"] {
   user-select: none;
   overflow: hidden;
   box-sizing: border-box;
-  min-height: 125px;
   width: 100%;
 }
 
