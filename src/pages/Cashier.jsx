@@ -115,7 +115,7 @@ const Cashier = () => {
   const [loading, setLoading] = useState(true);
 
   // Cashier Controls
-  const [selectedCategoryId, setSelectedCategoryId] = useState('ALL');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
   const barcodeInputRef = useRef(null);
@@ -881,6 +881,7 @@ const Cashier = () => {
       const matchesSearch = kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch);
 
       const matchesCat = 
+        !selectedCategoryId || 
         selectedCategoryId === 'ALL' || 
         String(p.category_id) === String(selectedCategoryId);
 
@@ -1208,238 +1209,191 @@ const Cashier = () => {
             </div>
           </div>
 
-          {/* Category Quick Tabs */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => setSelectedCategoryId('ALL')}
-              style={{
-                padding: '7px 16px',
-                borderRadius: '8px',
-                border: selectedCategoryId === 'ALL' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-                cursor: 'pointer',
-                fontWeight: selectedCategoryId === 'ALL' ? 700 : 600,
-                background: selectedCategoryId === 'ALL' ? 'var(--accent-color)' : 'var(--bg-secondary)',
-                color: selectedCategoryId === 'ALL' ? '#ffffff' : 'var(--text-primary)',
-                fontSize: '0.84rem',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease',
-                boxShadow: selectedCategoryId === 'ALL' ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
-              }}
-            >
-              هەموو ({products.length})
-            </button>
-            {categories.map(cat => {
-              const isActive = String(selectedCategoryId) === String(cat.id);
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategoryId(cat.id)}
-                  style={{
-                    padding: '7px 16px',
-                    borderRadius: '8px',
-                    border: isActive ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-                    cursor: 'pointer',
-                    fontWeight: isActive ? 700 : 600,
-                    background: isActive ? 'var(--accent-color)' : 'var(--bg-secondary)',
-                    color: isActive ? '#ffffff' : 'var(--text-primary)',
-                    fontSize: '0.84rem',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease',
-                    boxShadow: isActive ? '0 2px 4px rgba(37, 99, 235, 0.2)' : 'none'
-                  }}
-                >
-                  {cat.name}
-                </button>
-              );
-            })}
-          </div>
+          {/* Category Quick Drill-Down View */}
+          {(!selectedCategoryId && !productSearch.trim()) ? (
+            /* 1. Categories View: Shows only categories initially */
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', padding: '2px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 6px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                <span>جۆری خواردن و کاڵاکان:</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>({categories.length + 1} جۆر)</span>
+              </div>
 
-          {/* Quick Products Grid - EXACTLY 2 CARDS PER ROW */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
-            alignContent: 'start',
-            gridAutoRows: '142px',
-            gap: '8px', 
-            flex: 1, 
-            minHeight: 0, 
-            overflowY: 'auto', 
-            padding: '4px 2px' 
-          }}>
-            {filteredProducts.map(p => {
-              const promo = activePromotions[p.id];
-              const isOutOfStock = p.stock <= 0;
-              const hasCarton = p.units_per_box > 1 || p.wholesale_price > 0;
-
-              return (
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
+                alignContent: 'start',
+                gridAutoRows: '90px',
+                gap: '8px', 
+                padding: '2px' 
+              }}>
+                {/* All Products Card */}
                 <div
-                  key={p.id}
-                  onClick={() => addToCart(p, 1, 'PIECE')}
-                  className={`pos-product-card ${promo ? 'has-promo' : ''}`}
+                  onClick={() => setSelectedCategoryId('ALL')}
                   style={{
-                    padding: '8px 10px',
+                    padding: '10px 8px',
                     borderRadius: '12px',
-                    border: promo ? '1.5px solid rgba(217, 119, 6, 0.45)' : '1px solid var(--border-color)',
-                    background: promo ? 'linear-gradient(180deg, rgba(217, 119, 6, 0.08) 0%, var(--bg-secondary) 100%)' : 'var(--bg-secondary)',
+                    border: '1.5px solid var(--accent-color)',
+                    background: 'var(--accent-light)',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    height: '142px',
-                    boxSizing: 'border-box',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
                     cursor: 'pointer',
-                    position: 'relative',
-                    overflow: 'visible',
-                    boxShadow: promo ? '0 2px 8px rgba(217, 119, 6, 0.12)' : '0 1px 3px rgba(0, 0, 0, 0.04)'
+                    textAlign: 'center',
+                    boxShadow: '0 2px 4px rgba(37, 99, 235, 0.15)',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  {/* Top Meta: Stock & Promo Tag */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', minHeight: '18px' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600 }}>
-                      {isOutOfStock ? (
-                        <span style={{ 
-                          background: 'rgba(239, 68, 68, 0.12)', 
-                          color: '#dc2626', 
-                          border: '1px solid rgba(239, 68, 68, 0.3)', 
-                          padding: '2px 7px', 
-                          borderRadius: '6px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px'
-                        }}>
-                          <AlertCircle size={11} /> تەواوبوو
-                        </span>
-                      ) : (
-                        <span style={{ 
-                          background: 'var(--bg-tertiary)', 
-                          color: 'var(--text-secondary)', 
-                          border: '1px solid var(--border-color)', 
-                          padding: '2px 7px', 
-                          borderRadius: '6px' 
-                        }}>
-                          کۆگا: {p.stock}
-                        </span>
-                      )}
-                    </div>
-
-                    {promo && (
-                      <span style={{ 
-                        background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
-                        color: '#ffffff', 
-                        padding: '2px 8px', 
-                        borderRadius: '6px', 
-                        fontSize: '0.72rem', 
-                        fontWeight: 800,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        boxShadow: '0 2px 4px rgba(217, 119, 6, 0.25)'
-                      }}>
-                        <Tag size={10} /> ئۆفەر
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Product Title */}
-                  <div style={{ 
-                    fontWeight: 700, 
-                    fontSize: '0.86rem', 
-                    display: '-webkit-box', 
-                    WebkitLineClamp: 2, 
-                    WebkitBoxOrient: 'vertical', 
-                    overflow: 'hidden', 
-                    lineHeight: '1.35',
-                    minHeight: '2.4em',
-                    wordBreak: 'break-word',
-                    color: 'var(--text-primary)',
-                    margin: '2px 0 5px 0'
-                  }}>
-                    {p.name}
-                  </div>
-
-                  {/* Pricing and Action Strip */}
-                  <div style={{ marginTop: 'auto' }}>
-                    {/* Price Row */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '5px' }}>
-                      {promo ? (
-                        <>
-                          <span style={{ color: '#d97706', fontWeight: 900, fontSize: '1.05rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
-                            {Number(promo.promo_price).toLocaleString()} د.ع
-                          </span>
-                          <span style={{ color: 'var(--text-muted)', textDecoration: 'line-through', fontSize: '0.74rem', fontWeight: 500 }}>
-                            {Number(p.selling_price).toLocaleString()}
-                          </span>
-                        </>
-                      ) : (
-                        <span style={{ color: 'var(--accent-hover)', fontWeight: 900, fontSize: '1.08rem', lineHeight: '1', letterSpacing: '-0.02em' }}>
-                          {Number(p.selling_price).toLocaleString()} د.ع
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Unit & Carton Buttons */}
-                    <div style={{ display: 'flex', gap: '5px' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addToCart(p, 1, 'PIECE');
-                        }}
-                        style={{
-                          flex: 1,
-                          height: '30px',
-                          padding: '0 8px',
-                          borderRadius: '8px',
-                          background: 'var(--accent-light)',
-                          color: 'var(--accent-color)',
-                          border: '1px solid rgba(37, 99, 235, 0.25)',
-                          fontSize: '0.8rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '3px',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        +١ {p.unit || 'دانە'}
-                      </button>
-
-                      {hasCarton && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(p, 1, 'BOX');
-                          }}
-                          title={`زیادکردنی ١ کارتۆن (${p.units_per_box || 1} دانە) بە نرخی ${Number(p.wholesale_price).toLocaleString()} د.ع`}
-                          style={{
-                            flex: 1,
-                            height: '34px',
-                            padding: '0 8px',
-                            borderRadius: '8px',
-                            background: 'rgba(2, 132, 199, 0.1)',
-                            border: '1px solid rgba(2, 132, 199, 0.35)',
-                            color: '#0284c7',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '3px',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          <Package size={12} /> کارتۆن
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <span style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--accent-color)' }}>
+                    هەموو کاڵاکان
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--accent-hover)', fontWeight: 600 }}>
+                    ({products.length})
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Individual Categories */}
+                {categories.map(cat => {
+                  const count = products.filter(p => String(p.category_id) === String(cat.id)).length;
+                  return (
+                    <div
+                      key={cat.id}
+                      onClick={() => setSelectedCategoryId(cat.id)}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                        {cat.name}
+                      </span>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        ({count})
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* 2. Items View: Shows items for the selected category or search - ONLY ITEM NAME */
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              
+              {/* Back to Categories Header */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                padding: '5px 8px', 
+                marginBottom: '6px', 
+                background: 'var(--bg-secondary)', 
+                borderRadius: '8px', 
+                border: '1px solid var(--border-color)',
+                flexShrink: 0
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategoryId(null);
+                    setProductSearch('');
+                  }}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="گەڕانەوە بۆ جۆرەکان"
+                >
+                  <ArrowRight size={13} /> جۆرەکان
+                </button>
+
+                <span style={{ fontWeight: 800, fontSize: '0.86rem', color: 'var(--text-primary)' }}>
+                  {selectedCategoryId === 'ALL' ? 'هەموو کاڵاکان' : (categories.find(c => String(c.id) === String(selectedCategoryId))?.name || (productSearch ? 'گەڕان' : 'کاڵاکان'))}
+                </span>
+
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  ({filteredProducts.length})
+                </span>
+              </div>
+
+              {/* Items Grid: ONLY the item name */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
+                alignContent: 'start',
+                gridAutoRows: '84px',
+                gap: '6px', 
+                flex: 1, 
+                minHeight: 0, 
+                overflowY: 'auto', 
+                padding: '2px' 
+              }}>
+                {filteredProducts.length === 0 ? (
+                  <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+                    هیچ کاڵایەک نەدۆزرایەوە
+                  </div>
+                ) : (
+                  filteredProducts.map(p => (
+                    <div
+                      key={p.id}
+                      onClick={() => addToCart(p, 1, 'PIECE')}
+                      className="pos-product-card"
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        height: '84px',
+                        boxSizing: 'border-box',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ 
+                        fontWeight: 800, 
+                        fontSize: '0.88rem', 
+                        color: 'var(--text-primary)', 
+                        lineHeight: '1.35',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        wordBreak: 'break-word'
+                      }}>
+                        {p.name}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+            </div>
+          )}
         </div>
 
         {/* Left Side (in RTL): Interactive Cart & Direct Checkout - Expanded towards Right */}
@@ -1635,9 +1589,15 @@ const Cashier = () => {
             {/* Cart Items List with Decimal & Multipliers */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px', paddingRight: '2px' }}>
               {cart.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '35px 10px', color: 'var(--text-muted)' }}>
-                  <ShoppingCart size={40} style={{ opacity: 0.25, margin: '0 auto 10px auto' }} />
-                  عەرەبانەی کڕین واڵایە.<br/>کاڵایەک سکان بکە یان لە خشتەکە هەڵیبژێرە.
+                <div style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  height: '100%', 
+                  minHeight: '280px' 
+                }}>
+                  <ShoppingCart size={74} strokeWidth={1.4} style={{ opacity: 0.16, color: 'var(--text-muted)' }} />
                 </div>
               ) : (
                 cart.map(item => {
