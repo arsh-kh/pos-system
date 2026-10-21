@@ -1543,7 +1543,7 @@ const Cashier = () => {
                   flexShrink: 0
                 }}>
                   <span style={{ textAlign: 'center' }}>#</span>
-                  <span style={{ textAlign: 'right' }}>ناوی کاڵا</span>
+                  <span style={{ textAlign: 'center' }}>ناوی کاڵا</span>
                   <span style={{ textAlign: 'center' }}>دانە</span>
                   <span style={{ textAlign: 'center' }}>نرخ</span>
                   <span style={{ textAlign: 'left' }}>کۆ</span>
@@ -1582,18 +1582,19 @@ const Cashier = () => {
                         </div>
 
                         {/* ناوی کاڵا */}
-                        <div style={{ minWidth: 0 }}>
+                        <div style={{ minWidth: 0, textAlign: 'center' }}>
                           <div style={{ 
                             fontWeight: 800, 
                             fontSize: '0.88rem', 
                             color: 'var(--text-primary)', 
                             overflow: 'hidden', 
                             textOverflow: 'ellipsis', 
-                            whiteSpace: 'nowrap' 
+                            whiteSpace: 'nowrap',
+                            textAlign: 'center'
                           }}>
                             {item.name}
                           </div>
-                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
                             {item.is_custom && (
                               <span style={{ fontSize: '0.68rem', background: isKg ? 'rgba(2, 132, 199, 0.12)' : 'var(--warning-light)', color: isKg ? '#0284c7' : '#b45309', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
                                 {isKg ? 'بە کێش' : 'دەستی'}
@@ -1658,6 +1659,8 @@ const Cashier = () => {
                             step={isKg ? '0.05' : '1'}
                             min="0"
                             value={item.quantity}
+                            onFocus={(e) => e.target.select()}
+                            onClick={(e) => e.target.select()}
                             onChange={(e) => updateQuantity(itemKey, e.target.value)}
                             style={{ 
                               width: '44px', 
@@ -2071,17 +2074,34 @@ const Cashier = () => {
               {/* Big Grand Total Display */}
               <div style={{ 
                 background: 'var(--bg-tertiary)', 
-                padding: '10px 12px', 
-                borderRadius: '12px', 
+                padding: '14px 14px', 
+                borderRadius: '14px', 
                 border: '1.5px solid var(--border-color)', 
-                marginBottom: '8px',
-                textAlign: 'center'
+                marginBottom: '10px',
+                textAlign: 'center',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)'
               }}>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '2px' }}>
+                <div style={{ 
+                  fontSize: '0.88rem', 
+                  color: 'var(--text-secondary)', 
+                  fontWeight: 800, 
+                  letterSpacing: '0.3px',
+                  paddingBottom: '8px'
+                }}>
                   کۆی گشتی
                 </div>
+
+                {/* Dividing Line */}
                 <div style={{ 
-                  fontSize: '1.65rem', 
+                  height: '1px', 
+                  background: 'var(--border-color)', 
+                  margin: '0 auto 10px auto', 
+                  width: '85%',
+                  opacity: 0.8
+                }} />
+
+                <div style={{ 
+                  fontSize: '1.85rem', 
                   fontWeight: 900, 
                   color: paymentMode === 'DEBT' ? 'var(--danger-color)' : (paymentMode === 'SPLIT' ? 'var(--warning-color)' : 'var(--accent-hover)'),
                   lineHeight: '1.2'
@@ -2116,57 +2136,60 @@ const Cashier = () => {
                 </span>
               </div>
 
-              {/* Dual Action Checkout Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {/* Dual Action Checkout Buttons (Side-by-Side Square POS Tiles) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                 <button
+                  type="button"
                   onClick={() => handleCheckout(true)}
                   disabled={isCheckingOut || cart.length === 0}
                   style={{
-                    width: '100%',
-                    padding: '11px 10px',
-                    borderRadius: '10px',
+                    height: '76px',
+                    borderRadius: '12px',
                     background: cart.length === 0 
                       ? 'var(--bg-tertiary)' 
                       : (paymentMode === 'DEBT' ? 'var(--danger-color)' : (paymentMode === 'SPLIT' ? 'var(--warning-color)' : 'var(--success-color)')),
                     color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
                     border: 'none',
                     fontWeight: 800,
-                    fontSize: '0.96rem',
-                    cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: cart.length === 0 ? 'none' : '0 2px 6px rgba(0, 0, 0, 0.12)',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <Printer size={17} style={{ flexShrink: 0 }} />
-                  <span>{isCheckingOut ? '...' : 'پارەدان و چاپ'}</span>
-                </button>
-
-                <button
-                  onClick={() => handleCheckout(false)}
-                  disabled={isCheckingOut || cart.length === 0}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: '8px',
-                    background: cart.length === 0 ? 'var(--bg-tertiary)' : 'var(--primary-color)',
-                    color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
-                    border: 'none',
-                    fontWeight: 700,
                     fontSize: '0.86rem',
                     cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
+                    boxShadow: cart.length === 0 ? 'none' : '0 3px 8px rgba(0, 0, 0, 0.15)',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Banknote size={17} style={{ flexShrink: 0 }} />
-                  <span>{isCheckingOut ? '...' : 'فرۆشتن بێ چاپ'}</span>
+                  <Printer size={22} style={{ flexShrink: 0 }} />
+                  <span style={{ lineHeight: '1.1', textAlign: 'center' }}>{isCheckingOut ? '...' : 'پارەدان و چاپ'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCheckout(false)}
+                  disabled={isCheckingOut || cart.length === 0}
+                  style={{
+                    height: '76px',
+                    borderRadius: '12px',
+                    background: cart.length === 0 ? 'var(--bg-tertiary)' : 'var(--primary-color)',
+                    color: cart.length === 0 ? 'var(--text-muted)' : '#ffffff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.86rem',
+                    cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: cart.length === 0 ? 'none' : '0 3px 8px rgba(37, 99, 235, 0.2)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Banknote size={22} style={{ flexShrink: 0 }} />
+                  <span style={{ lineHeight: '1.1', textAlign: 'center' }}>{isCheckingOut ? '...' : 'فرۆشتن بێ چاپ'}</span>
                 </button>
               </div>
 
