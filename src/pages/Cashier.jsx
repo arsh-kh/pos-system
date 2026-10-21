@@ -1222,37 +1222,10 @@ const Cashier = () => {
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
                 alignContent: 'start',
-                gridAutoRows: '90px',
-                gap: '8px', 
+                gridAutoRows: '60px',
+                gap: '6px', 
                 padding: '2px' 
               }}>
-                {/* All Products Card */}
-                <div
-                  onClick={() => setSelectedCategoryId('ALL')}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '12px',
-                    border: '1.5px solid var(--accent-color)',
-                    background: 'var(--accent-light)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    boxShadow: '0 2px 4px rgba(37, 99, 235, 0.15)',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <span style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--accent-color)' }}>
-                    هەموو کاڵاکان
-                  </span>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--accent-hover)', fontWeight: 600 }}>
-                    ({products.length})
-                  </span>
-                </div>
-
                 {/* Individual Categories */}
                 {categories.map(cat => {
                   const count = products.filter(p => String(p.category_id) === String(cat.id)).length;
@@ -1261,25 +1234,36 @@ const Cashier = () => {
                       key={cat.id}
                       onClick={() => setSelectedCategoryId(cat.id)}
                       style={{
-                        padding: '10px 8px',
-                        borderRadius: '12px',
+                        padding: '6px 8px',
+                        borderRadius: '10px',
                         border: '1px solid var(--border-color)',
                         background: 'var(--bg-secondary)',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px',
+                        gap: '2px',
+                        height: '60px',
+                        boxSizing: 'border-box',
                         cursor: 'pointer',
                         textAlign: 'center',
-                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                      <span style={{ 
+                        fontWeight: 800, 
+                        fontSize: '0.86rem', 
+                        color: 'var(--text-primary)',
+                        lineHeight: '1.2',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
                         {cat.name}
                       </span>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, lineHeight: '1' }}>
                         ({count})
                       </span>
                     </div>
@@ -1341,7 +1325,7 @@ const Cashier = () => {
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
                 alignContent: 'start',
-                gridAutoRows: '84px',
+                gridAutoRows: '60px',
                 gap: '6px', 
                 flex: 1, 
                 minHeight: 0, 
@@ -1359,28 +1343,28 @@ const Cashier = () => {
                       onClick={() => addToCart(p, 1, 'PIECE')}
                       className="pos-product-card"
                       style={{
-                        padding: '8px 10px',
-                        borderRadius: '12px',
+                        padding: '6px 8px',
+                        borderRadius: '10px',
                         border: '1px solid var(--border-color)',
                         background: 'var(--bg-secondary)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         textAlign: 'center',
-                        height: '84px',
+                        height: '60px',
                         boxSizing: 'border-box',
                         cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                         transition: 'all 0.15s ease'
                       }}
                     >
                       <span style={{ 
                         fontWeight: 800, 
-                        fontSize: '0.88rem', 
+                        fontSize: '0.84rem', 
                         color: 'var(--text-primary)', 
-                        lineHeight: '1.35',
+                        lineHeight: '1.25',
                         display: '-webkit-box',
-                        WebkitLineClamp: 3,
+                        WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
                         wordBreak: 'break-word'
@@ -1528,63 +1512,7 @@ const Cashier = () => {
               })}
             </div>
 
-            {/* Customer Selection Row */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px', background: 'var(--bg-tertiary)', padding: '5px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', flexShrink: 0 }}>
-              <select 
-                value={selectedCustomerId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedCustomerId(val);
-                  if (!val) {
-                    setPaymentMode('CASH');
-                    setSplitCashAmount('');
-                  }
-                }}
-                style={{ 
-                  flex: 1, 
-                  minWidth: 0,
-                  padding: '5px 8px', 
-                  borderRadius: '6px', 
-                  background: 'var(--bg-secondary)', 
-                  border: '1px solid var(--border-color)', 
-                  color: 'var(--text-primary)', 
-                  fontSize: '0.8rem', 
-                  outline: 'none',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
-              >
-                <option value="">کڕیاری گشتی (نەقد)...</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ''} - قەرز: {Number(c.total_debt || 0).toLocaleString()} د.ع
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setIsQuickCustomerModalOpen(true)}
-                style={{
-                  flexShrink: 0,
-                  padding: '5px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(37, 99, 235, 0.12)',
-                  border: '1px solid rgba(37, 99, 235, 0.35)',
-                  color: 'var(--primary-color)',
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  whiteSpace: 'nowrap'
-                }}
-                title="زیادکردنی خێرای کڕیاری نوێ"
-              >
-                <Plus size={12} /> کڕیار
-              </button>
-            </div>
+
 
             {/* Cart Items List with Decimal & Multipliers */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '6px', paddingRight: '2px' }}>
@@ -2101,116 +2029,63 @@ const Cashier = () => {
                 </div>
               )}
 
-              {/* Discount Section */}
-              {!allowManualDiscount ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--bg-tertiary)', padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                  <Lock size={12} color="#f59e0b" />
-                  <span>داشکاندنی دەستی قفڵ کراوە</span>
-                </div>
-              ) : (
-                <div style={{ background: 'var(--bg-tertiary)', padding: '6px 8px', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 700 }}>داشکاندن:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDiscountType(discountType === 'AMOUNT' ? 'PERCENT' : 'AMOUNT');
-                        setDiscountValue('');
-                      }}
-                      style={{
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-secondary)',
-                        color: 'var(--primary-color)',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {discountType === 'AMOUNT' ? 'گۆڕین بۆ ڕێژە %' : 'گۆڕین بۆ دینار'}
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (discountType === 'AMOUNT') {
-                          const current = Math.max(0, parseInt(discountValue) || 0);
-                          const nextVal = Math.max(0, current - 250);
-                          setDiscountValue(nextVal === 0 ? '' : String(nextVal));
-                        } else {
-                          const current = Math.max(0, parseInt(discountValue) || 0);
-                          const nextVal = Math.max(0, current - 5);
-                          setDiscountValue(nextVal === 0 ? '' : String(nextVal));
-                        }
-                      }}
-                      title={discountType === 'AMOUNT' ? 'کەمکردنەوە بە ٢٥٠ دینار' : 'کەمکردنەوە بە ٥٪'}
-                      style={{
-                        padding: '3px 6px',
-                        borderRadius: '6px',
-                        background: 'var(--danger-light)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: 'var(--danger-color)',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        flexShrink: 0
-                      }}
-                    >
-                      <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '-250' : '-5%'}</span>
-                    </button>
-
-                    <input 
-                      ref={discountInputRef}
-                      type="number"
-                      min="0"
-                      max={discountType === 'PERCENT' ? "100" : (subtotal > 0 ? subtotal : undefined)}
-                      step={discountType === 'AMOUNT' ? '250' : '1'}
-                      placeholder={discountType === 'PERCENT' ? 'ڕێژە (%):' : 'بڕ (د.ع):'}
-                      value={discountValue}
-                      onChange={(e) => setDiscountValue(e.target.value)}
-                      style={{ flex: 1, minWidth: 0, padding: '4px 6px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 700, textAlign: 'center', outline: 'none' }}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (discountType === 'AMOUNT') {
-                          const current = Math.max(0, parseInt(discountValue) || 0);
-                          const nextVal = subtotal > 0 ? Math.min(subtotal, current + 250) : current + 250;
-                          setDiscountValue(String(nextVal));
-                        } else {
-                          const current = Math.max(0, parseInt(discountValue) || 0);
-                          const nextVal = Math.min(100, current + 5);
-                          setDiscountValue(String(nextVal));
-                        }
-                      }}
-                      title={discountType === 'AMOUNT' ? 'زیادکردن بە ٢٥٠ دینار' : 'زیادکردن بە ٥٪'}
-                      style={{
-                        padding: '3px 6px',
-                        borderRadius: '6px',
-                        background: 'rgba(2, 132, 199, 0.1)',
-                        border: '1px solid rgba(2, 132, 199, 0.35)',
-                        color: '#0284c7',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        flexShrink: 0
-                      }}
-                    >
-                      <span dir="ltr" style={{ display: 'inline-block' }}>{discountType === 'AMOUNT' ? '+250' : '+5%'}</span>
-                    </button>
-
-                    {calculatedDiscount > 0 && (
-                      <span style={{ color: 'var(--danger-color)', fontWeight: 800, fontSize: '0.74rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        -{calculatedDiscount.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Customer Selection Row (Moved from Middle Column to replace Discount) */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px', background: 'var(--bg-tertiary)', padding: '5px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                <select 
+                  value={selectedCustomerId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCustomerId(val);
+                    if (!val) {
+                      setPaymentMode('CASH');
+                      setSplitCashAmount('');
+                    }
+                  }}
+                  style={{ 
+                    flex: 1, 
+                    minWidth: 0,
+                    padding: '5px 8px', 
+                    borderRadius: '6px', 
+                    background: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)', 
+                    color: 'var(--text-primary)', 
+                    fontSize: '0.8rem', 
+                    outline: 'none',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <option value="">کڕیاری گشتی (نەقد)...</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.phone ? `(${c.phone})` : ''} - قەرز: {Number(c.total_debt || 0).toLocaleString()} د.ع
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickCustomerModalOpen(true)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(37, 99, 235, 0.12)',
+                    border: '1px solid rgba(37, 99, 235, 0.35)',
+                    color: 'var(--primary-color)',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="زیادکردنی خێرای کڕیاری نوێ"
+                >
+                  <Plus size={12} /> کڕیار
+                </button>
+              </div>
             </div>
 
             {/* Bottom: Totals Breakdown, Auto-Print & Checkout Buttons */}
@@ -2239,7 +2114,7 @@ const Cashier = () => {
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '2px' }}>
-                  کۆی گشتی بۆ دان:
+                  کۆی گشتی
                 </div>
                 <div style={{ 
                   fontSize: '1.65rem', 
@@ -2326,7 +2201,7 @@ const Cashier = () => {
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Zap size={15} style={{ flexShrink: 0 }} />
+                  <Banknote size={17} style={{ flexShrink: 0 }} />
                   <span>{isCheckingOut ? '...' : 'فرۆشتن بێ چاپ'}</span>
                 </button>
               </div>
