@@ -2058,19 +2058,6 @@ const Cashier = () => {
             {/* Bottom: Totals Breakdown, Auto-Print & Checkout Buttons */}
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: 'auto' }}>
               
-              {/* Subtotal & Promo Savings */}
-              {(totalPromotionalSavings > 0 || calculatedDiscount > 0) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                  <span>سەرەتایی: {subtotal.toLocaleString()} د.ع</span>
-                  {totalPromotionalSavings > 0 && (
-                    <span style={{ color: '#d97706', fontWeight: 700 }}>ئۆفەر: -{totalPromotionalSavings.toLocaleString()} د.ع</span>
-                  )}
-                  {calculatedDiscount > 0 && (
-                    <span style={{ color: 'var(--danger-color)', fontWeight: 700 }}>داشکاندن: -{calculatedDiscount.toLocaleString()} د.ع</span>
-                  )}
-                </div>
-              )}
-
               {/* Big Grand Total Display (Higher & Taller) */}
               <div style={{ 
                 background: 'var(--bg-tertiary)', 
@@ -2110,18 +2097,18 @@ const Cashier = () => {
                 </div>
               </div>
 
-              {/* Clean Discount Section Under Grand Total (Dinars only, no %, no +/- buttons) */}
+              {/* Clean Compact Discount Section Under Grand Total */}
               <div style={{ 
                 background: 'var(--bg-tertiary)', 
-                padding: '7px 10px', 
-                borderRadius: '10px', 
+                padding: '4px 8px', 
+                borderRadius: '8px', 
                 border: '1px solid var(--border-color)', 
-                marginBottom: '10px',
+                marginBottom: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '6px'
               }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   داشکاندن:
                 </span>
                 <input 
@@ -2129,7 +2116,7 @@ const Cashier = () => {
                   min="0"
                   max={subtotal > 0 ? subtotal : undefined}
                   step="250"
-                  placeholder="بڕ بە دینار..."
+                  placeholder="0"
                   value={discountValue}
                   onFocus={(e) => e.target.select()}
                   onClick={(e) => e.target.select()}
@@ -2140,12 +2127,13 @@ const Cashier = () => {
                   style={{ 
                     flex: 1, 
                     minWidth: 0, 
-                    padding: '5px 8px', 
-                    borderRadius: '6px', 
+                    padding: '3px 6px', 
+                    height: '28px',
+                    borderRadius: '5px', 
                     background: 'var(--bg-secondary)', 
                     border: '1px solid var(--border-color)', 
                     color: calculatedDiscount > 0 ? 'var(--danger-color)' : 'var(--text-primary)', 
-                    fontSize: '0.86rem', 
+                    fontSize: '0.8rem', 
                     fontWeight: 800, 
                     textAlign: 'center', 
                     outline: 'none' 
@@ -2156,15 +2144,19 @@ const Cashier = () => {
                     type="button"
                     onClick={() => setDiscountValue('')}
                     style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
+                      padding: '2px 6px',
+                      height: '26px',
+                      borderRadius: '5px',
                       background: 'var(--danger-light)',
                       border: '1px solid rgba(239, 68, 68, 0.35)',
                       color: 'var(--danger-color)',
-                      fontSize: '0.74rem',
+                      fontSize: '0.7rem',
                       fontWeight: 800,
                       cursor: 'pointer',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}
                     title="لابردنی داشکاندن"
                   >
