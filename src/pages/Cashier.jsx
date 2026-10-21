@@ -1255,7 +1255,17 @@ const Cashier = () => {
           </div>
 
           {/* Quick Products Grid - EXACTLY 2 CARDS PER ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 2px' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
+            alignContent: 'start',
+            gridAutoRows: '142px',
+            gap: '8px', 
+            flex: 1, 
+            minHeight: 0, 
+            overflowY: 'auto', 
+            padding: '4px 2px' 
+          }}>
             {filteredProducts.map(p => {
               const promo = activePromotions[p.id];
               const isOutOfStock = p.stock <= 0;
@@ -1274,7 +1284,7 @@ const Cashier = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    minHeight: '135px',
+                    height: '142px',
                     boxSizing: 'border-box',
                     cursor: 'pointer',
                     position: 'relative',

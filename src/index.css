@@ -107,6 +107,10 @@
   --glass-border: #334155;
   --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 * {
   box-sizing: border-box;
@@ -145,6 +149,8 @@ body {
   overflow-y: auto;
   font-feature-settings: 'tnum' 1, 'cv05' 1;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Crisp Clean Transitions */
