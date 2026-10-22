@@ -295,3 +295,142 @@ exports.getReturnsHistory = async (req, res) => {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
+
+exports.processDirectReturn = async (req, res) => {
+    const { product_id, quantity, reason, refund_method, customer_id, unit_type, price, sale_id } = req.body;
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [products] = await connection.query(
+            'SELECT * FROM Products WHERE id = ? FOR UPDATE',
+            [product_id]
+        );
+        if (products.length === 0) {
+            throw new Error('کاڵا نەدۆزرایەوە');
+        }
+        const product = products[0];
+        const returnQty = Math.max(0.001, parseFloat(quantity) || 1);
+
+        const isBox = unit_type === 'BOX';
+        const multiplier = isBox ? Math.max(1, parseFloat(product.units_per_box) || 1) : 1;
+        const stockToAdd = returnQty * multiplier;
+
+        let unitPrice = Number(price);
+        if (!unitPrice || isNaN(unitPrice)) {
+            unitPrice = isBox && Number(product.wholesale_price) > 0 
+                ? Number(product.wholesale_price) 
+                : Number(product.selling_price || 0);
+        }
+        const refundedAmount = Math.round(unitPrice * returnQty);
+
+        let finalRefundMethod = (refund_method || 'CASH').toUpperCase();
+        if (!['CASH', 'DEBT'].includes(finalRefundMethod)) {
+            finalRefundMethod = 'CASH';
+        }
+
+        let debtTransactionId = null;
+        let customerName = 'کڕیاری گشتی';
+        if (customer_id) {
+            const [custRows] = await connection.query('SELECT name FROM Customers WHERE id = ?', [customer_id]);
+            if (custRows.length > 0) customerName = custRows[0].name;
+
+            if (finalRefundMethod === 'DEBT') {
+                const debtNote = `گەڕاندنەوەی کاڵا (${product.name} x ${returnQty}) - کەمکردنەوە لە قەرز`;
+                const [debtRes] = await connection.query(
+                    'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',
+                    [customer_id, refundedAmount, 'PAY', debtNote]
+                );
+                debtTransactionId = debtRes.insertId;
+            }
+        }
+
+        // Insert into Returns
+        const [retResult] = await connection.query(
+            'INSERT INTO Returns (sale_id, product_id, quantity, refunded_amount, refund_method, customer_id, debt_transaction_id, reason, unit_type, units_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [sale_id || null, product_id, returnQty, refundedAmount, finalRefundMethod, customer_id || null, debtTransactionId, reason || 'گەڕاندنەوە لە کاشێر', isBox ? 'BOX' : 'PIECE', multiplier]
+        );
+        const returnId = retResult.insertId;
+
+        // Restore stock
+        await connection.query(
+            'UPDATE Products SET stock = stock + ? WHERE id = ?',
+            [stockToAdd, product_id]
+        );
+
+        // Restore Product_Batches FIFO remaining quantity
+        const [latestBatches] = await connection.query(`
+            SELECT id, remaining_quantity FROM Product_Batches 
+            WHERE product_id = ? 
+            ORDER BY id DESC LIMIT 1
+        `, [product_id]);
+
+        if (latestBatches.length > 0) {
+            const lb = latestBatches[0];
+            const newRem = Number(lb.remaining_quantity) + stockToAdd;
+            await connection.query(
+                "UPDATE Product_Batches SET remaining_quantity = ?, status = 'ACTIVE' WHERE id = ?",
+                [newRem, lb.id]
+            );
+        }
+
+        await connection.commit();
+
+        // Queue Sync Event
+        try {
+            await queueSyncEvent({
+                entity_type: 'RETURN',
+                entity_id: returnId,
+                action_type: 'CREATE',
+                payload: {
+                    return_id: returnId,
+                    product_id,
+                    return_qty: returnQty,
+                    refunded_amount: refundedAmount,
+                    refund_method: finalRefundMethod,
+                    customer_id: customer_id || null,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (syncErr) {
+            console.error('Queue sync error (non-fatal):', syncErr);
+        }
+
+        // Audit log
+        try {
+            await logAuditAction({
+                req,
+                action_type: 'CASHIER_RETURN',
+                entity_name: 'Returns',
+                entity_id: returnId,
+                new_value: { return_id: returnId, product_id, return_qty: returnQty, refunded_amount: refundedAmount },
+                details: `گەڕاندنەوەی کاشێر: ${product.name} x ${returnQty} بە بڕی ${refundedAmount.toLocaleString()} دینار (${finalRefundMethod === 'DEBT' ? 'لە قەرز کەمکرایەوە' : 'نەقد درایەوە'})`
+            });
+        } catch (auditErr) {
+            console.error('Audit log error (non-fatal):', auditErr);
+        }
+
+        res.json({
+            status: 'SUCCESS',
+            message: `کاڵای (${product.name}) بە سەرکەوتوویی گەڕێنرایەوە (${returnQty} دانە). بڕی ${refundedAmount.toLocaleString()} د.ع ${finalRefundMethod === 'DEBT' ? 'لە قەرز کەمکرایەوە' : 'بە نەقد درایەوە'}.`,
+            data: {
+                return_id: returnId,
+                product_id: product.id,
+                product_name: product.name,
+                barcode: product.barcode,
+                quantity: returnQty,
+                unit: product.unit || 'دانە',
+                refunded_amount: refundedAmount,
+                refund_method: finalRefundMethod,
+                customer_name: customerName,
+                created_at: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Direct Return Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    } finally {
+        connection.release();
+    }
+};

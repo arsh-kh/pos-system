@@ -6,6 +6,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/authMiddlewar
 // router.use(authenticateToken);
 
 router.post('/', returnsController.processReturn);
+router.post('/direct', returnsController.processDirectReturn);
 router.get('/', returnsController.getReturnsHistory);
 router.get('/sale/:id', returnsController.getSaleForReturn);
 

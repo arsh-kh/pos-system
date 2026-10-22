@@ -26,7 +26,8 @@ import {
   ArrowRight,
   Store,
   User,
-  LogOut
+  LogOut,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
@@ -154,6 +155,11 @@ const Cashier = () => {
     return localStorage.getItem('pos_auto_print') === 'true';
   });
   const [checkoutNotice, setCheckoutNotice] = useState(null);
+
+  // Quick Return in Cashier State
+  const [selectedCartKey, setSelectedCartKey] = useState(null);
+  const [returnQuantity, setReturnQuantity] = useState(1);
+  const [isProcessingReturn, setIsProcessingReturn] = useState(false);
   const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
   const storePhone = localStorage.getItem('pos_store_phone') || '0772 979 0421';
 
@@ -696,6 +702,95 @@ const Cashier = () => {
       totalSavings
     };
   }, [activePromotions]);
+
+  // Quick Return Calculations & Handlers (placed after getItemPricing)
+  const selectedCartItem = useMemo(() => {
+    if (!selectedCartKey) return null;
+    return cart.find(it => (it.cartKey || it.barcode) === selectedCartKey) || null;
+  }, [cart, selectedCartKey]);
+
+  const selectedCartItemPricing = useMemo(() => {
+    if (!selectedCartItem) return { unitPrice: 0, lineTotal: 0, regularPrice: 0 };
+    const p = getItemPricing(selectedCartItem);
+    const unitPrice = Number(p.regularPrice || selectedCartItem.price || 0);
+    return { ...p, unitPrice };
+  }, [selectedCartItem, getItemPricing]);
+
+  const calculatedReturnRefund = useMemo(() => {
+    if (!selectedCartItem || !returnQuantity) return 0;
+    const qty = parseFloat(returnQuantity) || 0;
+    const unitPrice = Number(selectedCartItemPricing?.unitPrice || selectedCartItem?.price || 0);
+    return Math.round(unitPrice * qty);
+  }, [selectedCartItem, returnQuantity, selectedCartItemPricing]);
+
+  const handleExecuteDirectReturn = async () => {
+    if (!selectedCartItem || !returnQuantity || returnQuantity <= 0) return;
+    const qtyToReturn = parseFloat(returnQuantity);
+    if (isNaN(qtyToReturn) || qtyToReturn <= 0) return;
+
+    setIsProcessingReturn(true);
+    try {
+      const unitPrice = Number(selectedCartItemPricing?.unitPrice || selectedCartItem?.price || 0);
+      const res = await axios.post('http://localhost:3001/api/returns/direct', {
+        product_id: selectedCartItem.id,
+        quantity: qtyToReturn,
+        reason: 'گەڕاندنەوە لە کاشێر',
+        refund_method: paymentMode === 'DEBT' ? 'DEBT' : 'CASH',
+        customer_id: selectedCustomerId || null,
+        unit_type: selectedCartItem.unit_type || 'PIECE',
+        price: unitPrice
+      });
+
+      if (res.data.status === 'SUCCESS') {
+        const refundAmt = res.data.data?.refunded_amount || Math.round(pricing.unitPrice * qtyToReturn);
+        setCheckoutNotice({
+          type: 'success',
+          message: `کاڵای (${selectedCartItem.name}) بە سەرکەوتوویی گەڕێنرایەوە (${qtyToReturn} دانە) - ${refundAmt.toLocaleString()} د.ع`
+        });
+
+        const returnRec = {
+          isReturn: true,
+          saleId: `RET-${res.data.data?.return_id || Date.now().toString().slice(-4)}`,
+          customerName: selectedCustomer?.name || 'کڕیاری گشتی',
+          cashierName: currentUser?.name || 'کاشێر',
+          date: formatDateTime(new Date()),
+          items: [{
+            name: `گەڕاوە: ${selectedCartItem.name}`,
+            quantity: qtyToReturn,
+            unit: selectedCartItem.unit || 'دانە',
+            total: refundAmt
+          }],
+          promotionalSavings: 0,
+          discount: 0,
+          subtotal: refundAmt,
+          total: refundAmt,
+          paymentMethod: paymentMode === 'DEBT' ? 'DEBT' : 'CASH',
+          paidAmount: paymentMode === 'DEBT' ? 0 : refundAmt,
+          debtAmount: paymentMode === 'DEBT' ? refundAmt : 0
+        };
+        setPrintedReceipt(returnRec);
+        if (autoPrint) {
+          triggerPrintReceipt(returnRec);
+        }
+
+        const remainingQty = Math.round((Number(selectedCartItem.quantity) - qtyToReturn) * 1000) / 1000;
+        if (remainingQty <= 0) {
+          removeFromCart(selectedCartKey);
+        } else {
+          updateQuantity(selectedCartKey, remainingQty);
+        }
+
+        setSelectedCartKey(null);
+        setReturnQuantity(1);
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Direct return error:', err);
+      alert(err.response?.data?.message || 'هەڵە لە گەڕاندنەوەی کاڵا');
+    } finally {
+      setIsProcessingReturn(false);
+    }
+  };
 
   // Subtotal Calculation before General Invoice Discount (with promo pricing applied)
   const subtotal = useMemo(() => {
@@ -1557,9 +1652,18 @@ const Cashier = () => {
                     const lineTotal = pricing.lineTotal;
                     const isKg = item.unit === 'کگم' || item.is_weighted;
                     const itemKey = item.cartKey || item.barcode;
+                    const isSelected = selectedCartKey === itemKey;
                     return (
                       <div 
                         key={itemKey}
+                        onClick={(e) => {
+                          if (e.target.closest('button') || e.target.closest('input')) return;
+                          const nextKey = isSelected ? null : itemKey;
+                          setSelectedCartKey(nextKey);
+                          if (nextKey) {
+                            setReturnQuantity(Math.min(1, Number(item.quantity) || 1));
+                          }
+                        }}
                         style={{
                           display: 'grid',
                           gridTemplateColumns: '36px minmax(130px, 1fr) 125px 95px 110px 36px',
@@ -1567,18 +1671,28 @@ const Cashier = () => {
                           alignItems: 'center',
                           padding: '7px 10px',
                           borderRadius: '8px',
-                          background: item.unit_type === 'BOX' 
-                            ? 'rgba(2, 132, 199, 0.08)' 
-                            : (pricing.hasPromo ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-tertiary)'),
-                          border: item.unit_type === 'BOX' 
-                            ? '1px solid rgba(2, 132, 199, 0.35)' 
-                            : (pricing.hasPromo ? '1px solid rgba(217, 119, 6, 0.35)' : '1px solid var(--border-color)'),
-                          transition: 'background 0.15s ease'
+                          cursor: 'pointer',
+                          background: isSelected
+                            ? 'rgba(245, 158, 11, 0.16)'
+                            : (item.unit_type === 'BOX' 
+                              ? 'rgba(2, 132, 199, 0.08)' 
+                              : (pricing.hasPromo ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-tertiary)')),
+                          border: isSelected
+                            ? '1.5px solid #f59e0b'
+                            : (item.unit_type === 'BOX' 
+                              ? '1px solid rgba(2, 132, 199, 0.35)' 
+                              : (pricing.hasPromo ? '1px solid rgba(217, 119, 6, 0.35)' : '1px solid var(--border-color)')),
+                          boxShadow: isSelected ? '0 0 0 1px #f59e0b' : 'none',
+                          transition: 'all 0.15s ease'
                         }}
                       >
                         {/* # (ژمارەی ڕیز) */}
-                        <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                          {index + 1}
+                        <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '0.82rem', color: isSelected ? '#f59e0b' : 'var(--text-muted)' }}>
+                          {isSelected ? (
+                            <span title="دیاریکراوە بۆ گەڕاندنەوە">✓</span>
+                          ) : (
+                            index + 1
+                          )}
                         </div>
 
                         {/* ناوی کاڵا */}
@@ -1595,6 +1709,11 @@ const Cashier = () => {
                             {item.name}
                           </div>
                           <div style={{ display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+                            {isSelected && (
+                              <span style={{ fontSize: '0.66rem', background: '#f59e0b', color: '#ffffff', padding: '0 5px', borderRadius: '4px', fontWeight: 800 }}>
+                                دیاریکراو بۆ گەڕاندنەوە
+                              </span>
+                            )}
                             {item.is_custom && (
                               <span style={{ fontSize: '0.68rem', background: isKg ? 'rgba(2, 132, 199, 0.12)' : 'var(--warning-light)', color: isKg ? '#0284c7' : '#b45309', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
                                 {isKg ? 'بە کێش' : 'دەستی'}
@@ -2053,6 +2172,226 @@ const Cashier = () => {
                   <Plus size={12} /> کڕیار
                 </button>
               </div>
+            </div>
+
+            {/* Quick Item Return Card in Left Column Space */}
+            <div style={{
+              background: selectedCartItem ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-tertiary)',
+              border: selectedCartItem ? '1.5px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--border-color)',
+              borderRadius: '10px',
+              padding: '10px 12px',
+              marginBottom: '10px',
+              transition: 'all 0.2s ease',
+              boxShadow: selectedCartItem ? '0 2px 10px rgba(245, 158, 11, 0.15)' : 'none'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: selectedCartItem ? '8px' : '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: selectedCartItem ? '#f59e0b' : 'var(--text-secondary)', fontWeight: 800, fontSize: '0.84rem' }}>
+                  <RotateCcw size={14} style={{ color: '#f59e0b' }} />
+                  <span>گەڕاندنەوەی کاڵا</span>
+                </div>
+                {selectedCartItem && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCartKey(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                      fontSize: '0.72rem',
+                      borderRadius: '4px'
+                    }}
+                    title="لابردنی دیاریکردن"
+                  >
+                    <X size={13} /> هەڵوەشاندنەوە
+                  </button>
+                )}
+              </div>
+
+              {/* If no item in cart is selected */}
+              {!selectedCartItem ? (
+                <div style={{ 
+                  fontSize: '0.74rem', 
+                  color: 'var(--text-muted)', 
+                  lineHeight: '1.4', 
+                  textAlign: 'center', 
+                  padding: '8px 4px',
+                  background: 'rgba(0, 0, 0, 0.08)',
+                  borderRadius: '6px'
+                }}>
+                  {cart.length === 0 ? (
+                    <span>کاڵاکە بخە ناو سەلە یان بارکۆدی لێبدە بۆ گەڕاندنەوە</span>
+                  ) : (
+                    <span>لە سەلەدا کلیک لە هەر کاڵایەک بکە بۆ گەڕاندنەوەی</span>
+                  )}
+                </div>
+              ) : (
+                /* When an item is selected */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Selected Item Info */}
+                  <div style={{ 
+                    background: 'var(--bg-secondary)', 
+                    padding: '6px 8px', 
+                    borderRadius: '6px', 
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {selectedCartItem.name}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        لە سەلە: {selectedCartItem.quantity} {selectedCartItem.unit || 'دانە'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'left', fontWeight: 800, fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                      {(Number(selectedCartItemPricing?.unitPrice || selectedCartItem?.price || 0)).toLocaleString()} د.ع
+                    </div>
+                  </div>
+
+                  {/* Quantity to Return Input */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      بڕی گەڕاوە:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReturnQuantity(prev => {
+                        const isKg = selectedCartItem.unit === 'کگم' || selectedCartItem.is_weighted;
+                        const step = isKg ? 0.25 : 1;
+                        return Math.max(step, Math.round((Number(prev || 1) - step) * 1000) / 1000);
+                      })}
+                      style={{
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '5px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800
+                      }}
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <input
+                      type="number"
+                      min="0.001"
+                      max={selectedCartItem.quantity}
+                      step={selectedCartItem.unit === 'کگم' || selectedCartItem.is_weighted ? '0.25' : '1'}
+                      value={returnQuantity}
+                      onClick={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val > 0) {
+                          setReturnQuantity(Math.min(val, Number(selectedCartItem.quantity)));
+                        } else if (e.target.value === '') {
+                          setReturnQuantity('');
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        height: '26px',
+                        borderRadius: '5px',
+                        border: '1px solid #f59e0b',
+                        background: 'var(--bg-secondary)',
+                        color: '#f59e0b',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        textAlign: 'center',
+                        outline: 'none'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setReturnQuantity(prev => {
+                        const isKg = selectedCartItem.unit === 'کگم' || selectedCartItem.is_weighted;
+                        const step = isKg ? 0.25 : 1;
+                        return Math.min(Number(selectedCartItem.quantity), Math.round((Number(prev || 0) + step) * 1000) / 1000);
+                      })}
+                      style={{
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '5px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800
+                      }}
+                    >
+                      <Plus size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReturnQuantity(Number(selectedCartItem.quantity))}
+                      style={{
+                        height: '26px',
+                        padding: '0 6px',
+                        borderRadius: '5px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="گەڕاندنەوەی هەمووی"
+                    >
+                      هەمووی
+                    </button>
+                  </div>
+
+                  {/* Return Refund Summary & Action Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                    <span>پارەی گەڕاوە:</span>
+                    <strong style={{ color: '#f59e0b', fontSize: '0.86rem' }}>
+                      {(calculatedReturnRefund || 0).toLocaleString()} دینار
+                    </strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExecuteDirectReturn}
+                    disabled={isProcessingReturn || !returnQuantity || returnQuantity <= 0}
+                    style={{
+                      width: '100%',
+                      height: '32px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: '#f59e0b',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      cursor: isProcessingReturn ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    <span>{isProcessingReturn ? 'خەریکی گەڕاندنەوەیە...' : `گەڕاندنەوەی کاڵا (${(calculatedReturnRefund || 0).toLocaleString()} د.ع)`}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Bottom: Totals Breakdown, Auto-Print & Checkout Buttons */}
