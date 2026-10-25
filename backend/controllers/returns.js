@@ -38,9 +38,18 @@ exports.getSaleForReturn = async (req, res) => {
             recommendedRefundMethod = customerTotalDebt > 0 ? 'DEBT' : 'CASH';
         }
 
+        // Check total refunds already executed for this sale
+        const [alreadyRefundedRows] = await db.query(
+            'SELECT COALESCE(SUM(refunded_amount), 0) as already_refunded_total FROM Returns WHERE sale_id = ?',
+            [id]
+        );
+        const alreadyRefundedTotal = Number(alreadyRefundedRows[0].already_refunded_total) || 0;
+        const saleTotalAmount = Number(sale.total_amount) || 0;
+        const remainingRefundableTotal = Math.max(0, saleTotalAmount - alreadyRefundedTotal);
+
         const [items] = await db.query(`
             SELECT si.*, 
-                   COALESCE(si.custom_name, p.name) as product_name, 
+                   p.name as product_name, 
                    p.barcode,
                    p.unit,
                    COALESCE((
@@ -53,16 +62,35 @@ exports.getSaleForReturn = async (req, res) => {
             WHERE si.sale_id = ?
         `, [id]);
 
+        // Calculate sale subtotal and proportional discount ratio
+        const calculatedSubtotal = items.reduce(
+            (sum, it) => sum + (Number(it.price_at_sale) * Number(it.quantity)),
+            0
+        );
+        const saleSubtotal = Number(sale.subtotal_amount) > 0 ? Number(sale.subtotal_amount) : calculatedSubtotal;
+        const discountAmount = Number(sale.discount_amount) || 0;
+
+        let discountRatio = 1;
+        if (discountAmount > 0 && saleSubtotal > 0) {
+            discountRatio = Math.max(0, Math.min(1, saleTotalAmount / saleSubtotal));
+        }
+
         const formattedItems = items.map(item => {
             const purchasedQty = Number(item.quantity) || 0;
             const alreadyReturned = Number(item.already_returned) || 0;
             const returnableQty = Math.max(0, purchasedQty - alreadyReturned);
+            const originalPrice = Number(item.price_at_sale) || 0;
+            const effectivePrice = Math.round(originalPrice * discountRatio);
 
             return {
                 ...item,
                 quantity: purchasedQty,
                 already_returned: alreadyReturned,
-                returnable_qty: returnableQty
+                returnable_qty: returnableQty,
+                original_price_at_sale: originalPrice,
+                effective_unit_price: effectivePrice,
+                has_discount: discountRatio < 0.9999,
+                discount_ratio: discountRatio
             };
         });
 
@@ -70,6 +98,10 @@ exports.getSaleForReturn = async (req, res) => {
             status: 'SUCCESS',
             data: {
                 ...sale,
+                subtotal_amount: saleSubtotal,
+                discount_amount: discountAmount,
+                already_refunded_total: alreadyRefundedTotal,
+                remaining_refundable_total: remainingRefundableTotal,
                 customer_total_debt: customerTotalDebt,
                 recommended_refund_method: recommendedRefundMethod,
                 items: formattedItems
@@ -97,7 +129,7 @@ exports.processReturn = async (req, res) => {
         const sale = sales[0];
 
         const [saleItems] = await connection.query(
-            'SELECT si.*, COALESCE(si.custom_name, p.name) as product_name FROM Sale_Items si LEFT JOIN Products p ON si.product_id = p.id WHERE si.sale_id = ? AND si.product_id = ?',
+            'SELECT si.*, p.name as product_name FROM Sale_Items si LEFT JOIN Products p ON si.product_id = p.id WHERE si.sale_id = ? AND si.product_id = ?',
             [sale_id, product_id]
         );
 
@@ -124,18 +156,59 @@ exports.processReturn = async (req, res) => {
             throw new Error(`ناتوانی لە بڕی گەڕاوە زیاتر لەوەی ماوە بگەڕێنیتەوە (ماوە: ${maxReturnable})`);
         }
 
-        const priceAtSale = Number(saleItem.price_at_sale) || 0;
-        let refundedAmount = Math.round(priceAtSale * returnQty);
-
-        // Cap cumulative refunds to the actual net sale.total_amount if invoice had manual discount
+        // Check total refunds already executed for this sale
         const [totalRefundsForSale] = await connection.query(
             'SELECT COALESCE(SUM(refunded_amount), 0) as already_refunded FROM Returns WHERE sale_id = ?',
             [sale_id]
         );
         const alreadyRefundedTotal = Number(totalRefundsForSale[0].already_refunded) || 0;
         const saleTotalAmount = Number(sale.total_amount) || 0;
-        if (alreadyRefundedTotal + refundedAmount > saleTotalAmount) {
-            refundedAmount = Math.max(0, saleTotalAmount - alreadyRefundedTotal);
+        const remainingRefundableForSale = Math.max(0, saleTotalAmount - alreadyRefundedTotal);
+
+        // Calculate sale subtotal and proportional discount ratio
+        const [allItemsInSale] = await connection.query(
+            'SELECT id, quantity, price_at_sale FROM Sale_Items WHERE sale_id = ?',
+            [sale_id]
+        );
+        const calculatedSubtotal = allItemsInSale.reduce(
+            (sum, it) => sum + (Number(it.price_at_sale) * Number(it.quantity)),
+            0
+        );
+        const saleSubtotal = Number(sale.subtotal_amount) > 0 ? Number(sale.subtotal_amount) : calculatedSubtotal;
+        const discountAmount = Number(sale.discount_amount) || 0;
+
+        let discountRatio = 1;
+        if (discountAmount > 0 && saleSubtotal > 0) {
+            discountRatio = Math.max(0, Math.min(1, saleTotalAmount / saleSubtotal));
+        }
+
+        const priceAtSale = Number(saleItem.price_at_sale) || 0;
+        const effectivePriceAtSale = priceAtSale * discountRatio;
+        let refundedAmount = Math.round(effectivePriceAtSale * returnQty);
+
+        // Check if this return returns ALL remaining items in the entire sale
+        // If so, assign the exact remainingRefundableForSale to prevent any 1-IQD integer rounding loss
+        const [remainingItemsQuery] = await connection.query(`
+            SELECT 
+                si.id,
+                si.quantity - COALESCE((
+                    SELECT SUM(r.quantity) 
+                    FROM Returns r 
+                    WHERE r.sale_id = si.sale_id AND r.product_id = si.product_id
+                ), 0) as remaining_qty
+            FROM Sale_Items si
+            WHERE si.sale_id = ?
+        `, [sale_id]);
+
+        let totalRemainingQtyAcrossSale = 0;
+        for (const row of remainingItemsQuery) {
+            totalRemainingQtyAcrossSale += Number(row.remaining_qty) || 0;
+        }
+
+        if (returnQty >= totalRemainingQtyAcrossSale) {
+            refundedAmount = remainingRefundableForSale;
+        } else if (refundedAmount > remainingRefundableForSale) {
+            refundedAmount = remainingRefundableForSale;
         }
 
         // Account for carton multiplier when restoring stock

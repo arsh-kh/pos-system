@@ -30,11 +30,25 @@ import './Layout.css';
 const PageWrapper = ({ children }) => {
   const location = useLocation();
   const isCashier = location.pathname === '/cashier';
+  const isHome = location.pathname === '/';
 
   if (isCashier) {
     return (
       <div className="page-wrapper cashier-wrapper" style={{ height: '100vh', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
         {children}
+      </div>
+    );
+  }
+
+  const isPurchases = location.pathname === '/purchases';
+
+  if (isHome || isPurchases) {
+    return (
+      <div className={`page-wrapper ${isHome ? 'home-wrapper' : 'purchases-wrapper'}`} style={{ height: '100vh', maxHeight: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
+        <UserBar />
+        <main className="page-content" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {children}
+        </main>
       </div>
     );
   }

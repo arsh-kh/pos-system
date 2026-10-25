@@ -38,7 +38,7 @@ exports.processCheckout = async (req, res) => {
                 });
             } else {
                 const [rows] = await connection.query(
-                    'SELECT id, stock, selling_price, cost_price, wholesale_price, barcode, box_barcode, units_per_box FROM Products WHERE barcode = ? OR box_barcode = ? FOR UPDATE', 
+                    'SELECT id, name, stock, selling_price, cost_price, wholesale_price, barcode, box_barcode, units_per_box, is_weighted FROM Products WHERE barcode = ? OR box_barcode = ? FOR UPDATE', 
                     [item.barcode, item.barcode]
                 );
                 
@@ -54,6 +54,11 @@ exports.processCheckout = async (req, res) => {
                 const isBox = (item.unit_type === 'BOX') || (Boolean(product.box_barcode) && String(product.box_barcode).trim() === String(item.barcode).trim());
                 const unitsPerBox = isBox ? Math.max(1, parseFloat(product.units_per_box) || 1) : 1;
                 const stockDeductionQty = isBox ? (itemQty * unitsPerBox) : itemQty;
+
+                // Strict Stock Enforcement (Permanently active: cannot sell without sufficient inventory)
+                if (!product.is_weighted && Number(product.stock) < stockDeductionQty) {
+                    throw new Error(`بڕی بەردەستی (${item.name || product.name || 'کاڵا'}) لە کۆگا بەشی فرۆشتن ناکات`);
+                }
 
                 let itemSellTotal = 0;
                 let effectivePriceAtSale = regularPrice;
@@ -371,9 +376,14 @@ exports.getSaleDetails = async (req, res) => {
         if (sale.length === 0) return res.status(404).json({ status: 'ERROR', message: 'Sale not found' });
 
         const [items] = await db.query(`
-            SELECT si.*, COALESCE(si.custom_name, p.name) as product_name, p.barcode
+            SELECT si.*, 
+                   COALESCE(p.name, 'کاڵا') as product_name, 
+                   p.barcode,
+                   p.unit,
+                   si.price_at_sale as price_per_unit,
+                   (si.quantity * si.price_at_sale) as total_price
             FROM Sale_Items si
-            JOIN Products p ON si.product_id = p.id
+            LEFT JOIN Products p ON si.product_id = p.id
             WHERE si.sale_id = ?
         `, [id]);
 

@@ -18,10 +18,10 @@ exports.getAllCustomers = async (req, res) => {
 };
 
 exports.addCustomer = async (req, res) => {
-    const { name, phone } = req.body;
+    const { name, phone, notes } = req.body;
     try {
-        const [result] = await db.query('INSERT INTO Customers (name, phone) VALUES (?, ?)', [name, phone]);
-        res.status(201).json({ status: 'SUCCESS', data: { id: result.insertId, name, phone, total_debt: 0 } });
+        const [result] = await db.query('INSERT INTO Customers (name, phone, notes) VALUES (?, ?, ?)', [name, phone, notes || null]);
+        res.status(201).json({ status: 'SUCCESS', data: { id: result.insertId, name, phone, notes: notes || null, total_debt: 0 } });
     } catch (error) {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
@@ -43,11 +43,31 @@ exports.getCustomerProfile = async (req, res) => {
 
         if (customer.length === 0) return res.status(404).json({ status: 'ERROR', message: 'Customer not found' });
 
-        // Get debt history
+        // Get debt history with itemized sale products details
         const [history] = await db.query(`
-            SELECT * FROM Customer_Debts 
-            WHERE customer_id = ? 
-            ORDER BY created_at DESC
+            SELECT cd.*,
+                   s.id AS invoice_id,
+                   (
+                       SELECT GROUP_CONCAT(
+                           CONCAT(
+                               p.name, 
+                               ' (', 
+                               TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM FORMAT(si.quantity, 2))),
+                               ' ', 
+                               CASE WHEN p.is_weighted = 1 OR p.unit = 'کگم' THEN 'کگم' ELSE 'دانە' END,
+                               ' × ', 
+                               FORMAT(si.price_at_sale, 0),
+                               ')'
+                           ) SEPARATOR ' ، '
+                       )
+                       FROM Sale_Items si
+                       JOIN Products p ON si.product_id = p.id
+                       WHERE si.sale_id = cd.sale_id
+                   ) AS sale_items_summary
+            FROM Customer_Debts cd
+            LEFT JOIN Sales s ON cd.sale_id = s.id
+            WHERE cd.customer_id = ? 
+            ORDER BY cd.created_at DESC, cd.id DESC
         `, [id]);
 
         res.json({ status: 'SUCCESS', data: { ...customer[0], history } });

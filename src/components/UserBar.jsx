@@ -23,7 +23,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ShoppingCart
+  ShoppingCart,
+  Settings as SettingsIcon
 } from 'lucide-react';
 
 const UserBar = () => {
@@ -175,7 +176,7 @@ const UserBar = () => {
               <Store size={16} />
             </div>
             <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-              {localStorage.getItem('pos_store_name') && localStorage.getItem('pos_store_name') !== 'مارکێتی حاجی ئاکۆ' ? localStorage.getItem('pos_store_name') : 'مارکێتی شارەکام'}
+              {localStorage.getItem('pos_store_name') && localStorage.getItem('pos_store_name') !== 'مارکێتی حاجی ئاکۆ' ? localStorage.getItem('pos_store_name') : 'مارکێتی شارەکەم'}
             </span>
           </div>
 
@@ -244,25 +245,46 @@ const UserBar = () => {
           )}
 
           {isAdmin && (
-            <button
-              onClick={() => navigate('/settings')}
-              title="ڕێکخستنەکان و پاراستنی داتاکان"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '9999px',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border-color)',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '0.82rem'
-              }}
-            >
-              <ShieldCheck size={14} /> ڕێکخستن
-            </button>
+            <>
+              <button
+                onClick={() => navigate('/audit-logs')}
+                title="چاودێری و تۆماری چالاکییەکان"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '6px 11px',
+                  borderRadius: '9999px',
+                  background: location.pathname === '/audit-logs' ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                  color: location.pathname === '/audit-logs' ? '#ffffff' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.82rem'
+                }}
+              >
+                <ShieldCheck size={14} /> چاودێری
+              </button>
+              <button
+                onClick={() => navigate('/settings')}
+                title="ڕێکخستنەکان و پاراستنی داتاکان"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '6px 11px',
+                  borderRadius: '9999px',
+                  background: location.pathname === '/settings' ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                  color: location.pathname === '/settings' ? '#ffffff' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.82rem'
+                }}
+              >
+                <SettingsIcon size={14} /> ڕێکخستن
+              </button>
+            </>
           )}
 
           {/* Theme Toggle Button */}

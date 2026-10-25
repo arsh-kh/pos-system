@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Search, FileText, X, Printer, Layers } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
+import BarcodeSVG from '../components/BarcodeSVG';
 import './Dashboard.css';
 
 const SalesHistory = () => {
@@ -14,8 +15,8 @@ const SalesHistory = () => {
   
   // Re-print Thermal Receipt State
   const [reprintReceipt, setReprintReceipt] = useState(null);
-  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
-  const storePhone = localStorage.getItem('pos_store_phone') || '0772 979 0421';
+  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی شارەکەم';
+  const storePhone = localStorage.getItem('pos_store_phone') || '';
 
   const fetchSales = async () => {
     try {
@@ -52,7 +53,7 @@ const SalesHistory = () => {
     setReprintReceipt(sale);
     setTimeout(() => {
       window.print();
-    }, 150);
+    }, 300);
   };
 
   // Filter Sales
@@ -95,6 +96,17 @@ const SalesHistory = () => {
       
       {/* Thermal Print Receipt Style */}
       <style>{`
+        #reprint-thermal-receipt {
+          display: none !important;
+        }
+        @media screen {
+          #reprint-thermal-receipt {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
+          }
+        }
         @media print {
           @page {
             size: auto;
@@ -103,21 +115,26 @@ const SalesHistory = () => {
           body * {
             visibility: hidden !important;
           }
-          #reprint-thermal-receipt, #reprint-thermal-receipt * {
-            visibility: visible !important;
-          }
           #reprint-thermal-receipt {
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 78mm !important;
+            width: 71mm !important;
+            max-width: 71mm !important;
+            box-sizing: border-box !important;
             background: white !important;
             color: black !important;
-            padding: 10px !important;
+            padding: 4px 5px !important;
             font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
-            font-size: 13px !important;
+            font-size: 12px !important;
             direction: rtl !important;
             text-align: right !important;
+          }
+          #reprint-thermal-receipt * {
+            visibility: visible !important;
+            box-sizing: border-box !important;
           }
           .receipt-divider {
             border-bottom: 1px dashed #000 !important;
@@ -382,36 +399,84 @@ const SalesHistory = () => {
       {/* Hidden Thermal Reprint Receipt Container (Targeted by @media print) */}
       {reprintReceipt && (
         <div id="reprint-thermal-receipt">
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{storeName}</div>
-          <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>مارکێتی شارەکەم</div>
+
+          {/* Unique Barcode directly below store name */}
+          <div style={{ textAlign: 'center', margin: '4px 0 6px 0' }}>
+            <BarcodeSVG value={`shrm/2026/${String(reprintReceipt.id).padStart(4, '0')}`} maxWidth="62mm" barHeight={52} />
+          </div>
+
           <div className="receipt-divider"></div>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
             <span>ژمارەی وەسڵ:</span>
-            <span>#{reprintReceipt.id}</span>
+            <span style={{ fontWeight: 'bold' }}>#{reprintReceipt.id}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>کڕیار:</span>
-            <span>{reprintReceipt.customer_name}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>بەروار:</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+            <span>بەروار و کات:</span>
             <span>{formatDateTime(reprintReceipt.created_at, { twelveHour: true })}</span>
           </div>
 
           <div className="receipt-divider"></div>
 
-          {/* Items */}
-          <div style={{ margin: '4px 0' }}>
-            {reprintReceipt.items?.map((it, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', margin: '3px 0' }}>
-                <span>{it.product_name} x {it.quantity}</span>
-                <span>{(Number(it.price_at_sale) * Number(it.quantity)).toLocaleString()} دینار</span>
-              </div>
-            ))}
-          </div>
+          {/* 5-Column Grid Table matching Cashier screen (#، کاڵا، بڕ، نرخ، کۆ) with vertical borders */}
+          {/* 5-Column Grid Table matching Cashier screen (#، کاڵا، دانە، نرخ، کۆ) with vertical borders */}
+          <table style={{ 
+            width: '100%', 
+            tableLayout: 'fixed',
+            borderCollapse: 'collapse', 
+            border: '1px solid #000000', 
+            direction: 'rtl',
+            fontSize: '10.5px',
+            margin: '5px 0',
+            boxSizing: 'border-box'
+          }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #000000', background: '#f5f5f5' }}>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '20px' }}>#</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 3px', textAlign: 'right' }}>کاڵا</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '38px' }}>دانە</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '44px' }}>نرخ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '48px' }}>کۆ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reprintReceipt.items?.map((it, idx) => {
+                const qtyVal = Number(it.quantity) || 0;
+                const cleanQty = Number.isInteger(qtyVal) ? qtyVal : parseFloat(qtyVal.toFixed(3));
+                const isGramOrWeight = it.unit === 'گم' || it.unit === 'کگم' || it.unit === 'گرام' || it.unit === 'کیلۆ' || it.unit_type === 'WEIGHT' || String(it.unit || '').includes('گم') || String(it.unit || '').includes('کێش');
+                const isBox = it.unit_type === 'BOX' || it.unit === 'کارتۆن';
+                const displayQty = isGramOrWeight ? `${cleanQty} گم` : (isBox ? `${cleanQty} کارتۆن` : cleanQty);
+                const itemPrice = Number(it.price_at_sale || it.price || 0);
+                const itemTotal = itemPrice * Number(it.quantity || 1);
+                return (
+                  <tr key={idx} style={{ borderBottom: '1px solid #000000' }}>
+                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 3px', textAlign: 'right', fontWeight: 600, overflow: 'hidden', wordBreak: 'break-word' }}>{it.product_name || it.name}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', whiteSpace: 'nowrap' }}>{displayQty}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', whiteSpace: 'nowrap' }}>{itemPrice.toLocaleString()}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{itemTotal.toLocaleString()}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
           <div className="receipt-divider"></div>
+
+          {Number(reprintReceipt.discount || 0) > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                <span>کۆی سەرەتایی:</span>
+                <span>{(Number(reprintReceipt.total_amount) + Number(reprintReceipt.discount)).toLocaleString()} دینار</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                <span>داشکاندن:</span>
+                <span>-{Number(reprintReceipt.discount).toLocaleString()} دینار</span>
+              </div>
+              <div className="receipt-divider"></div>
+            </>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold' }}>
             <span>کۆی گشتی:</span>
@@ -420,28 +485,28 @@ const SalesHistory = () => {
 
           {reprintReceipt.payment_method === 'SPLIT' ? (
             <div style={{ margin: '4px 0', padding: '4px 0', borderTop: '1px dashed #000' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
                 <span>شێوازی پارەدان:</span>
                 <span>فرە-جۆر (تێکەڵ)</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                 <span>دراو بە نەقد:</span>
                 <span>{Number(reprintReceipt.paid_amount || 0).toLocaleString()} دینار</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
                 <span>ماوە بە قەرز:</span>
                 <span>{Number(reprintReceipt.debt_amount || 0).toLocaleString()} دینار</span>
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '2px' }}>
               <span>شێوازی پارەدان:</span>
               <span>{reprintReceipt.payment_method === 'DEBT' ? 'قەرز' : 'نەقد'}</span>
             </div>
           )}
 
           <div className="receipt-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>وەسڵی فەرمیی فرۆشتن (چاپکراوە)</div>
+          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>بەخێربێن بۆ مارکێتی شارەکەم</div>
         </div>
       )}
 

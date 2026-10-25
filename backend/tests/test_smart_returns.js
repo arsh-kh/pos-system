@@ -173,14 +173,86 @@ async function runTests() {
     console.log(`✓ مەخزەنی کارتۆن دوای گەڕاندنەوەی ١ کارتۆن: ${boxProdAfter[0].stock} (١٢ دانە گەڕایەوە بۆ ١٢٠)`);
     if (Number(boxProdAfter[0].stock) !== 120) throw new Error('مەخزەنی گەڕاندنەوەی کارتۆن هەڵەیە!');
 
+    // ==========================================
+    // TEST 4: INVOICE WITH MANUAL DISCOUNT AND PROPORTIONAL RETURN
+    // ==========================================
+    console.log('\n--- تاقیکردنەوەی ٤: گەڕاندنەوەی پسووڵەی داشکاندنکراو بە شێوازی ڕێژەیی (Proportional Discount Return) ---');
+    const barcodeDisc = 'TEST_DISC_' + Date.now();
+    const [pDiscRes] = await db.query(
+      "INSERT INTO Products (name, barcode, cost_price, selling_price, stock) VALUES ('شای عێراقی', ?, 1500, 2500, 100)",
+      [barcodeDisc]
+    );
+    const testDiscProdId = pDiscRes.insertId;
+
+    // Checkout: 10 units x 2,500 = 25,000. Discount = 5,000. Net Total = 20,000
+    const tSale4 = mockReqRes({
+      items: [{ barcode: barcodeDisc, quantity: 10, price: 2500, name: 'شای عێراقی' }],
+      customer_id: null,
+      payment_method: 'CASH',
+      discount_amount: 5000
+    });
+    await checkoutController.processCheckout(tSale4.req, tSale4.res);
+    const saleDiscId = tSale4.getResult().responseData.saleId;
+    console.log(`پسووڵەی داشکاندن تۆمارکرا: #${saleDiscId} (کۆی گشتی: ٢٠،٠٠٠ د.ع دوای داشکاندنی ٥،٠٠٠ د.ع)`);
+
+    // Fetch sale for return via getSaleForReturn
+    const tGetSale = mockReqRes({}, { id: saleDiscId });
+    await returnsController.getSaleForReturn(tGetSale.req, tGetSale.res);
+    const saleForRetData = tGetSale.getResult().responseData.data;
+
+    console.log(`نرخی کڕدراو بە داشکاندنەوە: ${saleForRetData.items[0].effective_unit_price} د.ع (دەبێت 2000 بێت)`);
+    if (saleForRetData.items[0].effective_unit_price !== 2000) {
+      throw new Error(`effective_unit_price دەبێت 2000 بێت بەڵام دەرچوو: ${saleForRetData.items[0].effective_unit_price}`);
+    }
+    if (saleForRetData.remaining_refundable_total !== 20000) {
+      throw new Error(`remaining_refundable_total دەبێت 20000 بێت بەڵام دەرچوو: ${saleForRetData.remaining_refundable_total}`);
+    }
+
+    // Partial Return: 5 units out of 10
+    const tRet4Partial = mockReqRes({
+      sale_id: saleDiscId,
+      product_id: testDiscProdId,
+      quantity: 5,
+      reason: 'گەڕاندنەوەی نیوەی بار',
+      refund_method: 'CASH'
+    });
+    await returnsController.processReturn(tRet4Partial.req, tRet4Partial.res);
+    const partialRefunded = tRet4Partial.getResult().responseData.refunded_amount;
+    console.log(`✓ پارەی گەڕاوە بۆ ٥ دانە: ${partialRefunded} دینار (دەبێت بە تەواوی ١٠،٠٠٠ دینار بێت نەک ١٢،٥٠٠)`);
+    if (partialRefunded !== 10000) {
+      throw new Error(`پارەی گەڕاوەی بەشەکی دەبێت 10000 بێت بەڵام دەرچوو: ${partialRefunded}`);
+    }
+
+    // Remaining Return: 5 units remaining
+    const tRet4Final = mockReqRes({
+      sale_id: saleDiscId,
+      product_id: testDiscProdId,
+      quantity: 5,
+      reason: 'گەڕاندنەوەی ٥ دانەی کۆتایی',
+      refund_method: 'CASH'
+    });
+    await returnsController.processReturn(tRet4Final.req, tRet4Final.res);
+    const finalRefunded = tRet4Final.getResult().responseData.refunded_amount;
+    console.log(`✓ پارەی گەڕاوە بۆ ٥ دانەی دووەم: ${finalRefunded} دینار (دەبێت بە تەواوی ١٠،٠٠٠ دینار بێت)`);
+    if (finalRefunded !== 10000) {
+      throw new Error(`پارەی گەڕاوەی کۆتایی دەبێت 10000 بێت بەڵام دەرچوو: ${finalRefunded}`);
+    }
+
+    // Verify cumulative refunds
+    const [cumRefunds] = await db.query('SELECT SUM(refunded_amount) as total FROM Returns WHERE sale_id = ?', [saleDiscId]);
+    console.log(`✓ کۆی گشتی هەردوو گەڕاندنەوەکە: ${cumRefunds[0].total} دینار (ڕێک دەقاوودەق یەکسانە بە ٢٠،٠٠٠ دینار)`);
+    if (Number(cumRefunds[0].total) !== 20000) {
+      throw new Error(`کۆی گەڕاوە دەبێت 20000 بێت بەڵام دەرچوو: ${cumRefunds[0].total}`);
+    }
+
     // Clean up test data
     console.log('\n--- پاککردنەوەی داتای تاقیکارییەکان ---');
     await db.query('DELETE FROM Customer_Debts WHERE customer_id = ?', [testCustId]);
-    await db.query('DELETE FROM Returns WHERE sale_id IN (?, ?, ?)', [saleDebtId, saleCashId, saleBoxId]);
-    await db.query('DELETE FROM Sale_Items WHERE sale_id IN (?, ?, ?)', [saleDebtId, saleCashId, saleBoxId]);
-    await db.query('DELETE FROM Sales WHERE id IN (?, ?, ?)', [saleDebtId, saleCashId, saleBoxId]);
+    await db.query('DELETE FROM Returns WHERE sale_id IN (?, ?, ?, ?)', [saleDebtId, saleCashId, saleBoxId, saleDiscId]);
+    await db.query('DELETE FROM Sale_Items WHERE sale_id IN (?, ?, ?, ?)', [saleDebtId, saleCashId, saleBoxId, saleDiscId]);
+    await db.query('DELETE FROM Sales WHERE id IN (?, ?, ?, ?)', [saleDebtId, saleCashId, saleBoxId, saleDiscId]);
     await db.query('DELETE FROM Customers WHERE id = ?', [testCustId]);
-    await db.query('DELETE FROM Products WHERE id IN (?, ?)', [testPieceProdId, testBoxProdId]);
+    await db.query('DELETE FROM Products WHERE id IN (?, ?, ?)', [testPieceProdId, testBoxProdId, testDiscProdId]);
     console.log('✓ هەموو داتاکانی تاقیکردنەوە بە خاوێنی سڕدرانەوە.');
     console.log('=== هەموو تاقیکردنەوەکانی زیرەکی گەڕاندنەوە ١٠٠٪ سەرکەوتوو بوون! ===');
     process.exit(0);

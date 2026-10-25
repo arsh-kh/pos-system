@@ -111,3 +111,12 @@
 .pos-product-card button:active {
   transform: scale(0.97);
 }
+
+/* Clean Minimalist Scrollbar / Hide Scrollbar Utility */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

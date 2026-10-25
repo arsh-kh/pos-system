@@ -1,61 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { Search, Plus, Edit2, Trash2, X, Barcode, Printer, Tag, Coins, AlertTriangle, Calendar, Package, Layers } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Barcode, Printer, Tag, Coins, Package, Layers, Scale, ChevronDown } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { useAuth } from '../context/AuthContext';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { normalizeBarcode } from '../utils/barcodeNormalizer';
+import BarcodeSVG from '../components/BarcodeSVG';
 import './Dashboard.css';
-
-// SVG Barcode Component for High-Quality Thermal Print
-const BarcodeSVG = ({ value, width = 220, height = 65 }) => {
-  // Deterministic bar widths pattern based on barcode string
-  const bars = [];
-  const str = String(value || '000000000000');
-  
-  // Guard start pattern
-  bars.push(2, 1, 2, 1);
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i) % 7;
-    if (code === 0) bars.push(1, 2, 1, 2);
-    else if (code === 1) bars.push(2, 1, 1, 2);
-    else if (code === 2) bars.push(1, 1, 2, 2);
-    else if (code === 3) bars.push(2, 2, 1, 1);
-    else if (code === 4) bars.push(1, 2, 2, 1);
-    else if (code === 5) bars.push(3, 1, 1, 1);
-    else bars.push(1, 1, 3, 1);
-  }
-  // Guard end pattern
-  bars.push(2, 1, 2);
-
-  let currentX = 10;
-  const rects = [];
-  bars.forEach((barWidth, index) => {
-    if (index % 2 === 0) {
-      rects.push(
-        <rect
-          key={index}
-          x={currentX}
-          y={0}
-          width={barWidth * 1.5}
-          height={height - 18}
-          fill="#000000"
-        />
-      );
-    }
-    currentX += barWidth * 1.5;
-  });
-
-  return (
-    <div style={{ textAlign: 'center', background: '#ffffff', padding: '6px 8px', borderRadius: '4px', display: 'inline-block' }}>
-      <svg width={width} height={height} viewBox={`0 0 ${currentX + 10} ${height}`} style={{ display: 'block', margin: '0 auto' }}>
-        {rects}
-      </svg>
-      <div style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 'bold', color: '#000000', letterSpacing: '3px', marginTop: '2px' }}>
-        {str}
-      </div>
-    </div>
-  );
-};
 
 const Products = () => {
   const { isAdmin, canCashier } = useAuth();
@@ -70,13 +21,27 @@ const Products = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [categoryInput, setCategoryInput] = useState('');
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const categoryContainerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (categoryContainerRef.current && !categoryContainerRef.current.contains(e.target)) {
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   // Form State
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL'); // 'ALL', 'LOW_STOCK', 'EXPIRING'
   const [formData, setFormData] = useState({
     name: '', barcode: '', cost_price: '', selling_price: '', stock: '', category_id: '',
     wholesale_price: '', expiry_date: '', low_stock_threshold: '5',
-    box_barcode: '', units_per_box: '1'
+    box_barcode: '', units_per_box: '1',
+    is_weighted: false, unit: 'دانە'
   });
 
   // Barcode Printing State
@@ -89,6 +54,10 @@ const Products = () => {
 
   // FIFO Batches Modal State
   const [selectedBatchProduct, setSelectedBatchProduct] = useState(null);
+
+  // Custom Delete Modal State
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [productBatches, setProductBatches] = useState([]);
   const [loadingBatches, setLoadingBatches] = useState(false);
 
@@ -135,21 +104,33 @@ const Products = () => {
 
   // Hardware Wedge Barcode Scanner Listener
   useBarcodeScanner((scannedBarcode) => {
-    setSearchTerm(scannedBarcode);
+    const cleaned = normalizeBarcode(scannedBarcode);
+    if (isModalOpen) {
+      setFormData(prev => ({ ...prev, barcode: cleaned }));
+    } else {
+      setSearchTerm(cleaned);
+    }
   });
 
   const openAddModal = () => {
     setEditId(null);
+    setCategoryInput('');
+    setIsCategoryOpen(false);
     setFormData({ 
       name: '', barcode: '', cost_price: '', selling_price: '', stock: '', category_id: '',
       wholesale_price: '', expiry_date: '', low_stock_threshold: '5',
-      box_barcode: '', units_per_box: '1' 
+      box_barcode: '', units_per_box: '1',
+      is_weighted: false, unit: 'دانە'
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (p) => {
     setEditId(p.id);
+    const isW = Boolean(p.is_weighted || p.unit === 'کگم');
+    const existingCat = categories.find(c => String(c.id) === String(p.category_id));
+    setCategoryInput(existingCat ? existingCat.name : (p.category_name || ''));
+    setIsCategoryOpen(false);
     setFormData({
       name: p.name, 
       barcode: p.barcode, 
@@ -161,10 +142,17 @@ const Products = () => {
       expiry_date: p.expiry_date ? p.expiry_date.split('T')[0] : '',
       low_stock_threshold: p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? p.low_stock_threshold.toString() : '5',
       box_barcode: p.box_barcode || '',
-      units_per_box: p.units_per_box ? p.units_per_box.toString() : '1'
+      units_per_box: p.units_per_box ? p.units_per_box.toString() : '1',
+      is_weighted: isW,
+      unit: isW ? 'کگم' : (p.unit || 'دانە')
     });
     setIsModalOpen(true);
   };
+
+  const filteredCategories = useMemo(() => {
+    if (!categoryInput.trim()) return categories;
+    return categories.filter(c => kurdishSearchMatch(c.name, categoryInput));
+  }, [categories, categoryInput]);
 
   const generateBarcode = () => {
     // Generates a random 12-digit barcode for unbarcoded items
@@ -182,15 +170,51 @@ const Products = () => {
     e.preventDefault();
     try {
       const config = getAuthConfig();
+
+      // Resolve category: support typing or selecting category
+      let finalCategoryId = formData.category_id || null;
+      const trimmedCat = categoryInput.trim();
+      if (trimmedCat) {
+        const found = categories.find(c => c.name.trim().toLowerCase() === trimmedCat.toLowerCase());
+        if (found) {
+          finalCategoryId = found.id;
+        } else {
+          try {
+            const catRes = await axios.post('http://localhost:3001/api/categories', { name: trimmedCat }, config);
+            if (catRes.data?.data?.id) {
+              finalCategoryId = catRes.data.data.id;
+              setCategories(prev => {
+                if (prev.some(x => x.id === catRes.data.data.id)) return prev;
+                return [...prev, catRes.data.data];
+              });
+            }
+          } catch (catErr) {
+            console.error('Failed to auto-create category:', catErr);
+          }
+        }
+      } else {
+        finalCategoryId = null;
+      }
+
+      let finalBarcode = formData.barcode ? String(formData.barcode).trim() : '';
+      if (!finalBarcode) {
+        alert('تکایە بارکۆد بنووسە یان دروستی بکە');
+        return;
+      }
+
       const payload = {
         ...formData,
+        category_id: finalCategoryId,
+        barcode: finalBarcode,
         cost_price: formData.cost_price ? Number(formData.cost_price) : 0,
         stock: formData.stock ? parseFloat(formData.stock) : 0,
-        wholesale_price: formData.wholesale_price ? Number(formData.wholesale_price) : 0,
-        expiry_date: formData.expiry_date || null,
+        wholesale_price: (!formData.is_weighted && formData.wholesale_price) ? Number(formData.wholesale_price) : 0,
+        expiry_date: (!formData.is_weighted && formData.expiry_date) ? formData.expiry_date : null,
         low_stock_threshold: formData.low_stock_threshold !== undefined && formData.low_stock_threshold !== '' ? parseInt(formData.low_stock_threshold) : 5,
-        box_barcode: formData.box_barcode && formData.box_barcode.trim() !== '' ? formData.box_barcode.trim() : null,
-        units_per_box: formData.units_per_box ? Math.max(1, parseFloat(formData.units_per_box)) : 1
+        box_barcode: (!formData.is_weighted && formData.box_barcode && formData.box_barcode.trim() !== '') ? formData.box_barcode.trim() : null,
+        units_per_box: (!formData.is_weighted && formData.units_per_box) ? Math.max(1, parseFloat(formData.units_per_box)) : 1,
+        is_weighted: formData.is_weighted ? 1 : 0,
+        unit: formData.is_weighted ? 'کگم' : 'دانە'
       };
       if (editId) {
         await axios.put(`http://localhost:3001/api/products/${editId}`, payload, config);
@@ -204,14 +228,17 @@ const Products = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('دڵنیایت لە سڕینەوەی ئەم کاڵایە؟')) {
-      try {
-        await axios.delete(`http://localhost:3001/api/products/${id}`, getAuthConfig());
-        fetchData();
-      } catch {
-        alert('هەڵەیەک ڕوویدا لە کاتی سڕینەوەی کاڵاکە');
-      }
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      await axios.delete(`http://localhost:3001/api/products/${productToDelete.id}`, getAuthConfig());
+      setProductToDelete(null);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی سڕینەوەی کاڵاکە');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -223,7 +250,9 @@ const Products = () => {
 
   // Trigger Native Thermal Print
   const handlePrintLabels = () => {
-    window.print();
+    setTimeout(() => {
+      window.print();
+    }, 150);
   };
 
   // Low Stock and Expiry counts
@@ -275,7 +304,7 @@ const Products = () => {
   });
 
   return (
-    <div className="dashboard-page p-8" style={{ position: 'relative' }}>
+    <div className="dashboard-page" style={{ position: 'relative', padding: '10px 14px 20px 14px' }}>
       
       {/* Print-Only Style Sheet for Barcode Thermal Sticker Roll */}
       <style>{`
@@ -308,11 +337,6 @@ const Products = () => {
             height: 30mm !important;
             page-break-inside: avoid !important;
             border: 1px dashed #ccc !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-            align-items: center !important;
             padding: 2mm !important;
             direction: rtl !important;
             font-family: 'Noto Kufi Arabic', system-ui, sans-serif !important;
@@ -320,463 +344,807 @@ const Products = () => {
         }
       `}</style>
 
-      {/* Header */}
-      <div className="header mb-8" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Tag color="var(--accent-color)" size={32} />
+      {/* Header & Balanced Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+        {/* Right side: Title + Search Input + Category Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
             بەشی کاڵاکان
           </h1>
-          <p className="text-secondary">بینین، گەڕان، بەڕێوەبردنی نرخ و ئامادەکردنی بارکۆد بۆ چاپ</p>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Quick Search */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 1rem', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-            <Search size={20} color="var(--text-muted)" />
+
+          {/* Quick Search (36px) */}
+          <div style={{ 
+            position: 'relative', 
+            display: 'flex', 
+            alignItems: 'center', 
+            height: '36px', 
+            background: 'var(--bg-secondary)', 
+            border: '1px solid var(--border-color)', 
+            borderRadius: '8px', 
+            padding: '0 10px',
+            width: '210px',
+            boxSizing: 'border-box'
+          }}>
+            <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0 }} />
             <input 
               type="text" 
               placeholder="گەڕان بە ناو یان بارکۆد..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', marginRight: '10px', outline: 'none', width: '220px', fontSize: '0.92rem' }}
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                color: 'var(--text-primary)', 
+                marginRight: '6px', 
+                outline: 'none', 
+                width: '100%', 
+                fontSize: '0.84rem' 
+              }}
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={16} />
+              <button 
+                type="button"
+                onClick={() => setSearchTerm('')} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}
+              >
+                <X size={14} />
               </button>
             )}
           </div>
 
-
-          
-          {/* Add New Product Button */}
-          <button 
-            className="btn-primary" 
-            onClick={openAddModal} 
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: 'var(--accent-color)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+          {/* Category Select Dropdown (36px) */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{
+              height: '36px',
+              padding: '0 10px',
+              borderRadius: '8px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              outline: 'none',
+              cursor: 'pointer',
+              boxSizing: 'border-box'
+            }}
           >
-            <Plus size={20} /> کاڵای نوێ
+            <option value="ALL">هەموو جۆرەکان ({products.length})</option>
+            {categories.map(cat => {
+              const count = products.filter(p => String(p.category_id) === String(cat.id)).length;
+              return (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} ({count})
+                </option>
+              );
+            })}
+          </select>
+        </div>
+
+        {/* Left side: Status Filters (Pills) + "+ کاڵای نوێ" Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Compact Status Filter Pills (Small Segmented Control) */}
+          <div style={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            background: 'var(--bg-secondary)', 
+            border: '1px solid var(--border-color)', 
+            borderRadius: '8px', 
+            padding: '2px',
+            height: '36px',
+            boxSizing: 'border-box'
+          }}>
+            <button
+              type="button"
+              onClick={() => setStockStatusFilter('ALL')}
+              style={{
+                height: '30px',
+                padding: '0 10px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                background: stockStatusFilter === 'ALL' ? 'var(--primary-color)' : 'transparent',
+                color: stockStatusFilter === 'ALL' ? '#ffffff' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              هەموو ({products.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockStatusFilter('LOW_STOCK')}
+              style={{
+                height: '30px',
+                padding: '0 10px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                background: stockStatusFilter === 'LOW_STOCK' ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
+                color: stockStatusFilter === 'LOW_STOCK' ? '#f59e0b' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              بەرەو تەواوبوون ({lowStockCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStockStatusFilter('EXPIRING')}
+              style={{
+                height: '30px',
+                padding: '0 10px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                background: stockStatusFilter === 'EXPIRING' ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                color: stockStatusFilter === 'EXPIRING' ? '#ef4444' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              بەسەرچوون ({expiringCount})
+            </button>
+          </div>
+
+          {/* Add New Product Button (36px) */}
+          <button 
+            type="button"
+            onClick={openAddModal} 
+            style={{ 
+              height: '36px',
+              padding: '0 14px', 
+              borderRadius: '8px', 
+              background: 'var(--primary-color)', 
+              color: '#ffffff', 
+              border: 'none', 
+              cursor: 'pointer', 
+              fontWeight: 800,
+              fontSize: '0.86rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              boxSizing: 'border-box'
+            }}
+          >
+            <Plus size={16} /> کاڵای نوێ
           </button>
         </div>
       </div>
 
-      {/* Quick Status Filters: All, Low Stock, Expiring */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setStockStatusFilter('ALL')}
-          style={{
-            padding: '8px 18px',
-            borderRadius: '12px',
-            border: stockStatusFilter === 'ALL' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
-            background: stockStatusFilter === 'ALL' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-tertiary)',
-            color: stockStatusFilter === 'ALL' ? 'var(--accent-hover)' : 'var(--text-secondary)',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          هەموو دۆخەکان ({products.length})
-        </button>
-
-        <button
-          onClick={() => setStockStatusFilter('LOW_STOCK')}
-          style={{
-            padding: '8px 18px',
-            borderRadius: '12px',
-            border: stockStatusFilter === 'LOW_STOCK' ? '2px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.2)',
-            background: stockStatusFilter === 'LOW_STOCK' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.08)',
-            color: '#f59e0b',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <AlertTriangle size={16} /> بەرەو تەواوبوون ({lowStockCount})
-        </button>
-
-        <button
-          onClick={() => setStockStatusFilter('EXPIRING')}
-          style={{
-            padding: '8px 18px',
-            borderRadius: '12px',
-            border: stockStatusFilter === 'EXPIRING' ? '2px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.2)',
-            background: stockStatusFilter === 'EXPIRING' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.08)',
-            color: '#ef4444',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <Calendar size={16} /> بەسەرچوون / نزیک ({expiringCount})
-        </button>
-      </div>
-
-      {/* Category Filter Tabs */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '1rem', marginBottom: '1rem', scrollbarWidth: 'none' }}>
-        <button
-          onClick={() => setSelectedCategory('ALL')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '10px',
-            border: 'none',
-            cursor: 'pointer',
-            fontWeight: selectedCategory === 'ALL' ? 'bold' : 'normal',
-            background: selectedCategory === 'ALL' ? '#3b82f6' : 'var(--bg-tertiary)',
-            color: selectedCategory === 'ALL' ? '#ffffff' : 'var(--text-secondary)',
-            transition: 'all 0.2s'
-          }}
-        >
-          هەموو کاڵاکان ({products.length})
-        </button>
-        {categories.map(cat => {
-          const count = products.filter(p => String(p.category_id) === String(cat.id)).length;
-          const isActive = String(selectedCategory) === String(cat.id);
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '10px',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: isActive ? 'bold' : 'normal',
-                background: isActive ? 'var(--accent-color)' : 'var(--bg-tertiary)',
-                color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {cat.name} ({count})
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Products Table */}
-      <div className="glass-panel" style={{ padding: '1px', borderRadius: '16px', overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <thead style={{ background: 'var(--bg-tertiary)' }}>
-            <tr>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>ناوی کاڵا</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کەتەگۆری</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>بارکۆد (دانە / کارتۆن)</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی کڕین (دینار)</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی فرۆشتن (تاک)</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی جوملە (کارتۆن)</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کۆگا</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>بەرواری بەسەرچوون</th>
-              <th style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کردارەکان</th>
+      {/* Products Table (Strict RTL Compact Data Grid Standards, 8 Columns, 38px Row Height) */}
+      <div style={{ borderRadius: '10px', border: '1px solid var(--border-color)', overflow: 'hidden', background: 'var(--bg-secondary)' }}>
+        <table style={{ width: '100%', tableLayout: 'auto', borderCollapse: 'collapse', border: '1px solid var(--border-color)', direction: 'rtl' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-tertiary)', height: '36px' }}>
+              <th style={{ border: '1px solid var(--border-color)', width: '24%', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>کاڵا</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '130px', maxWidth: '140px', padding: '6px 8px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>بارکۆد</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '12%', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>جۆر</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '10%', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>نرخی کڕین</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '10%', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>نرخی فرۆشتن</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '10%', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>کۆگا</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '11%', padding: '6px 10px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>بەرواری بەسەرچوون</th>
+              <th style={{ border: '1px solid var(--border-color)', width: '11%', padding: '6px 8px', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>کردارەکان</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>باردەکرێت...</td></tr>
+              <tr><td colSpan="8" style={{ border: '1px solid var(--border-color)', padding: '25px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.86rem' }}>باردەکرێت...</td></tr>
             ) : filteredProducts.length === 0 ? (
-              <tr><td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>هیچ کاڵایەک نەدۆزرایەوە</td></tr>
+              <tr><td colSpan="8" style={{ border: '1px solid var(--border-color)', padding: '25px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.86rem' }}>هیچ کاڵایەک نەدۆزرایەوە</td></tr>
             ) : (
-              filteredProducts.map(p => (
-                <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='var(--bg-tertiary)'} onMouseOut={e => e.currentTarget.style.background='transparent'}>
-                  <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>{p.name}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem' }}>
+              filteredProducts.map(p => {
+                const isWeighted = Boolean(p.is_weighted || p.unit === 'کگم');
+                const unitLabel = isWeighted ? 'کگم' : (p.unit || 'دانە');
+                const rawStock = Number(p.stock) || 0;
+                const threshold = p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? Number(p.low_stock_threshold) : 5;
+                const isLow = rawStock <= threshold;
+
+                let formattedStock = '';
+                if (isWeighted) {
+                  const cleanNum = parseFloat(rawStock.toFixed(2));
+                  formattedStock = cleanNum.toLocaleString('en-US', { maximumFractionDigits: 2 });
+                } else {
+                  const roundedInt = Math.round(rawStock);
+                  formattedStock = roundedInt.toLocaleString('en-US');
+                }
+
+                let isExpired = false;
+                let isNearExpiry = false;
+                if (p.expiry_date) {
+                  const now = new Date(); now.setHours(0,0,0,0);
+                  const exp = new Date(p.expiry_date); exp.setHours(0,0,0,0);
+                  const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+                  if (diffDays <= 0) isExpired = true;
+                  else if (diffDays <= 30) isNearExpiry = true;
+                }
+
+                return (
+                  <tr 
+                    key={p.id} 
+                    style={{ 
+                      height: 'auto',
+                      minHeight: '38px',
+                      transition: 'background 0.12s ease'
+                    }} 
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} 
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* 1. کاڵا (Center-aligned with multi-line text wrapping) */}
+                    <td style={{ 
+                      border: '1px solid var(--border-color)', 
+                      padding: '6px 10px', 
+                      verticalAlign: 'middle', 
+                      textAlign: 'center', 
+                      whiteSpace: 'normal', 
+                      wordWrap: 'break-word', 
+                      overflowWrap: 'anywhere', 
+                      lineHeight: 1.4 
+                    }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-primary)' }}>
+                        {p.name}
+                      </span>
+                    </td>
+
+                    {/* 2. بارکۆد (Compact 130px max 140px, 12px font) */}
+                    <td style={{ 
+                      border: '1px solid var(--border-color)', 
+                      width: '130px', 
+                      maxWidth: '140px', 
+                      padding: '6px 8px', 
+                      verticalAlign: 'middle', 
+                      textAlign: 'center', 
+                      whiteSpace: 'nowrap', 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis' 
+                    }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        {p.barcode}
+                      </span>
+                    </td>
+
+                    {/* 3. جۆر */}
+                    <td style={{ border: '1px solid var(--border-color)', padding: '6px 10px', color: 'var(--text-secondary)', fontSize: '0.82rem', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.category_name || 'بێ جۆر'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: 'bold' }}>{p.barcode}</div>
-                    {p.box_barcode && (
-                      <div style={{ fontFamily: 'monospace', color: '#0284c7', fontSize: '0.75rem', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Package size={12} /> {p.box_barcode}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>
-                    {canViewCost ? `${Number(p.cost_price || 0).toLocaleString()} دینار` : '••••••'}
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ color: '#10b981', fontWeight: 'bold' }}>{Number(p.selling_price).toLocaleString()} دینار</div>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    {p.wholesale_price > 0 ? (
-                      <div>
-                        <div style={{ color: '#0284c7', fontWeight: 'bold' }}>{Number(p.wholesale_price).toLocaleString()} دینار</div>
-                        <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                          کارتۆنی {p.units_per_box ? Number(p.units_per_box) : 1} دانەیی
-                        </small>
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>-</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    {(() => {
-                      const threshold = p.low_stock_threshold !== undefined && p.low_stock_threshold !== null ? Number(p.low_stock_threshold) : 5;
-                      const isLow = Number(p.stock) <= threshold;
-                      const unitsPerBox = p.units_per_box ? Number(p.units_per_box) : 1;
-                      const boxCount = unitsPerBox > 1 ? Math.floor(Number(p.stock) / unitsPerBox) : null;
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <span style={{ 
-                            background: isLow ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)', 
-                            color: isLow ? '#ef4444' : '#10b981', 
-                            padding: '4px 10px', 
-                            borderRadius: '6px', 
-                            fontWeight: 'bold',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            width: 'fit-content'
-                          }}>
-                            {isLow && <AlertTriangle size={13} />}
-                            {p.stock} دانە
-                          </span>
-                          {boxCount !== null && (
-                            <small style={{ color: '#38bdf8', fontSize: '0.74rem', fontWeight: 'bold' }}>
-                              ≈ {boxCount} کارتۆن
-                            </small>
-                          )}
-                          {isLow && (
-                            <small style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 'bold' }}>بەرەو تەواوبوون</small>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    {(() => {
-                      if (!p.expiry_date) return <span style={{ color: 'var(--text-muted)' }}>-</span>;
-                      const now = new Date();
-                      now.setHours(0,0,0,0);
-                      const exp = new Date(p.expiry_date);
-                      exp.setHours(0,0,0,0);
-                      const diff = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
-                      const dateStr = p.expiry_date.split('T')[0];
-                      if (diff < 0) {
-                        return (
-                          <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                            ❌ بەسەرچووە ({dateStr})
-                          </span>
-                        );
-                      } else if (diff <= 30) {
-                        return (
-                          <span style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                            ⏳ {diff} ڕۆژ ماوە ({dateStr})
-                          </span>
-                        );
-                      } else {
-                        return (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                            {dateStr}
-                          </span>
-                        );
-                      }
-                    })()}
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      {/* FIFO Batches Button */}
-                      <button 
-                        title="وەجبەکانی FIFO و تێچوون" 
-                        onClick={() => openBatchesModal(p)} 
-                        style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
-                      >
-                        <Layers size={14} /> وەجبەکان
-                      </button>
-                      {/* Print Barcode Label Button */}
-                      <button 
-                        title="چاپی لەزگەی بارکۆد" 
-                        onClick={() => openPrintModal(p)} 
-                        style={{ background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '0.78rem' }}
-                      >
-                        <Printer size={14} /> چاپ
-                      </button>
-                      {/* Edit Button */}
-                      <button 
-                        title="دەستکاریکردن"
-                        onClick={() => openEditModal(p)} 
-                        style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: 'none', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <Edit2 size={15} />
-                      </button>
-                      {/* Delete Button (Admin Only) */}
-                      {isAdmin && (
-                        <button 
-                          title="سڕینەوە"
-                          onClick={() => handleDelete(p.id)} 
-                          style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'none', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                    </td>
+
+                    {/* 4. نرخی کڕین */}
+                    <td style={{ border: '1px solid var(--border-color)', padding: '6px 10px', color: 'var(--text-secondary)', fontSize: '0.84rem', fontWeight: 600, verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {canViewCost ? Number(p.cost_price || 0).toLocaleString() : '••••••'}
+                    </td>
+
+                    {/* 5. نرخی فرۆشتن */}
+                    <td style={{ border: '1px solid var(--border-color)', padding: '6px 10px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: 'var(--success-color)', fontWeight: 800, fontSize: '0.86rem' }}>
+                        {Number(p.selling_price).toLocaleString()}
+                      </span>
+                    </td>
+
+                    {/* 6. کۆگا (Formatted with thousand separators & integer piece rounding) */}
+                    <td style={{ border: '1px solid var(--border-color)', padding: '6px 10px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.84rem', color: isLow ? '#ef4444' : 'var(--text-primary)' }}>
+                        {formattedStock} {unitLabel}
+                      </span>
+                    </td>
+
+                    {/* 7. بەرواری بەسەرچوون */}
+                    <td style={{ border: '1px solid var(--border-color)', padding: '6px 10px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {p.expiry_date ? (
+                        <span style={{ 
+                          fontFamily: 'monospace', 
+                          fontSize: '0.82rem', 
+                          fontWeight: 600, 
+                          color: isExpired ? '#ef4444' : isNearExpiry ? '#f59e0b' : 'var(--text-secondary)' 
+                        }}>
+                          {String(p.expiry_date).split('T')[0]}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>-</span>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+
+                    {/* 8. کردارەکان */}
+                    <td style={{ border: '1px solid var(--border-color)', padding: '6px 8px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '3px', alignItems: 'center', justifyContent: 'center' }}>
+                        {/* FIFO Batches Button */}
+                        <button 
+                          type="button"
+                          title="وەجبەکانی FIFO" 
+                          onClick={() => openBatchesModal(p)} 
+                          style={{ 
+                            width: '28px', 
+                            height: '28px', 
+                            borderRadius: '6px', 
+                            border: 'none', 
+                            background: 'transparent', 
+                            color: 'var(--text-muted)', 
+                            cursor: 'pointer', 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            transition: 'all 0.12s ease'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#10b981'; e.currentTarget.style.background = 'rgba(16, 185, 129, 0.12)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <Layers size={15} />
+                        </button>
+
+                        {/* Print Barcode Label Button */}
+                        <button 
+                          type="button"
+                          title="چاپی لەزگەی بارکۆد" 
+                          onClick={() => openPrintModal(p)} 
+                          style={{ 
+                            width: '28px', 
+                            height: '28px', 
+                            borderRadius: '6px', 
+                            border: 'none', 
+                            background: 'transparent', 
+                            color: 'var(--text-muted)', 
+                            cursor: 'pointer', 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            transition: 'all 0.12s ease'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#0284c7'; e.currentTarget.style.background = 'rgba(2, 132, 199, 0.12)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <Printer size={15} />
+                        </button>
+
+                        {/* Edit Button */}
+                        <button 
+                          type="button"
+                          title="دەستکاریکردن"
+                          onClick={() => openEditModal(p)} 
+                          style={{ 
+                            width: '28px', 
+                            height: '28px', 
+                            borderRadius: '6px', 
+                            border: 'none', 
+                            background: 'transparent', 
+                            color: 'var(--text-muted)', 
+                            cursor: 'pointer', 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            transition: 'all 0.12s ease'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-color)'; e.currentTarget.style.background = 'rgba(37, 99, 235, 0.12)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <Edit2 size={15} />
+                        </button>
+
+                        {/* Delete Button (Admin Only) */}
+                        {isAdmin && (
+                          <button 
+                            type="button"
+                            title="سڕینەوە"
+                            onClick={() => setProductToDelete(p)} 
+                            style={{ 
+                              width: '28px', 
+                              height: '28px', 
+                              borderRadius: '6px', 
+                              border: 'none', 
+                              background: 'transparent', 
+                              color: 'var(--text-muted)', 
+                              cursor: 'pointer', 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              transition: 'all 0.12s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Add / Edit Product Modal */}
+      {/* Add / Edit Product Modal (Ultra-Clean Wide Zero-Scroll Layout) */}
       {isModalOpen && (
         <div className="pos-modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="pos-modal-card pos-modal-lg" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '1.2rem', fontWeight: 800 }}>
-                <Tag color="var(--accent-color)" />
+          <div 
+            className="pos-modal-card pos-modal-product" 
+            onClick={e => e.stopPropagation()}
+            style={{ 
+              maxWidth: '820px', 
+              width: '92%', 
+              padding: '20px 24px', 
+              overflow: 'visible',
+              background: '#ffffff',
+              direction: 'rtl',
+              borderRadius: '16px',
+              border: '1px solid #cbd5e1'
+            }}
+          >
+            {/* Header Row: Title on right, Unit Switcher + Close Button on left */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #e2e8f0' }}>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>
                 {editId ? 'دەستکاریکردنی کاڵا' : 'زیادکردنی کاڵای نوێ'}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18}/>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Compact segmented toggle for unit type (height: 34px, no icons) */}
+                <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1', height: '34px', boxSizing: 'border-box' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, is_weighted: false, unit: 'دانە' }))}
+                    style={{
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: !formData.is_weighted ? '#2563eb' : 'transparent',
+                      color: !formData.is_weighted ? '#ffffff' : '#64748b',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    بە دانە
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, is_weighted: true, unit: 'کگم' }))}
+                    style={{
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: formData.is_weighted ? '#2563eb' : 'transparent',
+                      color: formData.is_weighted ? '#ffffff' : '#64748b',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    بە کێش (کگم)
+                  </button>
+                </div>
+
+                {/* Close Button */}
+                <button 
+                  type="button"
+                  onClick={() => setIsModalOpen(false)} 
+                  style={{ 
+                    background: '#f1f5f9', 
+                    border: '1px solid #cbd5e1', 
+                    color: '#64748b', 
+                    cursor: 'pointer', 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '8px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    lineHeight: 1
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="responsive-grid-2">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Row 1: Basic Info (3-Column Grid: 1.5fr 1fr 1.5fr, gap 12px) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.5fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>ناوی کاڵا <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                    ناوی کاڵا <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input 
                     type="text" 
                     required 
                     value={formData.name} 
                     onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
+                    style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>کەتەگۆری</label>
-                  <select 
-                    value={formData.category_id} 
-                    onChange={e => setFormData({ ...formData, category_id: e.target.value })} 
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="">هەڵبژێرە...</option>
-                    {categories.map(c => <option key={c.id} value={c.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{c.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
-                  بارکۆد (Barcode) <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="بارکۆد بنووسە یان سکانی بکە..."
-                    value={formData.barcode} 
-                    onChange={e => setFormData({ ...formData, barcode: e.target.value })} 
-                    style={{ flex: '1 1 200px', minWidth: '150px', padding: '12px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '1px' }} 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={generateBarcode} 
-                    style={{ background: 'rgba(37, 99, 235, 0.12)', color: 'var(--accent-color)', border: '1px solid rgba(37, 99, 235, 0.3)', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', flexShrink: 0 }}
-                  >
-                    <Barcode size={18} /> دروستکردنی بارکۆد
-                  </button>
-                </div>
-                <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  ئەگەر کاڵاکە بارکۆدی نییە، کلیک لەسەر «دروستکردنی بارکۆد» بکە بۆ دروستکردنی بارکۆدی ١٢ ژمارەیی.
-                </small>
-              </div>
-
-              {/* Pricing Section (Iraqi Dinar Only) */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Coins size={18} color="#10b981" /> دیاریکردنی نرخەکان (دیناری عێراقی)
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>نرخی کڕین (دینار)</label>
+                
+                {/* Searchable and Typeable Category Combobox */}
+                <div style={{ position: 'relative' }} ref={categoryContainerRef}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                    جۆر
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input 
-                      type="number" 
-                      step="250"
-                      min="0"
-                      placeholder="0"
-                      value={formData.cost_price} 
-                      onChange={e => setFormData({ ...formData, cost_price: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
+                      type="text" 
+                      placeholder="جۆر هەڵبژێرە..."
+                      value={categoryInput} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setCategoryInput(val);
+                        setIsCategoryOpen(true);
+                        const match = categories.find(c => c.name.trim().toLowerCase() === val.trim().toLowerCase());
+                        setFormData(prev => ({ ...prev, category_id: match ? match.id : '' }));
+                      }} 
+                      onFocus={() => setIsCategoryOpen(true)}
+                      style={{ 
+                        width: '100%', 
+                        height: '38px',
+                        padding: '0 26px 0 10px', 
+                        borderRadius: '8px', 
+                        background: '#ffffff', 
+                        border: isCategoryOpen ? '1px solid #2563eb' : '1px solid #cbd5e1', 
+                        color: '#1e293b',
+                        boxSizing: 'border-box',
+                        fontSize: '0.88rem'
+                      }} 
                     />
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryOpen(prev => !prev)}
+                      style={{
+                        position: 'absolute',
+                        left: '6px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        fontSize: '10px'
+                      }}
+                    >
+                      ▼
+                    </button>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#059669', fontWeight: 'bold' }}>نرخی فرۆشتنی تاک (دینار) <span style={{ color: '#ef4444' }}>*</span></label>
-                    <input 
-                      type="number" 
-                      step="250"
-                      min="0"
-                      required 
-                      value={formData.selling_price} 
-                      onChange={e => setFormData({ ...formData, selling_price: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1.5px solid rgba(16, 185, 129, 0.4)', color: '#059669', fontWeight: 'bold' }} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Packaging & Wholesale / Carton Section */}
-              <div style={{ background: 'rgba(2, 132, 199, 0.06)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(2, 132, 199, 0.25)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Package size={18} color="#0284c7" /> فرۆشتنی فرە-جۆر / کارتۆن و سێت (Wholesale / Box)
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1', fontSize: '0.88rem' }}>
-                      بارکۆدی کارتۆن (Box Barcode)
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="بارکۆدی سەر کارتۆن..."
-                        value={formData.box_barcode} 
-                        onChange={e => setFormData({ ...formData, box_barcode: e.target.value })} 
-                        style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid rgba(2, 132, 199, 0.35)', color: '#0284c7', fontFamily: 'monospace' }} 
-                      />
-                      <button 
-                        type="button" 
-                        onClick={generateBoxBarcode} 
-                        title="دروستکردنی بارکۆدی کارتۆن"
-                        style={{ background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', border: '1px solid rgba(2, 132, 199, 0.35)', padding: '0 10px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 'bold' }}
+                  {/* Dropdown Menu */}
+                  {isCategoryOpen && (
+                    <div 
+                      style={{ 
+                        position: 'absolute', 
+                        top: '100%', 
+                        right: 0, 
+                        left: 0, 
+                        marginTop: '4px', 
+                        background: '#ffffff', 
+                        border: '1px solid #cbd5e1', 
+                        borderRadius: '8px', 
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.15)', 
+                        maxHeight: '190px', 
+                        overflowY: 'auto', 
+                        zIndex: 100, 
+                        padding: '4px' 
+                      }}
+                    >
+                      <div 
+                        onClick={() => {
+                          setCategoryInput('');
+                          setFormData(prev => ({ ...prev, category_id: '' }));
+                          setIsCategoryOpen(false);
+                        }}
+                        style={{ padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', color: '#94a3b8', fontSize: '0.85rem' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        ⚡ دروستکردن
-                      </button>
-                    </div>
-                  </div>
+                        (بێ جۆر)
+                      </div>
 
+                      {filteredCategories.map(c => {
+                        const isSelected = String(formData.category_id) === String(c.id) || categoryInput.trim().toLowerCase() === c.name.trim().toLowerCase();
+                        return (
+                          <div 
+                            key={c.id} 
+                            onClick={() => {
+                              setCategoryInput(c.name);
+                              setFormData(prev => ({ ...prev, category_id: c.id }));
+                              setIsCategoryOpen(false);
+                            }}
+                            style={{ 
+                              padding: '8px 12px', 
+                              borderRadius: '6px', 
+                              cursor: 'pointer', 
+                              fontWeight: isSelected ? 'bold' : 'normal',
+                              background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                              color: isSelected ? '#2563eb' : '#1e293b',
+                              fontSize: '0.88rem'
+                            }}
+                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
+                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <span>{c.name}</span>
+                          </div>
+                        );
+                      })}
+
+                      {categoryInput.trim() && !categories.some(c => c.name.trim().toLowerCase() === categoryInput.trim().toLowerCase()) && (
+                        <div 
+                          onClick={async () => {
+                            const newName = categoryInput.trim();
+                            try {
+                              const config = getAuthConfig();
+                              const res = await axios.post('http://localhost:3001/api/categories', { name: newName }, config);
+                              if (res.data?.data) {
+                                const createdCat = res.data.data;
+                                setCategories(prev => {
+                                  if (prev.some(x => x.id === createdCat.id)) return prev;
+                                  return [...prev, createdCat];
+                                });
+                                setFormData(prev => ({ ...prev, category_id: createdCat.id }));
+                                setCategoryInput(createdCat.name);
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                            setIsCategoryOpen(false);
+                          }}
+                          style={{ 
+                            padding: '9px 12px', 
+                            borderRadius: '6px', 
+                            cursor: 'pointer', 
+                            background: 'rgba(16, 185, 129, 0.1)', 
+                            color: '#10b981', 
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem',
+                            marginTop: '4px',
+                            borderTop: '1px solid #e2e8f0'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.16)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+                        >
+                          + زیادکردنی جۆری نوێ: «{categoryInput.trim()}»
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                    بارکۆد <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="بارکۆد..."
+                      value={formData.barcode} 
+                      onChange={e => setFormData({ ...formData, barcode: normalizeBarcode(e.target.value) })} 
+                      style={{ 
+                        width: '100%', 
+                        height: '38px', 
+                        padding: '0 80px 0 10px', 
+                        borderRadius: '8px', 
+                        background: '#ffffff', 
+                        border: '1px solid #cbd5e1', 
+                        color: '#1e293b', 
+                        fontFamily: 'monospace', 
+                        fontSize: '0.86rem', 
+                        boxSizing: 'border-box' 
+                      }} 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={generateBarcode} 
+                      style={{
+                        position: 'absolute',
+                        left: '4px',
+                        top: '4px',
+                        bottom: '4px',
+                        padding: '0 10px',
+                        background: '#eff6ff',
+                        color: '#2563eb',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      دروستکردن
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Pricing & Inventory (4 Columns for Weight, 5 Columns for Piece) */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: formData.is_weighted ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)', 
+                gap: '12px' 
+              }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                    {formData.is_weighted ? 'نرخی کڕینی ١ کیلۆ' : 'نرخی کڕینی تاک'}
+                  </label>
+                  <input 
+                    type="number" 
+                    step="250"
+                    min="0"
+                    placeholder="0"
+                    value={formData.cost_price} 
+                    onChange={e => setFormData({ ...formData, cost_price: e.target.value })} 
+                    style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                    {formData.is_weighted ? 'نرخی فرۆشتنی ١ کیلۆ' : 'نرخی فرۆشتنی تاک'} <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    step="250"
+                    min="0"
+                    required 
+                    placeholder="0"
+                    value={formData.selling_price} 
+                    onChange={e => setFormData({ ...formData, selling_price: e.target.value })} 
+                    style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                    {formData.is_weighted ? 'کێش لە کۆگا (کگم)' : 'دانە لە کۆگا'}
+                  </label>
+                  <input 
+                    type="number" 
+                    step={formData.is_weighted ? '0.001' : '1'}
+                    placeholder="0"
+                    value={formData.stock} 
+                    onChange={e => setFormData({ ...formData, stock: e.target.value })} 
+                    style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                    {formData.is_weighted ? 'ئاگاداری کەمبوونەوە (کگم)' : 'ئاگاداری کەمبوونەوە (دانە)'}
+                  </label>
+                  <input 
+                    type="number" 
+                    placeholder="5"
+                    value={formData.low_stock_threshold} 
+                    onChange={e => setFormData({ ...formData, low_stock_threshold: e.target.value })} 
+                    style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
+                  />
+                </div>
+
+                {!formData.is_weighted && (
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-                      ژمارەی دانە لە کارتۆندا
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                      بەرواری بەسەرچوون
                     </label>
                     <input 
-                      type="number" 
-                      min="1"
-                      step="any"
-                      placeholder="بۆ نموونە: 24"
-                      value={formData.units_per_box} 
-                      onChange={e => setFormData({ ...formData, units_per_box: e.target.value })} 
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid rgba(2, 132, 199, 0.35)', color: 'var(--text-primary)', fontWeight: 'bold' }} 
+                      type="date" 
+                      className="clean-date-input"
+                      value={formData.expiry_date} 
+                      onClick={(e) => { try { e.target.showPicker?.(); } catch(_) {} }}
+                      onChange={e => setFormData({ ...formData, expiry_date: e.target.value })} 
+                      style={{ width: '100%', height: '38px', padding: '0 8px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.82rem', textAlign: 'center' }} 
                     />
                   </div>
+                )}
+              </div>
 
+              {/* Row 3: Wholesale / Carton (3-Column Grid: 1fr 1fr 1.5fr, gap 12px — ONLY visible when "بە دانە" is selected) */}
+              {!formData.is_weighted && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#0284c7', fontWeight: 'bold', fontSize: '0.88rem' }}>
-                      نرخی فرۆشتنی کارتۆن (دینار)
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      نرخی فرۆشتنی کارتۆن
                     </label>
                     <input 
                       type="number" 
@@ -785,77 +1153,93 @@ const Products = () => {
                       placeholder="0"
                       value={formData.wholesale_price} 
                       onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.08)', border: '1px solid rgba(2, 132, 199, 0.35)', color: '#0284c7', fontWeight: 'bold' }} 
+                      style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
                     />
                   </div>
-                </div>
 
-                <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', lineHeight: '1.4' }}>
-                  💡 گەر کڕیار بە کارتۆن بیکڕێت، سیستەم ڕاستەوخۆ نرخی کارتۆن حیساب دەکات و بەپێی ژمارەی دانەکان لە کۆگا کەمی دەکاتەوە.
-                </small>
-              </div>
-
-              {/* Stock and Expiry Section */}
-              <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>دانە لە کۆگا</label>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      ژمارەی دانە لە کارتۆندا
+                    </label>
                     <input 
                       type="number" 
-                      placeholder="0"
-                      value={formData.stock} 
-                      onChange={e => setFormData({ ...formData, stock: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
+                      min="1"
+                      step="any"
+                      placeholder="24"
+                      value={formData.units_per_box} 
+                      onChange={e => setFormData({ ...formData, units_per_box: e.target.value })} 
+                      style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem' }} 
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#d97706' }}>ئاگاداری کەمبوونەوە لە</label>
-                    <input 
-                      type="number" 
-                      placeholder="5"
-                      value={formData.low_stock_threshold} 
-                      onChange={e => setFormData({ ...formData, low_stock_threshold: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#ef4444' }}>بەرواری بەسەرچوون</label>
-                    <input 
-                      type="date" 
-                      value={formData.expiry_date} 
-                      onChange={e => setFormData({ ...formData, expiry_date: e.target.value })} 
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)' }} 
-                    />
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      بارکۆدی کارتۆن
+                    </label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input 
+                        type="text" 
+                        placeholder="بارکۆدی کارتۆن..."
+                        value={formData.box_barcode} 
+                        onChange={e => setFormData({ ...formData, box_barcode: normalizeBarcode(e.target.value) })} 
+                        style={{ 
+                          width: '100%', 
+                          height: '38px', 
+                          padding: '0 80px 0 10px', 
+                          borderRadius: '8px', 
+                          background: '#ffffff', 
+                          border: '1px solid #cbd5e1', 
+                          color: '#1e293b', 
+                          fontFamily: 'monospace', 
+                          fontSize: '0.86rem', 
+                          boxSizing: 'border-box' 
+                        }} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={generateBoxBarcode} 
+                        style={{
+                          position: 'absolute',
+                          left: '4px',
+                          top: '4px',
+                          bottom: '4px',
+                          padding: '0 10px',
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        دروستکردن
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div style={{ 
-                position: 'sticky', 
-                bottom: '-1rem', 
-                margin: '1rem -1rem -1rem -1rem', 
-                padding: '12px 16px', 
-                background: 'var(--bg-secondary)', 
-                borderTop: '1px solid var(--border-color)', 
-                display: 'flex', 
-                gap: '10px', 
-                zIndex: 10,
-                boxShadow: '0 -4px 12px rgba(0,0,0,0.08)'
-              }}>
+              {/* Footer Row: Single Full-Width Primary Button */}
+              <div style={{ marginTop: '4px' }}>
                 <button 
                   type="submit" 
-                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'var(--accent-color)', color: 'white', border: 'none', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}
+                  style={{ 
+                    width: '100%', 
+                    height: '42px', 
+                    borderRadius: '8px', 
+                    background: '#2563eb', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    fontSize: '0.95rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer', 
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
                 >
                   پاشەکەوتکردن
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  style={{ padding: '12px 20px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  پاشگەزبوونەوە
                 </button>
               </div>
             </form>
@@ -934,7 +1318,7 @@ const Products = () => {
                 {printProduct.name}
               </div>
               <div style={{ margin: '4px auto' }}>
-                <BarcodeSVG value={printProduct.barcode} width={220} height={60} />
+                <BarcodeSVG value={printProduct.barcode} maxWidth="48mm" barHeight={42} />
               </div>
               <div style={{ fontSize: '1.35rem', fontWeight: 'bold', color: '#0f172a', marginTop: '6px' }}>
                 {Number(printProduct.selling_price).toLocaleString()} دینار
@@ -969,7 +1353,7 @@ const Products = () => {
               <div style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '46mm' }}>
                 {printProduct.name}
               </div>
-              <BarcodeSVG value={printProduct.barcode} width={160} height={46} />
+              <BarcodeSVG value={printProduct.barcode} maxWidth="45mm" barHeight={38} />
               <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '2px' }}>
                 {Number(printProduct.selling_price).toLocaleString()} دینار
               </div>
@@ -1096,6 +1480,112 @@ const Products = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {productToDelete && (
+        <div 
+          className="pos-modal-overlay" 
+          onClick={() => !isDeleting && setProductToDelete(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            direction: 'rtl'
+          }}
+        >
+          <div 
+            className="pos-modal-card" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '90%',
+              maxWidth: '420px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.12)',
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto'
+            }}>
+              <Trash2 size={26} />
+            </div>
+
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              دڵنیایت لە سڕینەوەی ئەم کاڵایە؟
+            </h3>
+
+            <div style={{ 
+              fontSize: '0.95rem', 
+              fontWeight: 700, 
+              color: 'var(--text-secondary)', 
+              background: 'var(--bg-tertiary)', 
+              padding: '10px 14px', 
+              borderRadius: '10px', 
+              marginBottom: '20px',
+              wordBreak: 'break-word'
+            }}>
+              «{productToDelete.name}»
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {isDeleting ? 'دەسڕدرێتەوە...' : 'سڕینەوە'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setProductToDelete(null)}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                پاشگەزبوونەوە
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { normalizeDigits } from '../utils/kurdishSearch';
+import { getCharFromBarcodeKeyEvent, normalizeBarcode } from '../utils/barcodeNormalizer';
 
 const useBarcodeScanner = (onScan) => {
     const buffer = useRef('');
@@ -26,16 +26,22 @@ const useBarcodeScanner = (onScan) => {
             }
 
             if (e.key === 'Enter') {
-                if (buffer.current.length >= 3) {
-                    // Normalize any Eastern Arabic / Kurdish digits to standard digits
-                    const cleaned = normalizeDigits(buffer.current).trim();
-                    if (cleaned.length >= 3) {
+                if (buffer.current.length >= 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Normalize any Eastern Arabic / Kurdish digits or localized keys (e.g. ث -> P)
+                    const cleaned = normalizeBarcode(buffer.current).trim();
+                    if (cleaned.length >= 2) {
                         onScan(cleaned);
                     }
                 }
                 buffer.current = '';
-            } else if (e.key.length === 1) { // Only capture printable characters
-                buffer.current += e.key;
+            } else {
+                // Extract true physical key character (immune to OS Arabic/Kurdish keyboard layouts)
+                const char = getCharFromBarcodeKeyEvent(e);
+                if (char) {
+                    buffer.current += char;
+                }
             }
 
             lastKeyTime.current = currentTime;

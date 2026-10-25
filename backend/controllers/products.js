@@ -16,13 +16,15 @@ exports.getAllProducts = async (req, res) => {
 };
 
 exports.addProduct = async (req, res) => {
-    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box } = req.body;
+    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit } = req.body;
     try {
         const cleanBoxBarcode = box_barcode && String(box_barcode).trim() !== '' ? String(box_barcode).trim() : null;
         const cleanUnitsPerBox = Math.max(1, parseFloat(units_per_box) || 1);
+        const weightedFlag = Boolean(is_weighted || unit === 'کگم') ? 1 : 0;
+        const cleanUnit = weightedFlag ? 'کگم' : (unit || 'دانە');
 
         const [result] = await db.query(
-            'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name, 
                 barcode, 
@@ -35,7 +37,9 @@ exports.addProduct = async (req, res) => {
                 expiry_date || null,
                 low_stock_threshold !== undefined && low_stock_threshold !== '' ? parseInt(low_stock_threshold) : 5,
                 cleanBoxBarcode,
-                cleanUnitsPerBox
+                cleanUnitsPerBox,
+                weightedFlag,
+                cleanUnit
             ]
         );
 
@@ -84,7 +88,7 @@ exports.addProduct = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
     const { id } = req.params;
-    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box } = req.body;
+    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit } = req.body;
     try {
         // 1. Fetch current product before update to compare changes
         const [currentRows] = await db.query('SELECT * FROM Products WHERE id = ?', [id]);
@@ -95,10 +99,14 @@ exports.updateProduct = async (req, res) => {
 
         const cleanBoxBarcode = box_barcode && String(box_barcode).trim() !== '' ? String(box_barcode).trim() : null;
         const cleanUnitsPerBox = Math.max(1, parseFloat(units_per_box) || 1);
+        const weightedFlag = (is_weighted !== undefined || unit !== undefined) 
+            ? (Boolean(is_weighted || unit === 'کگم') ? 1 : 0) 
+            : (oldP.is_weighted || 0);
+        const cleanUnit = weightedFlag ? 'کگم' : (unit || oldP.unit || 'دانە');
 
         // 2. Perform database update
         await db.query(
-            'UPDATE Products SET name=?, barcode=?, cost_price=?, selling_price=?, usd_price=?, stock=?, category_id=?, wholesale_price=?, expiry_date=?, low_stock_threshold=?, box_barcode=?, units_per_box=? WHERE id=?',
+            'UPDATE Products SET name=?, barcode=?, cost_price=?, selling_price=?, usd_price=?, stock=?, category_id=?, wholesale_price=?, expiry_date=?, low_stock_threshold=?, box_barcode=?, units_per_box=?, is_weighted=?, unit=? WHERE id=?',
             [
                 name, 
                 barcode, 
@@ -112,6 +120,8 @@ exports.updateProduct = async (req, res) => {
                 low_stock_threshold !== undefined && low_stock_threshold !== '' ? parseInt(low_stock_threshold) : 5,
                 cleanBoxBarcode,
                 cleanUnitsPerBox,
+                weightedFlag,
+                cleanUnit,
                 id
             ]
         );

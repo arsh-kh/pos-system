@@ -39,3 +39,6 @@ backend/backups/*.json
 # Electron Installer Builds
 release/
 
+# Chrome temporary profile data
+.chrome_data/
+

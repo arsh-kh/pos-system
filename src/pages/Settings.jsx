@@ -26,6 +26,7 @@ const Settings = () => {
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [savedNotice, setSavedNotice] = useState(false);
 
+
   // -------------------------------------------------------------
   // Hardware Management: Thermal Printer & Barcode Scanner State
   // -------------------------------------------------------------
@@ -884,6 +885,7 @@ const Settings = () => {
             </button>
           </div>
         </div>
+
 
         {/* Security & Admin Password Management Card */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
