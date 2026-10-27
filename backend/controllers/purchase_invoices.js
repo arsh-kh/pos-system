@@ -28,8 +28,8 @@ exports.createPurchaseInvoice = async (req, res) => {
         return res.status(400).json({ status: 'ERROR', message: 'تکایە لانیکەم یەک کاڵا دیاری بکە' });
     }
 
-    if (!supplier_id && (payment_method === 'DEBT' || Number(remaining_amount) > 0)) {
-        return res.status(400).json({ status: 'ERROR', message: 'کڕین بە قەرز پێویستی بە هەڵبژاردنی کۆمپانیایە' });
+    if (!supplier_id) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە سەرەتا کۆمپانیا دیاری بکە' });
     }
 
     const additionalCostBigInt = safeBigInt(additional_cost || 0);
@@ -141,11 +141,12 @@ exports.createPurchaseInvoice = async (req, res) => {
                 dateVal
             ]);
 
-            // Update Products stock, update cost_price to landedUnitCost, and only update selling_price if provided
+            // Update Products stock, update cost_price to landedUnitCost, box_cost_price if provided, and only update selling_price if provided
             const newSellPrice = item.selling_price ? safeBigInt(item.selling_price).toString() : null;
+            const newBoxCost = item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null;
             await connection.query(
-                'UPDATE Products SET stock = stock + ?, cost_price = ?, selling_price = COALESCE(?, selling_price) WHERE id = ?',
-                [itemQtyNum, landedUnitCost.toString(), newSellPrice, item.product_id]
+                'UPDATE Products SET stock = stock + ?, cost_price = ?, box_cost_price = COALESCE(?, box_cost_price), selling_price = COALESCE(?, selling_price) WHERE id = ?',
+                [itemQtyNum, landedUnitCost.toString(), newBoxCost, newSellPrice, item.product_id]
             );
         }
 

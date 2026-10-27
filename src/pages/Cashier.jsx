@@ -2468,7 +2468,7 @@ const Cashier = () => {
                       type="number"
                       min="0"
                       max={grandTotal > 0 ? grandTotal : undefined}
-                      step="250"
+                      step="any"
                       value={splitCashAmount}
                       placeholder="0"
                       onFocus={(e) => e.target.select()}
@@ -2529,7 +2529,7 @@ const Cashier = () => {
                   <input
                     type="number"
                     min="0"
-                    step="250"
+                    step="any"
                     placeholder="بڕی پارەی کڕیار..."
                     value={cashReceived}
                     onClick={(e) => e.target.select()}
@@ -2768,7 +2768,7 @@ const Cashier = () => {
                   type="number"
                   min="0"
                   max={subtotal > 0 ? subtotal : undefined}
-                  step="250"
+                  step="any"
                   placeholder="0"
                   value={discountValue}
                   onFocus={(e) => e.target.select()}
@@ -3854,7 +3854,7 @@ const Cashier = () => {
                 </label>
                 <input 
                   type="number" 
-                  step="250"
+                  step="any"
                   min="0"
                   placeholder="0"
                   value={quickCustomerDebt}
@@ -3934,7 +3934,7 @@ const Cashier = () => {
                   </button>
                   <input 
                     type="number" 
-                    step="250"
+                    step="any"
                     min="0"
                     required
                     autoFocus

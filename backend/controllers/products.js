@@ -1,6 +1,13 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
 
+const ensureProductsSchema = async () => {
+    try {
+        await db.query("ALTER TABLE Products ADD COLUMN box_cost_price BIGINT DEFAULT NULL");
+    } catch (_) {}
+};
+ensureProductsSchema();
+
 exports.getAllProducts = async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -16,15 +23,18 @@ exports.getAllProducts = async (req, res) => {
 };
 
 exports.addProduct = async (req, res) => {
-    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit } = req.body;
+    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit, box_cost_price } = req.body;
     try {
         const cleanBoxBarcode = box_barcode && String(box_barcode).trim() !== '' ? String(box_barcode).trim() : null;
         const cleanUnitsPerBox = Math.max(1, parseFloat(units_per_box) || 1);
         const weightedFlag = Boolean(is_weighted || unit === 'کگم') ? 1 : 0;
         const cleanUnit = weightedFlag ? 'کگم' : (unit || 'دانە');
+        const cleanBoxCostPrice = (box_cost_price !== undefined && box_cost_price !== null && box_cost_price !== '') 
+            ? Math.round(Number(box_cost_price)) 
+            : null;
 
         const [result] = await db.query(
-            'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit, box_cost_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name, 
                 barcode, 
@@ -39,7 +49,8 @@ exports.addProduct = async (req, res) => {
                 cleanBoxBarcode,
                 cleanUnitsPerBox,
                 weightedFlag,
-                cleanUnit
+                cleanUnit,
+                cleanBoxCostPrice
             ]
         );
 
@@ -88,7 +99,7 @@ exports.addProduct = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
     const { id } = req.params;
-    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit } = req.body;
+    const { name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit, box_cost_price } = req.body;
     try {
         // 1. Fetch current product before update to compare changes
         const [currentRows] = await db.query('SELECT * FROM Products WHERE id = ?', [id]);
@@ -103,10 +114,13 @@ exports.updateProduct = async (req, res) => {
             ? (Boolean(is_weighted || unit === 'کگم') ? 1 : 0) 
             : (oldP.is_weighted || 0);
         const cleanUnit = weightedFlag ? 'کگم' : (unit || oldP.unit || 'دانە');
+        const cleanBoxCostPrice = (box_cost_price !== undefined && box_cost_price !== null && box_cost_price !== '') 
+            ? Math.round(Number(box_cost_price)) 
+            : (oldP.box_cost_price || null);
 
         // 2. Perform database update
         await db.query(
-            'UPDATE Products SET name=?, barcode=?, cost_price=?, selling_price=?, usd_price=?, stock=?, category_id=?, wholesale_price=?, expiry_date=?, low_stock_threshold=?, box_barcode=?, units_per_box=?, is_weighted=?, unit=? WHERE id=?',
+            'UPDATE Products SET name=?, barcode=?, cost_price=?, selling_price=?, usd_price=?, stock=?, category_id=?, wholesale_price=?, expiry_date=?, low_stock_threshold=?, box_barcode=?, units_per_box=?, is_weighted=?, unit=?, box_cost_price=? WHERE id=?',
             [
                 name, 
                 barcode, 
@@ -122,6 +136,7 @@ exports.updateProduct = async (req, res) => {
                 cleanUnitsPerBox,
                 weightedFlag,
                 cleanUnit,
+                cleanBoxCostPrice,
                 id
             ]
         );

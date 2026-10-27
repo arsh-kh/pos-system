@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS Sale_Items (
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price_at_sale BIGINT NOT NULL,
+    custom_name VARCHAR(255) NULL,
     FOREIGN KEY (sale_id) REFERENCES Sales(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;

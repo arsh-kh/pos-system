@@ -49,6 +49,16 @@ const RANGES = [
   { id: 'custom', label: 'ماوەی دەستی', icon: <Filter size={16} />, desc: 'بەرواری دیاریکراو' }
 ];
 
+const formatProductQty = (qty, isWeighted = false) => {
+  if (qty === undefined || qty === null || qty === '') return '0';
+  const num = parseFloat(qty);
+  if (isNaN(num)) return '0';
+  if (isWeighted) {
+    return parseFloat(num.toFixed(2)).toLocaleString('en-US');
+  }
+  return Math.round(num).toLocaleString('en-US');
+};
+
 const ThisMonth = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -139,43 +149,25 @@ const ThisMonth = () => {
   };
 
   return (
-    <div className="dashboard-page p-8" style={{ position: 'relative' }}>
+    <div className="dashboard-page" style={{ padding: '20px 24px', position: 'relative' }}>
       
       {/* Top Header */}
-      <div className="header mb-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            <TrendingUp color="#6366f1" size={32} />
-            ڕاپۆرتە گشتییەکان و شیکاری دارایی
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', margin: '6px 0 0', fontSize: '0.9rem' }}>
-            شیکاری فرۆشتن، قازانجی پوخت، خەرجی و کڕیاران بەپێی ڕۆژ، هەفتە، مانگ، ساڵ یان ماوەی دیاریکراو.
-          </p>
-        </div>
-
-        {/* Action Controls */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={handlePrintReport}
-            className="btn-secondary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
-              borderRadius: '12px',
-              fontSize: '0.88rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <Printer size={16} /> چاپکردنی وەسڵی دارایی
-          </button>
-        </div>
+      <div style={{ marginBottom: '16px' }}>
+        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          ڕاپۆرتە گشتییەکان و شیکاری دارایی
+        </h1>
       </div>
 
-      {/* Range Selection Pills Bar */}
-      <div className="glass-panel" style={{ padding: '8px', borderRadius: '16px', marginBottom: '1.5rem', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Range Selection Bar & Print Action in Same Row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px',
+        marginBottom: '20px'
+      }}>
+        {/* Date Filter Buttons (Icons & Heavy Gradients Removed) */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           {RANGES.map(r => {
             const isActive = selectedRange === r.id;
@@ -184,40 +176,45 @@ const ThisMonth = () => {
                 key={r.id}
                 onClick={() => setSelectedRange(r.id)}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '9px 18px',
-                  borderRadius: '12px',
-                  border: isActive ? '1px solid #6366f1' : '1px solid var(--border-color)',
-                  background: isActive ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'var(--bg-tertiary)',
-                  color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
+                  padding: '7px 16px',
+                  borderRadius: '8px',
+                  border: isActive ? '1.5px solid #3b82f6' : '1px solid var(--border-color, #334155)',
+                  background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-secondary, #1e293b)',
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: '0.86rem',
                   cursor: 'pointer',
-                  boxShadow: isActive ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.15s ease'
                 }}
               >
-                {r.icon}
                 <span>{r.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Current Active Period Badge */}
-        {reportData && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', fontSize: '0.82rem', fontWeight: 700 }}>
-            <Calendar size={14} />
-            <span>{reportData.range_label}</span>
-          </div>
-        )}
+        {/* Print Button (Far left of row in RTL) */}
+        <button
+          onClick={handlePrintReport}
+          style={{
+            padding: '7px 16px',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color, #334155)',
+            background: 'var(--bg-secondary, #1e293b)',
+            color: 'var(--text-primary)',
+            fontSize: '0.86rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          چاپکردنی وەسڵی دارایی
+        </button>
       </div>
 
       {/* Custom Date Range Filter Inputs */}
       {selectedRange === 'custom' && (
-        <form onSubmit={handleApplyCustomFilter} className="glass-panel" style={{ padding: '1.2rem', borderRadius: '16px', marginBottom: '1.5rem', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid #6366f1' }}>
+        <form onSubmit={handleApplyCustomFilter} className="glass-panel" style={{ padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color, #334155)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)' }}>لە بەروار:</span>
             <input
@@ -225,8 +222,8 @@ const ThisMonth = () => {
               value={customStartDate}
               onChange={(e) => setCustomStartDate(e.target.value)}
               style={{
-                padding: '8px 12px',
-                borderRadius: '10px',
+                padding: '7px 12px',
+                borderRadius: '8px',
                 background: 'var(--bg-tertiary)',
                 border: '1px solid var(--border-color)',
                 color: 'var(--text-primary)',
@@ -245,8 +242,8 @@ const ThisMonth = () => {
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
               style={{
-                padding: '8px 12px',
-                borderRadius: '10px',
+                padding: '7px 12px',
+                borderRadius: '8px',
                 background: 'var(--bg-tertiary)',
                 border: '1px solid var(--border-color)',
                 color: 'var(--text-primary)',
@@ -262,24 +259,21 @@ const ThisMonth = () => {
             type="submit"
             className="btn-primary"
             style={{
-              padding: '8px 18px',
-              borderRadius: '10px',
+              padding: '7px 18px',
+              borderRadius: '8px',
               fontSize: '0.88rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
+              fontWeight: 700,
+              cursor: 'pointer'
             }}
           >
-            <Filter size={15} /> پشکنینی ماوە
+            پشکنینی ماوە
           </button>
         </form>
       )}
 
       {/* Error Notice */}
       {errorMessage && (
-        <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', marginBottom: '1.5rem', fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ padding: '12px 16px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', marginBottom: '1.25rem', fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <AlertCircle size={18} /> {errorMessage}
         </div>
       )}
@@ -292,113 +286,120 @@ const ThisMonth = () => {
         </div>
       ) : (
         <>
-          {/* Section 1: Four Master KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          {/* Section 1: Minimalist Flat 4-Column Summary Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
             
-            {/* Card 1: Net Sales */}
-            <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '20px', borderTop: '4px solid #2563eb', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)' }}>کۆی گشتی فرۆشتن (پوخت)</span>
-                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <ShoppingBag size={18} />
-                </div>
+            {/* Block 1: Total Sales */}
+            <div style={{
+              background: 'var(--bg-secondary, #1e293b)',
+              border: '1px solid var(--border-color, #334155)',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
+                کۆی فرۆشتن
               </div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                {totalSales.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 600 }}>دینار</span>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <span>{totalInvoices.toLocaleString()} پسووڵە</span>
-                <span>•</span>
-                <span>تێکڕا: {avgInvoice.toLocaleString()} د.ع</span>
-              </div>
-              {totalDiscounts > 0 && (
-                <div style={{ fontSize: '0.74rem', color: '#f59e0b', marginTop: '6px' }}>
-                  داشکاندن: {totalDiscounts.toLocaleString()} د.ع
-                </div>
-              )}
-            </div>
-
-            {/* Card 2: Net Profit (FIFO Engine) */}
-            <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '20px', borderTop: '4px solid #10b981', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)' }}>قازانجی پوختەی خاوێن</span>
-                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <TrendingUp size={18} />
-                </div>
-              </div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 900, color: netProfit >= 0 ? '#10b981' : '#ef4444', marginBottom: '6px' }}>
-                {netProfit.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 600 }}>دینار</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '6px', background: profitMargin >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: profitMargin >= 0 ? '#10b981' : '#ef4444', fontWeight: 800 }}>
-                  ڕێژەی قازانج: {profitMargin}%
-                </span>
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>تێچووی کۆگا و گەیشتن</span>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {totalSales.toLocaleString()} <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>دینار</span>
               </div>
             </div>
 
-            {/* Card 3: Payment Breakdown (Cash vs Debt) */}
-            <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '20px', borderTop: '4px solid #d97706', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)' }}>شێوازی کۆکردنەوە</span>
-                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Wallet size={18} />
-                </div>
+            {/* Block 2: Net Profit */}
+            <div style={{
+              background: 'var(--bg-secondary, #1e293b)',
+              border: '1px solid var(--border-color, #334155)',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
+                صافی قازانج
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                  <span style={{ color: '#10b981', fontWeight: 700 }}>نەقد (کاش):</span>
-                  <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{cashCollected.toLocaleString()} د.ع</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                  <span style={{ color: '#ea580c', fontWeight: 700 }}>فرۆش بە قەرز:</span>
-                  <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{debtIssued.toLocaleString()} د.ع</span>
-                </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {netProfit.toLocaleString()} <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>دینار</span>
               </div>
-              {totalRefunded > 0 && (
-                <div style={{ fontSize: '0.74rem', color: '#ef4444', marginTop: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '4px' }}>
-                  گەڕاوەی کڕیار: -{totalRefunded.toLocaleString()} د.ع ({returnsCount} جار)
-                </div>
-              )}
             </div>
 
-            {/* Card 4: Expenses & Damages Loss */}
-            <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '20px', borderTop: '4px solid #b91c1c', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)' }}>خەرجی و فەوتانی کاڵا</span>
-                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'rgba(185, 28, 28, 0.12)', color: '#b91c1c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <PackageX size={18} />
+            {/* Block 3: Cash & Debt */}
+            <div style={{
+              background: 'var(--bg-secondary, #1e293b)',
+              border: '1px solid var(--border-color, #334155)',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
+                نەقد و قەرز
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>نەقد:</span>
+                  <span style={{ fontWeight: 700 }}>{cashCollected.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>قەرز:</span>
+                  <span style={{ fontWeight: 700 }}>{debtIssued.toLocaleString()} د.ع</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>خەرجییەکان:</span>
-                  <span style={{ fontWeight: 800, color: '#ef4444' }}>-{totalExpenses.toLocaleString()} د.ع</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>فەوتان و زیان:</span>
-                  <span style={{ fontWeight: 800, color: '#ef4444' }}>-{totalDamagesLoss.toLocaleString()} د.ع</span>
-                </div>
+            </div>
+
+            {/* Block 4: Expenses & Loss */}
+            <div style={{
+              background: 'var(--bg-secondary, #1e293b)',
+              border: '1px solid var(--border-color, #334155)',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
+                خەرجی و زیان
               </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '4px' }}>
-                کۆی کەمکراوە: -{(totalExpenses + totalDamagesLoss).toLocaleString()} د.ع
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>خەرجی:</span>
+                  <span style={{ fontWeight: 700 }}>{totalExpenses > 0 ? `${totalExpenses.toLocaleString()} د.ع` : '0'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>زیان:</span>
+                  <span style={{ fontWeight: 700 }}>{totalDamagesLoss > 0 ? `${totalDamagesLoss.toLocaleString()} د.ع` : '0'}</span>
+                </div>
               </div>
             </div>
 
           </div>
 
           {/* Section 2: Interactive Timeline Area Chart */}
-          <div className="glass-panel mb-8" style={{ padding: '1.75rem', borderRadius: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '8px' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={20} color="#6366f1" /> هێڵی کاتیی فرۆشتن و قازانج ({reportData?.range_label})
+          <div style={{
+            background: 'var(--bg-secondary, #1e293b)',
+            border: '1px solid var(--border-color, #334155)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                هێڵی کاتیی فرۆشتن و قازانج
               </h2>
-              <div style={{ display: 'flex', gap: '14px', alignItems: 'center', fontSize: '0.82rem', fontWeight: 700 }}>
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center', fontSize: '0.82rem', fontWeight: 600 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#2563eb' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#2563eb' }} /> فرۆشتن
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#2563eb' }} /> فرۆشتن
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#10b981' }} /> قازانج
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', background: '#10b981' }} /> قازانج
                 </span>
               </div>
             </div>
@@ -473,14 +474,16 @@ const ThisMonth = () => {
           </div>
 
           {/* Section 3: Top 5 Best Selling Products in This Period */}
-          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '8px' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={20} color="#f59e0b" /> پڕفرۆشترین کاڵاکان لەم ماوەیەدا
+          <div style={{
+            background: 'var(--bg-secondary, #1e293b)',
+            border: '1px solid var(--border-color, #334155)',
+            borderRadius: '12px',
+            padding: '16px 20px'
+          }}>
+            <div style={{ marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                پڕفرۆشترین کاڵاکان لەم ماوەیەدا
               </h2>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                بەپێی زۆرترین دانەی فرۆشراو
-              </span>
             </div>
 
             {topProducts.length === 0 ? (
@@ -489,26 +492,37 @@ const ThisMonth = () => {
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'right' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
-                      <th style={{ padding: '10px 14px' }}>پلە</th>
-                      <th style={{ padding: '10px 14px' }}>ناوی کاڵا</th>
-                      <th style={{ padding: '10px 14px' }}>بارکۆد</th>
-                      <th style={{ padding: '10px 14px' }}>دانەی فرۆشراو</th>
-                      <th style={{ padding: '10px 14px' }}>کۆی داهات (دینار)</th>
+                      <th style={{ width: '50px', padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>#</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600 }}>ناوی کاڵا</th>
+                      <th style={{ width: '220px', padding: '10px 14px', fontWeight: 600 }}>بارکۆد</th>
+                      <th style={{ width: '140px', padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>بڕی فرۆشراو</th>
+                      <th style={{ width: '160px', padding: '10px 14px', textAlign: 'left', fontWeight: 600 }}>کۆی داهات</th>
                     </tr>
                   </thead>
                   <tbody>
                     {topProducts.map((p, idx) => {
-                      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`;
+                      const isWeighted = Boolean(p.is_weighted || p.unit === 'کگم');
+                      const qtyFormatted = formatProductQty(p.total_quantity, isWeighted);
                       return (
-                        <tr key={p.id || idx} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.9rem' }}>
-                          <td style={{ padding: '12px 14px', fontWeight: 900, fontSize: '1.1rem' }}>{medal}</td>
-                          <td style={{ padding: '12px 14px', fontWeight: 800, color: 'var(--text-primary)' }}>{p.name}</td>
-                          <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{p.barcode}</td>
-                          <td style={{ padding: '12px 14px', fontWeight: 800, color: '#0284c7' }}>{p.total_quantity.toLocaleString()} دانە</td>
-                          <td style={{ padding: '12px 14px', fontWeight: 800, color: '#10b981' }}>{p.total_revenue.toLocaleString()} د.ع</td>
+                        <tr key={p.id || idx} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.88rem' }}>
+                          <td style={{ padding: '11px 14px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {idx + 1}
+                          </td>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {p.name}
+                          </td>
+                          <td style={{ padding: '11px 14px', fontFamily: 'monospace', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                            {p.barcode || '—'}
+                          </td>
+                          <td style={{ padding: '11px 14px', textAlign: 'center', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                            {qtyFormatted}
+                          </td>
+                          <td style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                            {Number(p.total_revenue).toLocaleString('en-US')}
+                          </td>
                         </tr>
                       );
                     })}

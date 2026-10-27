@@ -269,6 +269,18 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
+/* Seamless input inside search bars / custom input wrappers */
+.input-seamless,
+.input-seamless:focus {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+}
+
 input::placeholder, textarea::placeholder {
   color: var(--text-muted);
   opacity: 0.75;

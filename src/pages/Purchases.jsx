@@ -4,6 +4,7 @@ import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
 import { formatDate } from '../utils/dateFormatter';
+import ProductModal from '../components/ProductModal';
 import './Dashboard.css';
 
 const Purchases = () => {
@@ -30,16 +31,11 @@ const Purchases = () => {
 
   // Quick Add Product Modal State
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [quickProductData, setQuickProductData] = useState({
-    name: '',
-    barcode: '',
-    cost_price: '',
-    selling_price: '',
-    category_id: ''
-  });
+  const [quickAddBarcode, setQuickAddBarcode] = useState('');
 
   // Printable Invoice Voucher State
   const [printedInvoice, setPrintedInvoice] = useState(null);
+  const [companyWarningOpen, setCompanyWarningOpen] = useState(false);
   const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی شارەکەم';
   const storePhone = localStorage.getItem('pos_store_phone') || '';
 
@@ -73,28 +69,63 @@ const Purchases = () => {
     fetchData();
   }, []);
 
+  const openQuickAddModal = (presetBarcode = '') => {
+    setQuickAddBarcode(presetBarcode || '');
+    setIsQuickAddOpen(true);
+  };
+
   const handleProcessBarcode = (code) => {
     if (!code) return;
     const cleanCode = normalizeBarcode(code).trim();
-    const existing = products.find(p => p.barcode === cleanCode || p.box_barcode === cleanCode);
+    const existing = products.find(p => 
+      normalizeBarcode(p.barcode) === cleanCode || 
+      (p.box_barcode && normalizeBarcode(p.box_barcode) === cleanCode)
+    );
 
     if (existing) {
+      const unitsPerBox = Math.max(1, parseFloat(existing.units_per_box) || 1);
+      const isScannedBox = Boolean(existing.box_barcode && normalizeBarcode(existing.box_barcode) === cleanCode);
+      const initialUnitType = isScannedBox ? 'BOX' : (unitsPerBox > 1 ? 'BOX' : 'PIECE');
+
       setItems(prevItems => {
         const itemIdx = prevItems.findIndex(i => i.product_id === existing.id);
         if (itemIdx >= 0) {
           const updated = [...prevItems];
-          const newQty = (parseInt(updated[itemIdx].quantity) || 0) + 1;
-          updated[itemIdx].quantity = newQty.toString();
+          const it = { ...updated[itemIdx] };
+          if (it.unit_type === 'BOX') {
+            const newBoxQty = (parseFloat(it.box_quantity) || 0) + 1;
+            it.box_quantity = String(newBoxQty);
+            it.quantity = String(Math.round(newBoxQty * unitsPerBox));
+          } else {
+            const newQty = (parseFloat(it.quantity) || 0) + 1;
+            it.quantity = String(newQty);
+            it.box_quantity = unitsPerBox > 0 ? String(parseFloat((newQty / unitsPerBox).toFixed(2)) || 0) : String(newQty);
+          }
+          updated[itemIdx] = it;
           return updated;
         } else {
+          const pieceCost = Number(existing.cost_price) || 0;
+          const boxCost = existing.box_cost_price 
+            ? Number(existing.box_cost_price) 
+            : Math.round(pieceCost * unitsPerBox);
+          // When bought by Carton, dynamically calculate Cost per Piece = (Carton Price / Pieces per Carton)
+          const effectivePieceCost = (initialUnitType === 'BOX' && unitsPerBox > 0)
+            ? Math.round(boxCost / unitsPerBox)
+            : (pieceCost || (unitsPerBox > 0 ? Math.round(boxCost / unitsPerBox) : 0));
+
           return [
             ...prevItems,
             {
               product_id: existing.id,
               name: existing.name,
               barcode: existing.barcode,
-              quantity: '1',
-              cost_price: existing.cost_price || 0,
+              box_barcode: existing.box_barcode || '',
+              units_per_box: unitsPerBox,
+              unit_type: initialUnitType,
+              box_quantity: '1',
+              box_cost_price: String(boxCost),
+              quantity: initialUnitType === 'BOX' ? String(unitsPerBox) : '1',
+              cost_price: String(effectivePieceCost),
               selling_price: existing.selling_price || 0,
               stock_before: existing.stock || 0
             }
@@ -102,14 +133,7 @@ const Purchases = () => {
         }
       });
     } else {
-      setQuickProductData({
-        name: '',
-        barcode: cleanCode,
-        cost_price: '',
-        selling_price: '',
-        category_id: categories[0]?.id || ''
-      });
-      setIsQuickAddOpen(true);
+      openQuickAddModal(cleanCode);
     }
     setScanBarcode('');
     scanInputRef.current?.focus();
@@ -126,49 +150,156 @@ const Purchases = () => {
     }
   };
 
-  const handleQuickAddProductSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const config = getAuthConfig();
-      const payload = {
-        name: quickProductData.name,
-        barcode: quickProductData.barcode,
-        cost_price: Number(quickProductData.cost_price) || 0,
-        selling_price: Number(quickProductData.selling_price) || 0,
-        stock: 0,
-        category_id: quickProductData.category_id || null
-      };
+  const handleQuickAddSuccess = (newProd) => {
+    const unitsPerBox = Math.max(1, parseFloat(newProd.units_per_box) || 1);
+    const boxCost = Math.max(0, Number(newProd.box_cost_price) || (Number(newProd.cost_price) * unitsPerBox) || 0);
+    const pieceCost = Math.max(0, Number(newProd.cost_price) || 0);
+    const initialUnitType = (!newProd.is_weighted && unitsPerBox > 1) ? 'BOX' : 'PIECE';
 
-      const res = await axios.post('http://localhost:3001/api/products', payload, config);
-      if (res.data.status === 'SUCCESS' || res.status === 201) {
-        const newProd = res.data.data;
-        setItems(prev => [
-          ...prev,
-          {
-            product_id: newProd.id,
-            name: newProd.name,
-            barcode: newProd.barcode,
-            quantity: '1',
-            cost_price: newProd.cost_price,
-            selling_price: newProd.selling_price,
-            stock_before: 0
-          }
-        ]);
-
-        const refreshed = await axios.get('http://localhost:3001/api/products', config);
-        if (refreshed.data.status === 'SUCCESS') setProducts(refreshed.data.data);
-
-        setIsQuickAddOpen(false);
+    setItems(prev => {
+      const existingIdx = prev.findIndex(i => i.product_id === newProd.id);
+      if (existingIdx >= 0) {
+        const updated = [...prev];
+        const it = { ...updated[existingIdx] };
+        if (it.unit_type === 'BOX') {
+          const newBoxQty = (parseFloat(it.box_quantity) || 0) + 1;
+          it.box_quantity = String(newBoxQty);
+          it.quantity = String(Math.round(newBoxQty * unitsPerBox));
+        } else {
+          const newQty = (parseFloat(it.quantity) || 0) + 1;
+          it.quantity = String(newQty);
+          it.box_quantity = unitsPerBox > 0 ? String(parseFloat((newQty / unitsPerBox).toFixed(2)) || 0) : String(newQty);
+        }
+        updated[existingIdx] = it;
+        return updated;
       }
-    } catch (err) {
-      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە زیادکردنی کاڵاکە');
-    }
+          const effectivePieceCost = (initialUnitType === 'BOX' && unitsPerBox > 0)
+            ? Math.round(boxCost / unitsPerBox)
+            : pieceCost;
+
+          return [
+            ...prev,
+            {
+              product_id: newProd.id,
+              name: newProd.name,
+              barcode: newProd.barcode,
+              box_barcode: newProd.box_barcode || '',
+              units_per_box: unitsPerBox,
+              unit_type: initialUnitType,
+              box_quantity: '1',
+              box_cost_price: String(boxCost || (pieceCost * unitsPerBox)),
+              quantity: initialUnitType === 'BOX' ? String(unitsPerBox) : '1',
+              cost_price: String(effectivePieceCost),
+              selling_price: newProd.selling_price || 0,
+              stock_before: 0
+            }
+          ];
+    });
+
+    const config = getAuthConfig();
+    axios.get('http://localhost:3001/api/products', config).then(res => {
+      if (res.data?.status === 'SUCCESS') setProducts(res.data.data);
+    }).catch(() => {});
   };
 
   const updateItem = (index, field, value) => {
     setItems(prev => {
       const updated = [...prev];
-      updated[index][field] = value;
+      const it = { ...updated[index] };
+      const unitsPerBox = Math.max(1, parseFloat(it.units_per_box) || 1);
+
+      if (field === 'unit_type') {
+        it.unit_type = value;
+        if (value === 'BOX') {
+          const bQty = Math.max(1, parseFloat(it.box_quantity) || 1);
+          it.box_quantity = String(bQty);
+          it.quantity = String(Math.round(bQty * unitsPerBox));
+          if (!it.box_cost_price || Number(it.box_cost_price) === 0) {
+            it.box_cost_price = String(Math.round((Number(it.cost_price) || 0) * unitsPerBox));
+          }
+          it.cost_price = unitsPerBox > 0 ? String(Math.round((Number(it.box_cost_price) || 0) / unitsPerBox)) : String(it.box_cost_price);
+        } else {
+          const pQty = Math.max(1, parseFloat(it.quantity) || 1);
+          it.quantity = String(pQty);
+          if (!it.cost_price || Number(it.cost_price) === 0) {
+            it.cost_price = unitsPerBox > 0 ? String(Math.round((Number(it.box_cost_price) || 0) / unitsPerBox)) : '0';
+          }
+          it.box_cost_price = String(Math.round((Number(it.cost_price) || 0) * unitsPerBox));
+        }
+      } else if (field === 'box_quantity') {
+        if (value === '') {
+          it.box_quantity = '';
+          it.quantity = '';
+        } else {
+          const parsed = parseFloat(value);
+          if (parsed < 0 || isNaN(parsed)) {
+            it.box_quantity = '1';
+            it.quantity = String(unitsPerBox);
+          } else {
+            const safeVal = Math.max(0.001, parsed);
+            it.box_quantity = value;
+            it.quantity = String(Math.round(safeVal * unitsPerBox));
+          }
+        }
+      } else if (field === 'box_cost_price') {
+        if (value === '') {
+          it.box_cost_price = '';
+          it.cost_price = '';
+        } else {
+          const parsed = parseFloat(value);
+          if (parsed < 0 || isNaN(parsed)) {
+            it.box_cost_price = '0';
+            it.cost_price = '0';
+          } else {
+            const safeVal = Math.max(0, parsed);
+            it.box_cost_price = value;
+            it.cost_price = unitsPerBox > 0 ? String(Math.round(safeVal / unitsPerBox)) : String(safeVal);
+          }
+        }
+      } else if (field === 'quantity') {
+        if (value === '') {
+          it.quantity = '';
+          it.box_quantity = '';
+        } else {
+          const parsed = parseFloat(value);
+          if (parsed < 0 || isNaN(parsed)) {
+            it.quantity = '1';
+            it.box_quantity = unitsPerBox > 0 ? String(parseFloat((1 / unitsPerBox).toFixed(2))) : '1';
+          } else {
+            const safeVal = Math.max(0.001, parsed);
+            it.quantity = value;
+            it.box_quantity = unitsPerBox > 0 ? String(parseFloat((safeVal / unitsPerBox).toFixed(2)) || 0) : String(safeVal);
+          }
+        }
+      } else if (field === 'cost_price') {
+        if (value === '') {
+          it.cost_price = '';
+          it.box_cost_price = '';
+        } else {
+          const parsed = parseFloat(value);
+          if (parsed < 0 || isNaN(parsed)) {
+            it.cost_price = '0';
+            it.box_cost_price = '0';
+          } else {
+            const safeVal = Math.max(0, parsed);
+            it.cost_price = value;
+            it.box_cost_price = String(Math.round(safeVal * unitsPerBox));
+          }
+        }
+      } else if (field === 'selling_price') {
+        if (value === '') {
+          it.selling_price = '';
+        } else {
+          const parsed = parseFloat(value);
+          if (parsed < 0 || isNaN(parsed)) {
+            it.selling_price = '0';
+          } else {
+            it.selling_price = value;
+          }
+        }
+      }
+
+      updated[index] = it;
       return updated;
     });
   };
@@ -177,7 +308,20 @@ const Purchases = () => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Calculations
+  // Mathematical Line Item Total Helper (Always: Quantity × Purchase Price)
+  const getItemLineTotal = (item) => {
+    if (item.unit_type === 'BOX') {
+      const bQty = Math.max(0, parseFloat(item.box_quantity) || 0);
+      const bPrice = Math.max(0, parseFloat(item.box_cost_price) || 0);
+      return Math.round(bQty * bPrice);
+    } else {
+      const pQty = Math.max(0, parseFloat(item.quantity) || 0);
+      const pPrice = Math.max(0, parseFloat(item.cost_price) || 0);
+      return Math.round(pQty * pPrice);
+    }
+  };
+
+  // Calculations: Subtotal, Shipping, Grand Total, Landed Cost Allocation
   const { 
     itemsSubtotal, 
     effectiveAdditionalCost, 
@@ -192,11 +336,11 @@ const Purchases = () => {
     let qtySum = 0;
 
     items.forEach(item => {
-      const q = Math.max(0, parseInt(item.quantity) || 0);
-      const cp = Math.max(0, Number(item.cost_price) || 0);
+      const q = Math.max(0, parseFloat(item.quantity) || 0);
       const sp = Math.max(0, Number(item.selling_price) || 0);
+      const lineCost = getItemLineTotal(item);
 
-      cost += cp * q;
+      cost += lineCost;
       sales += sp * q;
       qtySum += q;
     });
@@ -206,21 +350,20 @@ const Purchases = () => {
 
     let remainingAdd = addCost;
     const itemsWithLanded = items.map((item, idx) => {
-      const q = Math.max(1, parseInt(item.quantity) || 1);
-      const cp = Math.max(0, Number(item.cost_price) || 0);
-      const lineSub = cp * q;
+      const q = Math.max(0.001, parseFloat(item.quantity) || 1);
+      const lineCost = getItemLineTotal(item);
 
       let allocated = 0;
       if (addCost > 0 && cost > 0) {
         if (idx === items.length - 1) {
           allocated = remainingAdd;
         } else {
-          allocated = Math.round((addCost * lineSub) / cost);
+          allocated = Math.round((addCost * lineCost) / cost);
           remainingAdd -= allocated;
         }
       }
       const perUnitAdd = Math.round(allocated / q);
-      const landedUnitCost = cp + perUnitAdd;
+      const landedUnitCost = Math.round(Number(item.cost_price) || 0) + perUnitAdd;
 
       return {
         ...item,
@@ -241,42 +384,85 @@ const Purchases = () => {
     };
   }, [items, additionalCost]);
 
+  // Synchronize Payment Method State with Absolute Accounting Rigor
   useEffect(() => {
     if (paymentMethod === 'CASH') {
-      setPaidAmount(totalInvoiceCost.toString());
+      setPaidAmount(String(totalInvoiceCost));
     } else if (paymentMethod === 'DEBT') {
       setPaidAmount('0');
+    } else if (paymentMethod === 'PARTIAL') {
+      const currentPaid = Number(paidAmount) || 0;
+      if (currentPaid > totalInvoiceCost) {
+        setPaidAmount(String(totalInvoiceCost));
+      }
     }
   }, [paymentMethod, totalInvoiceCost]);
 
   const effectivePaid = paymentMethod === 'CASH' 
     ? totalInvoiceCost 
-    : (paymentMethod === 'DEBT' ? 0 : (Number(paidAmount) || 0));
+    : (paymentMethod === 'DEBT' ? 0 : Math.min(totalInvoiceCost, Math.max(0, Math.round(Number(paidAmount) || 0))));
   const totalRemaining = Math.max(0, totalInvoiceCost - effectivePaid);
 
-  const handleSaveInvoice = async (andPrint = false) => {
-    if (!supplierId && (paymentMethod === 'DEBT' || totalRemaining > 0)) {
-      return alert('کڕین بە قەرز پێویستی بە دیاریکردنی کۆمپانیایە');
+  const handlePaidAmountChange = (val) => {
+    if (val === '') {
+      setPaidAmount('');
+      return;
     }
-    if (items.length === 0) return alert('هیچ کاڵایەک لە پسووڵەکەدا نییە');
-    if (effectivePaid < 0 || effectivePaid > totalInvoiceCost) return alert('بڕی پارەی دراو نادروستە');
+    const parsed = parseFloat(val);
+    if (isNaN(parsed) || parsed < 0) {
+      setPaidAmount('0');
+      return;
+    }
+    if (parsed > totalInvoiceCost) {
+      setPaidAmount(String(totalInvoiceCost));
+    } else {
+      setPaidAmount(val);
+    }
+  };
+
+  const isSaveDisabled = isSubmitting || items.length === 0;
+
+  const handleSaveInvoice = async (andPrint = false) => {
+    if (!supplierId) {
+      setCompanyWarningOpen(true);
+      return;
+    }
+    if (items.length === 0) {
+      alert('تکایە لانیکەم یەک کاڵا زیاد بکە');
+      return;
+    }
+    if (effectivePaid < 0 || effectivePaid > totalInvoiceCost) {
+      alert('بڕی پارەی دراو نادروستە');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const payload = {
-        supplier_id: supplierId ? supplierId : null,
+        supplier_id: supplierId,
         invoice_number: invoiceNumber || null,
         invoice_date: invoiceDate,
         payment_method: paymentMethod,
         additional_cost: effectiveAdditionalCost,
         paid_amount: effectivePaid,
         remaining_amount: totalRemaining,
-        items: items.map(i => ({
-          product_id: i.product_id,
-          quantity: Math.max(0.001, parseFloat(i.quantity) || 1),
-          cost_price: Math.max(0, Number(i.cost_price) || 0),
-          selling_price: Math.max(0, Number(i.selling_price) || 0)
-        }))
+        items: items.map(i => {
+          const isBox = i.unit_type === 'BOX';
+          const unitsPerBox = Math.max(1, parseFloat(i.units_per_box) || 1);
+          const totalPieces = isBox 
+            ? Math.max(0.001, (parseFloat(i.box_quantity) || 0) * unitsPerBox)
+            : Math.max(0.001, parseFloat(i.quantity) || 1);
+          const pieceCost = isBox
+            ? Math.max(0, (Number(i.box_cost_price) || 0) / unitsPerBox)
+            : Math.max(0, Number(i.cost_price) || 0);
+
+          return {
+            product_id: i.product_id,
+            quantity: Math.round(totalPieces * 1000) / 1000,
+            cost_price: Math.round(pieceCost),
+            selling_price: Math.max(0, Number(i.selling_price) || 0)
+          };
+        })
       };
 
       await axios.post('http://localhost:3001/api/purchase-invoices', payload);
@@ -287,19 +473,24 @@ const Purchases = () => {
         supplierName: savedSupplier ? savedSupplier.name : 'کڕینی نەقد',
         supplierPhone: savedSupplier ? savedSupplier.phone : '',
         date: formatDate(invoiceDate || new Date()),
-        paymentMethod: paymentMethod === 'CASH' ? 'نەقد' : (paymentMethod === 'DEBT' ? 'قەرز' : 'بەشەکی'),
+        paymentMethod: paymentMethod === 'CASH' ? 'نەقد' : (paymentMethod === 'DEBT' ? 'قەرز' : 'تێکەڵ'),
         paidAmount: effectivePaid,
         remainingAmount: totalRemaining,
         itemsSubtotal,
         additionalCost: effectiveAdditionalCost,
         totalInvoiceCost,
-        items: itemsWithLandedCost.map(i => ({
-          name: i.name,
-          quantity: i.quantity,
-          cost_price: Number(i.cost_price) || 0,
-          landedUnitCost: i.landedUnitCost || Number(i.cost_price) || 0,
-          total: Math.round((Number(i.cost_price) || 0) * (parseFloat(i.quantity) || 1))
-        }))
+        items: itemsWithLandedCost.map(i => {
+          const lineTotal = getItemLineTotal(i);
+          const unitDesc = i.unit_type === 'BOX' ? `${i.box_quantity} کارتۆن` : `${i.quantity} دانە`;
+
+          return {
+            name: i.name,
+            quantity: unitDesc,
+            cost_price: i.unit_type === 'BOX' ? Number(i.box_cost_price) : Number(i.cost_price),
+            landedUnitCost: i.landedUnitCost || Number(i.cost_price) || 0,
+            total: lineTotal
+          };
+        })
       };
 
       setPrintedInvoice(invoiceReceiptData);
@@ -337,227 +528,217 @@ const Purchases = () => {
       overflow: 'hidden',
       padding: '10px 16px',
       gap: '8px',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      direction: 'rtl'
     }}>
       
-      {/* Top Section: Header & Invoice Details */}
+      {/* Top Section: Clean Toolbar */}
       <div style={{
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        padding: '10px 14px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '8px',
+        padding: '8px 12px',
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         gap: '8px',
+        flexWrap: 'nowrap',
         flexShrink: 0
       }}>
-        {/* Row 1: Title & Return Link */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            پسووڵەی کڕین
-          </h1>
-          <a 
-            href="#/financials?tab=RETURNS"
+        {/* Supplier Select */}
+        <div style={{ flex: '1.4', minWidth: '180px' }}>
+          <select 
+            value={supplierId} 
+            onChange={(e) => {
+              setSupplierId(e.target.value);
+              if (!e.target.value) setPaymentMethod('CASH');
+            }} 
             style={{
-              padding: '6px 14px',
-              borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.12)',
-              color: '#f87171',
-              textDecoration: 'none',
+              width: '100%',
+              height: '38px',
+              padding: '0 10px',
+              borderRadius: '6px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontSize: '0.86rem',
+              outline: 'none',
               fontWeight: 700,
-              fontSize: '0.85rem',
-              border: '1px solid rgba(239, 68, 68, 0.25)'
+              boxSizing: 'border-box'
             }}
           >
-            گەڕاندنەوە بۆ کۆمپانیاکان
-          </a>
+            <option value="">کۆمپانیا دیاریبکە...</option>
+            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
         </div>
 
-        {/* Row 2: Invoice Fields Toolbar */}
+        {/* Invoice Number */}
+        <div style={{ width: '130px' }}>
+          <input 
+            type="text" 
+            value={invoiceNumber} 
+            onChange={(e) => setInvoiceNumber(e.target.value)}
+            placeholder="ژمارەی پسووڵە"
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 10px',
+              borderRadius: '6px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontFamily: 'monospace',
+              fontSize: '0.86rem',
+              textAlign: 'center',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }} 
+          />
+        </div>
+
+        {/* Date Picker */}
+        <div style={{ width: '140px' }}>
+          <input 
+            type="date" 
+            value={invoiceDate} 
+            onChange={(e) => setInvoiceDate(e.target.value)}
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 10px',
+              borderRadius: '6px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontSize: '0.86rem',
+              textAlign: 'center',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }} 
+          />
+        </div>
+
+        {/* Payment Method Selector (Segmented 38px) */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(180px, 1.4fr) minmax(110px, 0.9fr) minmax(125px, 0.9fr) minmax(180px, 1fr) auto minmax(110px, 0.8fr)',
-          gap: '8px',
-          alignItems: 'center'
+          display: 'inline-flex',
+          borderRadius: '6px',
+          overflow: 'hidden',
+          border: '1px solid #cbd5e1',
+          height: '38px',
+          width: '180px',
+          boxSizing: 'border-box'
         }}>
-          {/* Supplier */}
-          <div>
-            <select 
-              value={supplierId} 
-              onChange={(e) => {
-                setSupplierId(e.target.value);
-                if (!e.target.value) setPaymentMethod('CASH');
-              }} 
+          {[
+            { id: 'CASH', label: 'نەقد' },
+            { id: 'DEBT', label: 'قەرز' },
+            { id: 'PARTIAL', label: 'تێکەڵ' }
+          ].map(pm => (
+            <button
+              key={pm.id}
+              type="button"
+              onClick={() => {
+                if (pm.id !== 'CASH' && !supplierId) {
+                  setCompanyWarningOpen(true);
+                  return;
+                }
+                setPaymentMethod(pm.id);
+                if (pm.id === 'PARTIAL' && (paymentMethod === 'CASH' || !paidAmount)) {
+                  setPaidAmount('0');
+                }
+              }}
               style={{
-                width: '100%',
-                height: '36px',
-                padding: '0 10px',
-                borderRadius: '8px',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                fontSize: '0.88rem',
-                outline: 'none',
-                fontWeight: 600
+                flex: 1,
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: paymentMethod === pm.id ? 800 : 600,
+                background: paymentMethod === pm.id ? '#2563eb' : '#f8fafc',
+                color: paymentMethod === pm.id ? '#ffffff' : '#64748b',
+                fontSize: '0.82rem',
+                transition: 'background 0.15s ease'
               }}
             >
-              <option value="">کڕینی نەقد (بێ کۆمپانیا)</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
+              {pm.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Invoice Number */}
-          <div>
-            <input 
-              type="text" 
-              value={invoiceNumber} 
-              onChange={(e) => setInvoiceNumber(e.target.value)}
-              placeholder="ژمارەی پسووڵە"
-              style={{
-                width: '100%',
-                height: '36px',
-                padding: '0 10px',
-                borderRadius: '8px',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                fontFamily: 'monospace',
-                fontSize: '0.88rem',
-                boxSizing: 'border-box'
-              }} 
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <input 
-              type="date" 
-              value={invoiceDate} 
-              onChange={(e) => setInvoiceDate(e.target.value)}
-              style={{
-                width: '100%',
-                height: '36px',
-                padding: '0 10px',
-                borderRadius: '8px',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                fontSize: '0.88rem',
-                boxSizing: 'border-box'
-              }} 
-            />
-          </div>
-
-          {/* Payment Method Selector */}
-          <div style={{
-            display: 'flex',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            border: '1px solid var(--border-color)',
-            height: '36px'
-          }}>
-            {[
-              { id: 'CASH', label: 'نەقد' },
-              { id: 'DEBT', label: 'قەرز' },
-              { id: 'PARTIAL', label: 'بەشەکی' }
-            ].map(pm => (
-              <button
-                key={pm.id}
-                type="button"
-                onClick={() => {
-                  if (pm.id !== 'CASH' && !supplierId) {
-                    alert('کڕین بە قەرز یان بەشەکی پێویستی بە دیاریکردنی کۆمپانیایە');
-                    return;
-                  }
-                  setPaymentMethod(pm.id);
-                }}
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: paymentMethod === pm.id ? 800 : 600,
-                  background: paymentMethod === pm.id ? '#f43f5e' : 'var(--bg-tertiary)',
-                  color: paymentMethod === pm.id ? '#ffffff' : 'var(--text-secondary)',
-                  fontSize: '0.82rem',
-                  transition: 'background 0.15s ease'
-                }}
-              >
-                {pm.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Paid Amount Field (Only in Partial Mode) */}
-          {paymentMethod === 'PARTIAL' ? (
-            <div style={{ width: '130px' }}>
-              <input 
-                type="number" 
-                step="250"
-                min="0"
-                value={paidAmount} 
-                onChange={(e) => setPaidAmount(e.target.value)} 
-                placeholder="پارەی دراو"
-                style={{
-                  width: '100%',
-                  height: '36px',
-                  padding: '0 8px',
-                  borderRadius: '8px',
-                  background: 'rgba(16, 185, 129, 0.08)',
-                  border: '1.5px solid #10b981',
-                  color: '#10b981',
-                  fontWeight: 800,
-                  fontSize: '0.9rem',
-                  textAlign: 'center',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }} 
-              />
-            </div>
-          ) : (
-            <div />
-          )}
-
-          {/* Additional Cost Field */}
-          <div>
+        {/* Paid Amount Field (Only in Partial Mode - Standard 1px solid #cbd5e1 gray border) */}
+        {paymentMethod === 'PARTIAL' && (
+          <div style={{ width: '120px' }}>
             <input 
               type="number" 
-              step="250"
+              step="any"
               min="0"
-              value={additionalCost} 
-              onChange={(e) => setAdditionalCost(e.target.value)}
-              placeholder="تێچووی زیادە"
+              max={totalInvoiceCost}
+              value={paidAmount} 
+              onChange={(e) => handlePaidAmountChange(e.target.value)} 
+              onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+              placeholder="پارەی دراو"
               style={{
                 width: '100%',
-                height: '36px',
+                height: '38px',
                 padding: '0 8px',
-                borderRadius: '8px',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                color: '#f59e0b',
+                borderRadius: '6px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                color: '#1e293b',
                 fontWeight: 700,
                 fontSize: '0.88rem',
                 textAlign: 'center',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                outline: 'none'
               }} 
             />
           </div>
+        )}
+
+        {/* Additional Cost Field */}
+        <div style={{ width: '150px' }}>
+          <input 
+            type="number" 
+            step="any"
+            min="0"
+            value={additionalCost} 
+            onChange={(e) => {
+              if (e.target.value === '') {
+                setAdditionalCost('');
+              } else {
+                const v = Math.max(0, parseFloat(e.target.value) || 0);
+                setAdditionalCost(String(v));
+              }
+            }}
+            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+            placeholder="تێچووی زیادە (بار)"
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 8px',
+              borderRadius: '6px',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontWeight: 700,
+              fontSize: '0.86rem',
+              textAlign: 'center',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }} 
+          />
         </div>
       </div>
 
-      {/* Barcode & Product Search Row */}
+      {/* Consolidate Search Row: Barcode, Name Search, Add, and + New Product on tightly unified line */}
       <div style={{
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '10px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '8px',
         padding: '6px 10px',
-        display: 'grid',
-        gridTemplateColumns: 'minmax(240px, 1.2fr) minmax(220px, 1.2fr) minmax(180px, 1fr)',
-        gap: '8px',
+        display: 'flex',
         alignItems: 'center',
+        gap: '8px',
         flexShrink: 0
       }}>
         {/* Barcode Scan Form */}
-        <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '6px' }}>
+        <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '6px', flex: '1.2' }}>
           <input 
             ref={scanInputRef}
             type="text" 
@@ -567,29 +748,32 @@ const Purchases = () => {
             autoFocus
             style={{
               flex: 1,
-              height: '34px',
+              height: '38px',
               padding: '0 10px',
               borderRadius: '6px',
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-primary)',
-              fontSize: '0.9rem',
-              fontFamily: 'monospace'
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontSize: '0.88rem',
+              fontFamily: 'monospace',
+              boxSizing: 'border-box',
+              outline: 'none'
             }}
           />
           <button 
             type="submit" 
             style={{
-              height: '34px',
-              padding: '0 14px',
+              height: '38px',
+              padding: '0 16px',
               borderRadius: '6px',
-              background: '#f43f5e',
+              background: '#2563eb',
               color: '#ffffff',
               border: 'none',
               cursor: 'pointer',
               fontWeight: 700,
-              fontSize: '0.82rem',
-              whiteSpace: 'nowrap'
+              fontSize: '0.84rem',
+              whiteSpace: 'nowrap',
+              boxSizing: 'border-box'
             }}
           >
             زیادکردن
@@ -597,7 +781,7 @@ const Purchases = () => {
         </form>
 
         {/* Kurdish Live Search */}
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', flex: '1.5' }}>
           <input 
             type="text"
             placeholder="گەڕان بە ناوی کاڵا..."
@@ -605,14 +789,15 @@ const Purchases = () => {
             onChange={(e) => setProductSearch(e.target.value)}
             style={{
               width: '100%',
-              height: '34px',
+              height: '38px',
               padding: '0 10px',
               borderRadius: '6px',
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-primary)',
-              fontSize: '0.88rem',
-              boxSizing: 'border-box'
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#1e293b',
+              fontSize: '0.86rem',
+              boxSizing: 'border-box',
+              outline: 'none'
             }}
           />
           {filteredProducts.length > 0 && (
@@ -622,10 +807,10 @@ const Purchases = () => {
               left: 0,
               right: 0,
               marginTop: '4px',
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
               borderRadius: '8px',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
               zIndex: 100,
               maxHeight: '220px',
               overflowY: 'auto'
@@ -634,7 +819,7 @@ const Purchases = () => {
                 <div
                   key={p.id}
                   onClick={() => {
-                    handleProcessBarcode(p.barcode);
+                    handleProcessBarcode(p.barcode || p.box_barcode);
                     setProductSearch('');
                   }}
                   style={{
@@ -643,188 +828,281 @@ const Purchases = () => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    borderBottom: '1px solid var(--border-color)'
+                    borderBottom: '1px solid #f1f5f9'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
-                  <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.85rem' }}>{p.name}</span>
-                  <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.85rem' }}>{Number(p.cost_price || 0).toLocaleString()} د.ع</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>{p.name}</span>
+                    {Number(p.units_per_box) > 1 && (
+                      <span style={{ fontSize: '0.74rem', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
+                        {p.units_per_box} دانە/کارتۆن
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: '#1e293b', fontWeight: 700, fontSize: '0.84rem' }}>{Number(p.cost_price || 0).toLocaleString()} د.ع</span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Quick Product Pick Dropdown */}
-        <div>
-          <select
-            onChange={(e) => {
-              if (e.target.value) {
-                handleProcessBarcode(e.target.value);
-                e.target.value = '';
-              }
-            }}
-            style={{
-              width: '100%',
-              height: '34px',
-              padding: '0 8px',
-              borderRadius: '6px',
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-primary)',
-              fontSize: '0.85rem',
-              outline: 'none'
-            }}
-          >
-            <option value="">لیستی کاڵاکان...</option>
-            {products.map(p => (
-              <option key={p.id} value={p.barcode} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                {p.name} ({Number(p.cost_price || 0).toLocaleString()} د.ع)
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Quick Add Product Button */}
+        <button
+          type="button"
+          onClick={() => openQuickAddModal('')}
+          style={{
+            height: '38px',
+            padding: '0 16px',
+            borderRadius: '6px',
+            background: '#0284c7',
+            color: '#ffffff',
+            border: 'none',
+            fontWeight: 800,
+            fontSize: '0.84rem',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box'
+          }}
+        >
+          + کاڵای نوێ
+        </button>
       </div>
 
-      {/* Items Table Container (Flex: 1, Internally Scrollable, Zero Page Scroll) */}
+      {/* Items Table Container (Strict Bordered Data Grid, Zero Page Scroll) */}
       <div style={{
         flex: 1,
         minHeight: 0,
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '8px',
         overflowY: 'auto',
         overflowX: 'auto',
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <colgroup>
+            <col style={{ width: '3%' }} />
+            <col style={{ width: '21%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '5%' }} />
+          </colgroup>
           <thead style={{
             position: 'sticky',
             top: 0,
-            background: 'var(--bg-tertiary)',
-            borderBottom: '1px solid var(--border-color)',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
             zIndex: 10
           }}>
-            <tr>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', textAlign: 'center', width: '35px' }}>#</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem' }}>ناوی کاڵا</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', width: '130px' }}>بارکۆد</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', textAlign: 'center', width: '90px' }}>بڕ</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', width: '120px' }}>نرخی کڕین</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', width: '120px' }}>نرخی فرۆشتن</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', width: '120px' }}>کۆی کڕین</th>
-              <th style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 800, fontSize: '0.8rem', textAlign: 'center', width: '50px' }}></th>
+            <tr style={{ height: '38px', color: '#475569', fontSize: '0.82rem', fontWeight: 700 }}>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>#</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'right' }}>ناوی کاڵا</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بارکۆد</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>هەبوو</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>شێوازی کڕین</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بڕ</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی کڕین</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی فرۆشتن (تاک)</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center' }}>کۆی کڕین</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>کردار</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ padding: '50px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  هیچ کاڵایەک لە پسووڵەکەدا نییە
+                <td colSpan="10" style={{ border: '1px solid #e2e8f0', padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+                  هیچ کاڵایەک لە پسووڵەکەدا نییە. بارکۆد لێبدە یان بە ناوی کاڵا بگەڕێ.
                 </td>
               </tr>
             ) : (
               items.map((item, index) => {
-                const qty = parseInt(item.quantity) || 0;
-                const cp = Number(item.cost_price) || 0;
-                const sp = Number(item.selling_price) || 0;
-                const lineTotalCost = cp * qty;
+                const isBox = item.unit_type === 'BOX';
+                const unitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+                const lineTotalCost = getItemLineTotal(item);
 
                 return (
-                  <tr key={index} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.82rem' }}>
+                  <tr 
+                    key={index} 
+                    style={{ height: '42px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* Index */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center', color: '#64748b', fontWeight: 700, fontSize: '0.80rem' }}>
                       {index + 1}
                     </td>
 
-                    <td style={{ padding: '8px 10px', fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
-                      {item.name}
+                    {/* Name - Ultra-Clean without pill tag */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 10px', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span>{item.name}</span>
                     </td>
 
-                    <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
-                      {item.barcode}
+                    {/* Barcode */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b', fontSize: '0.82rem' }}>
+                      {isBox && item.box_barcode ? item.box_barcode : item.barcode}
                     </td>
 
-                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                    {/* Current Stock (عەمباری ئێستا) */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.84rem' }}>
+                      {Number(item.stock_before || 0).toLocaleString()} دانە
+                    </td>
+
+                    {/* Unit Selector: Carton or Piece */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        background: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        padding: '2px',
+                        height: '28px',
+                        boxSizing: 'border-box'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, 'unit_type', 'BOX')}
+                          style={{
+                            padding: '0 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            background: isBox ? '#2563eb' : 'transparent',
+                            color: isBox ? '#ffffff' : '#64748b',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          کارتۆن
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, 'unit_type', 'PIECE')}
+                          style={{
+                            padding: '0 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            background: !isBox ? '#2563eb' : 'transparent',
+                            color: !isBox ? '#ffffff' : '#64748b',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          دانە
+                        </button>
+                      </div>
+                    </td>
+
+                    {/* Quantity Input - Clean Single Centered Input */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
                       <input 
                         type="number" 
-                        min="1" 
-                        value={item.quantity} 
-                        onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
+                        step="any"
+                        min="0.001" 
+                        value={isBox ? item.box_quantity : item.quantity} 
+                        onChange={(e) => updateItem(index, isBox ? 'box_quantity' : 'quantity', e.target.value)} 
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
                           width: '75px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
+                          height: '28px',
+                          borderRadius: '4px',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#1e293b',
                           textAlign: 'center',
-                          fontWeight: 800,
-                          fontSize: '0.88rem'
+                          fontWeight: 700,
+                          fontSize: '0.86rem',
+                          outline: 'none'
                         }} 
                       />
                     </td>
 
-                    <td style={{ padding: '8px 10px' }}>
+                    {/* Cost Price Input - Clean Single Centered Input */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
                       <input 
                         type="number" 
-                        step="250"
+                        step="any"
                         min="0"
-                        value={item.cost_price} 
-                        onChange={(e) => updateItem(index, 'cost_price', e.target.value)} 
+                        value={isBox ? item.box_cost_price : item.cost_price} 
+                        onChange={(e) => updateItem(index, isBox ? 'box_cost_price' : 'cost_price', e.target.value)} 
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
-                          width: '110px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          background: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          color: 'var(--text-primary)',
-                          fontWeight: 800,
-                          fontSize: '0.88rem',
-                          padding: '0 8px'
+                          width: '95px',
+                          height: '28px',
+                          borderRadius: '4px',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#1e293b',
+                          fontWeight: 700,
+                          fontSize: '0.86rem',
+                          textAlign: 'center',
+                          outline: 'none'
                         }} 
                       />
                     </td>
 
-                    <td style={{ padding: '8px 10px' }}>
+                    {/* Selling Price (Per Piece) - Clean Gray Border */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
                       <input 
                         type="number" 
-                        step="250"
+                        step="any"
                         min="0"
                         value={item.selling_price} 
                         onChange={(e) => updateItem(index, 'selling_price', e.target.value)} 
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
-                          width: '110px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          background: 'rgba(16, 185, 129, 0.08)',
-                          border: '1px solid rgba(16, 185, 129, 0.35)',
-                          color: '#10b981',
-                          fontWeight: 800,
-                          fontSize: '0.88rem',
-                          padding: '0 8px'
+                          width: '85px',
+                          height: '28px',
+                          borderRadius: '4px',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#1e293b',
+                          fontWeight: 700,
+                          fontSize: '0.86rem',
+                          textAlign: 'center',
+                          outline: 'none'
                         }} 
                       />
                     </td>
 
-                    <td style={{ padding: '8px 10px', fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
-                      {lineTotalCost.toLocaleString()} د.ع
+                    {/* Line Total: Exactly Quantity × Purchase Price */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>
+                      {lineTotalCost.toLocaleString()}
                     </td>
 
-                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                    {/* Actions: Clean Minimalist Gray Border Button */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
                       <button 
                         type="button"
                         onClick={() => removeItem(index)} 
                         style={{
-                          background: 'rgba(239, 68, 68, 0.1)',
-                          color: '#ef4444',
-                          border: 'none',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
+                          background: '#ffffff',
+                          color: '#64748b',
+                          border: '1px solid #cbd5e1',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
                           cursor: 'pointer',
                           fontWeight: 700,
-                          fontSize: '0.8rem'
+                          fontSize: '0.76rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#ef4444';
+                          e.currentTarget.style.background = '#fef2f2';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#64748b';
+                          e.currentTarget.style.background = '#ffffff';
                         }}
                       >
                         سڕینەوە
@@ -838,44 +1116,45 @@ const Purchases = () => {
         </table>
       </div>
 
-      {/* Bottom Fixed Summary & Save Bar (Fixed height, ZERO page scroll) */}
+      {/* Bottom Sticky Summary & Save Bar: Clean Solid White Background, subtle top border, standard font weights */}
       <div style={{
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        padding: '8px 14px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderTop: '1px solid #e2e8f0',
+        borderRadius: '8px',
+        padding: '10px 16px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         gap: '12px',
         flexShrink: 0
       }}>
-        {/* Summary Indicators */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            کاڵا: <strong style={{ color: 'var(--text-primary)' }}>{items.length} جۆر ({totalQty} دانە)</strong>
+        {/* Summary Indicators with Clean Monochrome Text (No 5 rainbow colors) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', color: '#475569', fontSize: '0.86rem' }}>
+          <div>
+            کاڵا: <strong style={{ color: '#1e293b', fontWeight: 800 }}>{items.length} جۆر ({totalQty} دانە)</strong>
           </div>
 
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            کۆی کڕین: <strong style={{ color: 'var(--text-primary)' }}>{itemsSubtotal.toLocaleString()} د.ع</strong>
+          <div>
+            کۆی کڕین: <strong style={{ color: '#1e293b', fontWeight: 800 }}>{itemsSubtotal.toLocaleString()} د.ع</strong>
           </div>
 
           {effectiveAdditionalCost > 0 && (
-            <div style={{ fontSize: '0.85rem', color: '#f59e0b' }}>
-              تێچووی زیادە: <strong>{effectiveAdditionalCost.toLocaleString()} د.ع</strong>
+            <div>
+              تێچووی زیادە: <strong style={{ color: '#1e293b', fontWeight: 800 }}>{effectiveAdditionalCost.toLocaleString()} د.ع</strong>
             </div>
           )}
 
-          <div style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            کۆی گشتی: <span style={{ color: '#f43f5e', fontSize: '1.15rem' }}>{totalInvoiceCost.toLocaleString()} د.ع</span>
+          <div>
+            کۆی گشتی: <strong style={{ color: '#1e293b', fontWeight: 800 }}>{totalInvoiceCost.toLocaleString()} د.ع</strong>
           </div>
 
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            دراو: <strong style={{ color: '#10b981' }}>{effectivePaid.toLocaleString()} د.ع</strong>
+          <div>
+            دراو: <strong style={{ color: '#1e293b', fontWeight: 800 }}>{effectivePaid.toLocaleString()} د.ع</strong>
           </div>
 
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            ماوە (قەرز): <strong style={{ color: totalRemaining > 0 ? '#ef4444' : '#10b981' }}>{totalRemaining.toLocaleString()} د.ع</strong>
+          <div>
+            ماوە (قەرز): <strong style={{ color: '#1e293b', fontWeight: 800 }}>{totalRemaining.toLocaleString()} د.ع</strong>
           </div>
         </div>
 
@@ -886,12 +1165,12 @@ const Purchases = () => {
               type="button"
               onClick={() => window.print()}
               style={{
-                height: '38px',
+                height: '36px',
                 padding: '0 12px',
-                borderRadius: '8px',
-                background: 'rgba(56, 189, 248, 0.12)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
-                color: '#38bdf8',
+                borderRadius: '6px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                color: '#0284c7',
                 fontWeight: 700,
                 fontSize: '0.82rem',
                 cursor: 'pointer',
@@ -905,17 +1184,17 @@ const Purchases = () => {
           <button 
             type="button"
             onClick={() => handleSaveInvoice(false)}
-            disabled={isSubmitting || items.length === 0}
+            disabled={isSaveDisabled}
             style={{
-              height: '38px',
+              height: '36px',
               padding: '0 18px',
-              borderRadius: '8px',
-              background: (isSubmitting || items.length === 0) ? 'rgba(255,255,255,0.06)' : 'var(--bg-tertiary)',
-              color: (isSubmitting || items.length === 0) ? 'var(--text-muted)' : 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              fontSize: '0.88rem',
+              borderRadius: '6px',
+              background: isSaveDisabled ? '#f8fafc' : '#ffffff',
+              color: isSaveDisabled ? '#94a3b8' : '#1e293b',
+              border: isSaveDisabled ? '1px solid #e2e8f0' : '1px solid #cbd5e1',
+              fontSize: '0.86rem',
               fontWeight: 700,
-              cursor: (isSubmitting || items.length === 0) ? 'not-allowed' : 'pointer',
+              cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap'
             }}
           >
@@ -925,17 +1204,17 @@ const Purchases = () => {
           <button 
             type="button"
             onClick={() => handleSaveInvoice(true)}
-            disabled={isSubmitting || items.length === 0}
+            disabled={isSaveDisabled}
             style={{
-              height: '38px',
+              height: '36px',
               padding: '0 20px',
-              borderRadius: '8px',
-              background: (isSubmitting || items.length === 0) ? 'rgba(255,255,255,0.06)' : '#f43f5e',
-              color: (isSubmitting || items.length === 0) ? 'var(--text-muted)' : '#ffffff',
+              borderRadius: '6px',
+              background: isSaveDisabled ? '#cbd5e1' : '#2563eb',
+              color: '#ffffff',
               border: 'none',
-              fontSize: '0.88rem',
+              fontSize: '0.86rem',
               fontWeight: 800,
-              cursor: (isSubmitting || items.length === 0) ? 'not-allowed' : 'pointer',
+              cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap'
             }}
           >
@@ -944,108 +1223,29 @@ const Purchases = () => {
         </div>
       </div>
 
-      {/* Quick Add Product Modal */}
-      {isQuickAddOpen && (
-        <div className="pos-modal-overlay" onClick={() => setIsQuickAddOpen(false)}>
-          <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.05rem', fontWeight: 800 }}>
-                تۆمارکردنی کاڵای نوێ
-              </h2>
-              <button 
-                type="button" 
-                onClick={() => setIsQuickAddOpen(false)} 
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 700 }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleQuickAddProductSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>بارکۆد</label>
-                <input 
-                  type="text" 
-                  disabled 
-                  value={quickProductData.barcode} 
-                  style={{ width: '100%', height: '36px', padding: '0 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontFamily: 'monospace', fontWeight: 700, boxSizing: 'border-box' }} 
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>ناوی کاڵا</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="ناوی کاڵا بنووسە..."
-                  value={quickProductData.name} 
-                  onChange={(e) => setQuickProductData({ ...quickProductData, name: e.target.value })} 
-                  style={{ width: '100%', height: '36px', padding: '0 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box' }} 
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>کەتەگۆری</label>
-                <select 
-                  value={quickProductData.category_id} 
-                  onChange={(e) => setQuickProductData({ ...quickProductData, category_id: e.target.value })} 
-                  style={{ width: '100%', height: '36px', padding: '0 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                >
-                  <option value="">بێ کەتەگۆری...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>نرخی کڕین</label>
-                  <input 
-                    type="number" 
-                    step="250"
-                    min="0"
-                    placeholder="0"
-                    value={quickProductData.cost_price} 
-                    onChange={(e) => setQuickProductData({ ...quickProductData, cost_price: e.target.value })} 
-                    style={{ width: '100%', height: '36px', padding: '0 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 700, boxSizing: 'border-box' }} 
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.82rem', color: '#10b981', fontWeight: 700 }}>نرخی فرۆشتن</label>
-                  <input 
-                    type="number" 
-                    required
-                    step="250"
-                    min="0"
-                    value={quickProductData.selling_price} 
-                    onChange={(e) => setQuickProductData({ ...quickProductData, selling_price: e.target.value })} 
-                    style={{ width: '100%', height: '36px', padding: '0 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid #10b981', color: '#10b981', fontWeight: 700, boxSizing: 'border-box' }} 
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem' }}>
-                <button 
-                  type="submit" 
-                  style={{ flex: 1, height: '38px', borderRadius: '8px', background: '#f43f5e', color: '#ffffff', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  تۆمارکردن
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsQuickAddOpen(false)}
-                  style={{ height: '38px', padding: '0 16px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  داخستن
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Quick Add Product Modal (Unified DRY Layout matching Products & Warehouse) */}
+      <ProductModal
+        isOpen={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        onSuccess={handleQuickAddSuccess}
+        mode="purchase"
+        presetBarcode={quickAddBarcode}
+        categories={categories}
+        onCategoriesUpdate={(newCat) => {
+          setCategories(prev => {
+            if (prev.some(x => x.id === newCat.id)) return prev;
+            return [...prev, newCat];
+          });
+        }}
+        title="تۆمارکردنی کاڵای نوێ بۆ کۆگا"
+        submitText="تۆمارکردن و خستنەسەر پسووڵە"
+      />
 
       {/* Hidden Thermal Purchase Receipt (Targeted by @media print) */}
       <style>{`
+        #thermal-purchase-receipt {
+          display: none !important;
+        }
         @media print {
           @page {
             margin: 0;
@@ -1058,6 +1258,7 @@ const Purchases = () => {
             visibility: visible !important;
           }
           #thermal-purchase-receipt {
+            display: block !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -1078,7 +1279,7 @@ const Purchases = () => {
       `}</style>
 
       {printedInvoice && (
-        <div id="thermal-purchase-receipt">
+        <div id="thermal-purchase-receipt" style={{ display: 'none' }}>
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px' }}>{storeName}</div>
           {storePhone && <div style={{ textAlign: 'center', fontSize: '11px', color: '#333' }}>پەیوەندی: {storePhone}</div>}
           <div className="purchase-divider"></div>
@@ -1157,7 +1358,74 @@ const Purchases = () => {
           )}
 
           <div className="purchase-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '6px' }}>وەسڵی فەرمیی کڕین</div>
+          <p style={{ textAlign: 'center', marginTop: '6px', fontSize: '9px' }}>وەسڵی فەرمیی کڕین</p>
+        </div>
+      )}
+
+      {/* Clean & Minimalist Company Required Notification Modal */}
+      {companyWarningOpen && (
+        <div 
+          onClick={() => setCompanyWarningOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            direction: 'rtl'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              padding: '24px 32px',
+              width: '320px',
+              maxWidth: '90vw',
+              textAlign: 'center',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <p style={{
+              margin: 0,
+              fontSize: '1rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              lineHeight: 1.5
+            }}>
+              تکایە سەرەتا کۆمپانیا دیاری بکە
+            </p>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setCompanyWarningOpen(false)}
+              style={{
+                height: '36px',
+                padding: '0 32px',
+                borderRadius: '6px',
+                background: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.86rem',
+                cursor: 'pointer'
+              }}
+            >
+              باشە
+            </button>
+          </div>
         </div>
       )}
 

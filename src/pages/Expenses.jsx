@@ -379,7 +379,7 @@ const Expenses = () => {
                   <input 
                     type="number" 
                     required
-                    step="250"
+                    step="any"
                     min="0"
                     placeholder="بۆ نموونە: ٥٠٠٠٠"
                     value={formData.amount} 

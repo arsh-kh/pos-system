@@ -548,7 +548,7 @@ const Promotions = () => {
                     onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
                     placeholder={formData.discount_type === 'FIXED_PRICE' ? 'بۆ نموونە: 750' : 'بۆ نموونە: 25'}
                     min="0"
-                    step={formData.discount_type === 'FIXED_PRICE' ? "250" : "1"}
+                    step={formData.discount_type === 'FIXED_PRICE' ? "any" : "1"}
                     max={formData.discount_type === 'PERCENT' ? "99" : undefined}
                     required
                     style={{ flex: '1 1 120px', minWidth: '100px', padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'center' }}

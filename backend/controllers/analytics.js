@@ -501,13 +501,15 @@ exports.getPeriodReport = async (req, res) => {
                 p.id,
                 COALESCE(si.custom_name, p.name) as name,
                 p.barcode,
+                p.is_weighted,
+                p.unit,
                 COALESCE(SUM(si.quantity * si.units_per_box), 0) as total_quantity,
                 COALESCE(SUM(si.quantity * si.price_at_sale), 0) as total_revenue
             FROM Sale_Items si
             JOIN Sales s ON si.sale_id = s.id
             LEFT JOIN Products p ON si.product_id = p.id
             WHERE s.created_at BETWEEN ? AND ?
-            GROUP BY p.id, si.custom_name, p.name, p.barcode
+            GROUP BY p.id, si.custom_name, p.name, p.barcode, p.is_weighted, p.unit
             ORDER BY total_quantity DESC
             LIMIT 5
         `, [startDateTime, endDateTime]);

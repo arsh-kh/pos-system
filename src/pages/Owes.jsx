@@ -803,7 +803,7 @@ const Owes = () => {
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input 
                       type="number"
-                      step="250"
+                      step="any"
                       min="0"
                       placeholder="بڕی پارە..."
                       value={transactionAmount}

@@ -866,7 +866,7 @@ const TotalSales = () => {
                     <input 
                       type="number"
                       min="0"
-                      step="250"
+                      step="any"
                       required
                       placeholder="بۆ نموونە: 25000"
                       value={manualForm.total_amount}
@@ -920,7 +920,7 @@ const TotalSales = () => {
                   <input 
                     type="number"
                     min="0"
-                    step="250"
+                    step="any"
                     placeholder="بۆ نموونە: 5000 (ئارەزوومەندانە)"
                     value={manualForm.total_profit}
                     onChange={(e) => setManualForm({ ...manualForm, total_profit: e.target.value })}

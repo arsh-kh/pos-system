@@ -654,7 +654,7 @@ const VendorReturns = () => {
                   </button>
                   <input
                     type="number"
-                    step="250"
+                    step="any"
                     min="0"
                     value={costPrice}
                     onChange={(e) => setCostPrice(e.target.value)}
