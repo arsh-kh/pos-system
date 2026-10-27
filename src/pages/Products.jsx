@@ -47,7 +47,12 @@ const Products = () => {
   const [printProduct, setPrintProduct] = useState(null);
   const [printCopies, setPrintCopies] = useState(1);
   const [storeName, setStoreName] = useState(() => {
-    return localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
+    const saved = localStorage.getItem('pos_store_name');
+    if (saved && saved !== 'مارکێتی حاجی ئاکۆ') {
+      return saved;
+    }
+    try { localStorage.setItem('pos_store_name', 'مارکێتی شارەکەم'); } catch (_) {}
+    return 'مارکێتی شارەکەم';
   });
   const printAreaRef = useRef(null);
 

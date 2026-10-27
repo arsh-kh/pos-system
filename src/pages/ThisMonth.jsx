@@ -64,7 +64,7 @@ const ThisMonth = () => {
   const navigate = useNavigate();
   const printAreaRef = useRef(null);
 
-  const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
+  const storeName = (localStorage.getItem('pos_store_name') && localStorage.getItem('pos_store_name') !== 'مارکێتی حاجی ئاکۆ') ? localStorage.getItem('pos_store_name') : 'مارکێتی شارەکەم';
   const storePhone = localStorage.getItem('pos_store_phone') || '0772 979 0421';
 
   // Time-Range State

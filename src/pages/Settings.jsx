@@ -75,7 +75,7 @@ const Settings = () => {
     setHardwareNotice('');
     try {
       if (ipcRenderer) {
-        const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی حاجی ئاکۆ';
+        const storeName = (localStorage.getItem('pos_store_name') && localStorage.getItem('pos_store_name') !== 'مارکێتی حاجی ئاکۆ') ? localStorage.getItem('pos_store_name') : 'مارکێتی شارەکەم';
         const res = await ipcRenderer.invoke('print-test-receipt', {
           printerName: selectedPrinter,
           storeName,
