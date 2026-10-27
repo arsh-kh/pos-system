@@ -148,9 +148,7 @@ const Login = () => {
           <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
             مارکێتی شارەکەم
           </h1>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>
-            تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە بۆ چوونەژوورەوە
-          </p>
+
         </div>
 
         {/* Error Alert */}
@@ -301,10 +299,7 @@ const Login = () => {
           </button>
         </form>
 
-        {/* Security Notice Footer */}
-        <div style={{ marginTop: '22px', textAlign: 'center', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-          هەموو چوونەژوورەوەیەک لە تۆماری چاودێری (Audit Logs) پارێزراوە.
-        </div>
+
       </div>
     </div>
   );
