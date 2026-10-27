@@ -90,49 +90,66 @@ exports.login = async (req, res) => {
 };
 
 exports.changePassword = async (req, res) => {
-    const { username, oldPassword, newPassword } = req.body;
+    const { username, oldPassword, newUsername, newPassword } = req.body;
 
-    if (!username || !oldPassword || !newPassword) {
-        return res.status(400).json({ status: 'ERROR', message: 'تکایە هەموو خانەکان پڕبکەرەوە' });
-    }
-
-    if (newPassword.length < 4) {
-        return res.status(400).json({ status: 'ERROR', message: 'وشەی نهێنی نوێ نابێت لە ٤ پیت کەمتر بێت' });
+    if (!username || !oldPassword) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی بەکارهێنەر و وشەی نهێنی ئێستا بنووسە' });
     }
 
     try {
-        const [users] = await db.query('SELECT * FROM Users WHERE username = ?', [username]);
+        const [users] = await db.query('SELECT * FROM Users WHERE username = ?', [username.trim()]);
         if (users.length === 0) {
             return res.status(404).json({ status: 'ERROR', message: 'بەکارهێنەر نەدۆزرایەوە' });
         }
 
         const user = users[0];
-        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        const isMatch = await bcrypt.compare(oldPassword.trim(), user.password);
 
         if (!isMatch) {
-            return res.status(401).json({ status: 'ERROR', message: 'وشەی نهێنی کۆن هەڵەیە' });
+            return res.status(401).json({ status: 'ERROR', message: 'وشەی نهێنی ئێستا (کۆن) هەڵەیە' });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
+        let updatedUsername = user.username;
+        if (newUsername && newUsername.trim() && newUsername.trim() !== user.username) {
+            const cleanNewUsername = newUsername.trim();
+            const [existing] = await db.query('SELECT id FROM Users WHERE username = ? AND id != ?', [cleanNewUsername, user.id]);
+            if (existing.length > 0) {
+                return res.status(400).json({ status: 'ERROR', message: 'ئەم ناوی بەکارهێنەرە پێشتر بەکارهاتووە' });
+            }
+            await db.query('UPDATE Users SET username = ? WHERE id = ?', [cleanNewUsername, user.id]);
+            updatedUsername = cleanNewUsername;
+        }
 
-        await db.query('UPDATE Users SET password = ? WHERE id = ?', [hashedPassword, user.id]);
+        if (newPassword && newPassword.trim()) {
+            if (newPassword.trim().length < 4) {
+                return res.status(400).json({ status: 'ERROR', message: 'وشەی نهێنی نوێ نابێت لە ٤ پیت کەمتر بێت' });
+            }
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(newPassword.trim(), salt);
+            await db.query('UPDATE Users SET password = ? WHERE id = ?', [hashedPassword, user.id]);
+        }
 
         await logAuditAction({
             req,
             action_type: 'UPDATE',
             entity_name: 'Users',
             entity_id: user.id,
-            details: `گۆڕینی وشەی نهێنی بۆ بەکارهێنەر: ${user.username}`
+            details: `نوێکردنەوەی هەژماری بەکارهێنەر: ${user.username} -> ${updatedUsername}`
         });
 
         res.json({
             status: 'SUCCESS',
-            message: 'وشەی نهێنی بە سەرکەوتوویی نوێکرایەوە'
+            message: 'زانیارییەکانی هەژمار بە سەرکەوتوویی نوێکرانەوە',
+            data: {
+                id: user.id,
+                username: updatedUsername,
+                full_name: user.full_name,
+                role: user.role
+            }
         });
     } catch (error) {
         console.error('Change Password Error:', error);
-        res.status(500).json({ status: 'ERROR', message: 'هەڵەیەک لە سێرڤەر ڕوویدا لە کاتی نوێکردنەوەی وشەی نهێنی' });
+        res.status(500).json({ status: 'ERROR', message: 'هەڵەیەک لە سێرڤەر ڕوویدا لە کاتی نوێکردنەوەی هەژمار' });
     }
 };
 

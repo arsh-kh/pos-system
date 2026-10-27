@@ -6,7 +6,7 @@ import {
   Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock,
   Copy, ExternalLink, Edit2, Printer, ScanBarcode, Volume2, Zap, HelpCircle as HelpIcon,
   Bot, Info, BookOpen, FileText, Folder,
-  Users, UserPlus, KeyRound, UserCheck, UserX
+  User, Users, UserPlus, KeyRound, UserCheck, UserX
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -288,10 +288,17 @@ const Settings = () => {
     }
   };
 
-  // Admin Security & Password Change State
+  // Admin Security & Credentials Change State
+  const [adminUsername, setAdminUsername] = useState(currentUser?.username || 'admin');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    if (currentUser?.username) {
+      setAdminUsername(currentUser.username);
+    }
+  }, [currentUser]);
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
@@ -887,12 +894,12 @@ const Settings = () => {
         </div>
 
 
-        {/* Security & Admin Password Management Card */}
+        {/* Security & Admin Credentials Management Card */}
         <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#f59e0b' }}>
-                <Key size={24} /> ئاسایش و وشەی نهێنی
+                <Key size={24} /> ئاسایش و هەژماری بەڕێوەبەر
               </h3>
               <span style={{ fontSize: '0.8rem', padding: '4px 10px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 600 }}>
                 هەژمار: {currentUser?.username || 'admin'}
@@ -900,7 +907,7 @@ const Settings = () => {
             </div>
 
             <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-              وشەی نهێنی بەڕێوەبەر نوێ بکەرەوە بۆ پاراستنی دارایی و قازانجەکان لە بەکارهێنەرانی تر.
+              ناوی بەکارهێنەر (یوزەرنەیم) و وشەی نهێنی بەڕێوەبەر نوێ بکەرەوە بۆ پاراستنی دارایی و سیستەم.
             </p>
 
             {passwordChangeError && (
@@ -920,31 +927,36 @@ const Settings = () => {
               setPasswordChangeError('');
               setPasswordChangeSuccess('');
 
-              if (!oldPassword || !newPassword || !confirmPassword) {
-                setPasswordChangeError('تکایە هەموو خانەکان پڕبکەرەوە');
+              if (!adminUsername.trim()) {
+                setPasswordChangeError('تکایە ناوی بەکارهێنەر (یوزەرنەیم) بنووسە');
                 return;
               }
 
-              if (newPassword.length < 4) {
+              if (!oldPassword) {
+                setPasswordChangeError('تکایە وشەی نهێنی ئێستا (کۆن) بنووسە بۆ دڵنیابوونەوە');
+                return;
+              }
+
+              if (newPassword && newPassword.length < 4) {
                 setPasswordChangeError('وشەی نهێنی نوێ نابێت لە ٤ پیت کەمتر بێت');
                 return;
               }
 
-              if (newPassword !== confirmPassword) {
+              if (newPassword && newPassword !== confirmPassword) {
                 setPasswordChangeError('وشەی نهێنی نوێ و دووبارەکردنەوەکەی وەک یەک نین');
                 return;
               }
 
               setPasswordChangeLoading(true);
               try {
-                const res = await changePassword(oldPassword, newPassword);
+                const res = await changePassword(oldPassword, newPassword || undefined, adminUsername.trim());
                 if (res?.success) {
-                  setPasswordChangeSuccess('وشەی نهێنی بە سەرکەوتوویی نوێکرایەوە!');
+                  setPasswordChangeSuccess('زانیارییەکانی هەژمار بە سەرکەوتوویی نوێکرانەوە!');
                   setOldPassword('');
                   setNewPassword('');
                   setConfirmPassword('');
                 } else {
-                  setPasswordChangeError(res?.message || 'هەڵە لە کاتی گۆڕینی وشەی نهێنی');
+                  setPasswordChangeError(res?.message || 'هەڵە لە کاتی نوێکردنەوەی هەژمار');
                 }
               } catch (err) {
                 setPasswordChangeError(err.message || 'هەڵەیەک ڕوویدا');
@@ -953,6 +965,23 @@ const Settings = () => {
               }
             }} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                  ناوی بەکارهێنەر (یوزەرنەیم)
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    type="text"
+                    value={adminUsername}
+                    onChange={e => setAdminUsername(e.target.value)}
+                    placeholder="ناوی بەکارهێنەر (یوزەرنەیم)..."
+                    required
+                    style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                  />
+                  <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
                   وشەی نهێنی ئێستا (کۆن)
@@ -979,7 +1008,7 @@ const Settings = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  وشەی نهێنی نوێ
+                  وشەی نهێنی نوێ (ئەگەر دەتەوێت بگۆڕێت)
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input 
@@ -987,7 +1016,6 @@ const Settings = () => {
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                     placeholder="لانیکەم ٤ پیت یان ژمارە..."
-                    required
                     style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                   <button
@@ -1010,7 +1038,6 @@ const Settings = () => {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="دووبارە وشەی نهێنی نوێ بنووسەوە..."
-                  required
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
                 />
               </div>
@@ -1022,7 +1049,7 @@ const Settings = () => {
                   style={{ flex: 1, padding: '11px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '0.92rem', cursor: passwordChangeLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}
                 >
                   <Key size={16} />
-                  {passwordChangeLoading ? 'نوێ دەکرێتەوە...' : 'نوێکردنەوەی وشەی نهێنی'}
+                  {passwordChangeLoading ? 'نوێ دەکرێتەوە...' : 'نوێکردنەوەی هەژمار و وشەی نهێنی'}
                 </button>
 
                 <button

@@ -125,19 +125,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Change Password handler
-  const changePassword = async (oldPassword, newPassword) => {
+  // Change Password & Username handler
+  const changePassword = async (oldPassword, newPassword, newUsername) => {
     setIsSubmitting(true);
     setLoginError('');
     try {
       const res = await axios.post('http://localhost:3001/api/auth/change-password', {
         username: currentUser?.username || 'admin',
         oldPassword,
-        newPassword
+        newPassword,
+        newUsername
       });
-      return { success: res.data?.status === 'SUCCESS', message: res.data?.message };
+      if (res.data?.status === 'SUCCESS' && res.data?.data) {
+        const updated = { ...currentUser, ...res.data.data };
+        setCurrentUser(updated);
+        try {
+          sessionStorage.setItem('pos_user', JSON.stringify(updated));
+          localStorage.setItem('pos_user', JSON.stringify(updated));
+        } catch (_) {}
+      }
+      return { success: res.data?.status === 'SUCCESS', message: res.data?.message, user: res.data?.data };
     } catch (err) {
-      const msg = err.response?.data?.message || 'هەڵە لە کاتی گۆڕینی وشەی نهێنی';
+      const msg = err.response?.data?.message || 'هەڵە لە کاتی نوێکردنەوەی هەژمار';
       return { success: false, message: msg };
     } finally {
       setIsSubmitting(false);
