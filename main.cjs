@@ -121,7 +121,7 @@ function createWindow() {
     height: 850,
     minWidth: 1024,
     minHeight: 700,
-    title: 'سیستەمی مارکێت POS - Market POS System',
+    title: 'مارکێتی شارەکەم',
     icon: appIcon,
     backgroundColor: '#0f172a',
     autoHideMenuBar: true,

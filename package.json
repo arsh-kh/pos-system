@@ -45,10 +45,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "سیستەمی مارکێت POS",
+      "shortcutName": "مارکێتی شارەکەم",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "uninstallDisplayName": "سیستەمی مارکێت POS - Market POS System",
+      "uninstallDisplayName": "مارکێتی شارەکەم",
       "runAfterFinish": true,
       "artifactName": "MarketPOS_Setup.${ext}",
       "deleteAppDataOnUninstall": false

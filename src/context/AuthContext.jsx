@@ -6,7 +6,12 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   // Session user state: null on fresh startup, requiring mandatory username & password
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = sessionStorage.getItem('pos_user') || localStorage.getItem('pos_user');
+    // Purge persistent pos_user from localStorage so app restarts require full credentials
+    try {
+      localStorage.removeItem('pos_user');
+    } catch (_) {}
+
+    const saved = sessionStorage.getItem('pos_user');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -52,10 +57,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (currentUser) {
       sessionStorage.setItem('pos_user', JSON.stringify(currentUser));
-      localStorage.setItem('pos_user', JSON.stringify(currentUser));
+      localStorage.removeItem('pos_user');
       axios.defaults.headers.common['x-user-name'] = currentUser.username;
       axios.defaults.headers.common['x-user-role'] = currentUser.role;
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
       if (token) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       } else {
@@ -63,6 +68,7 @@ export const AuthProvider = ({ children }) => {
       }
     } else {
       sessionStorage.removeItem('pos_user');
+      sessionStorage.removeItem('token');
       localStorage.removeItem('pos_user');
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
@@ -108,8 +114,10 @@ export const AuthProvider = ({ children }) => {
 
       if (res.data.status === 'SUCCESS') {
         const { token, user } = res.data;
-        localStorage.setItem('token', token);
+        sessionStorage.setItem('token', token);
         sessionStorage.setItem('pos_user', JSON.stringify(user));
+        localStorage.setItem('token', token);
+        localStorage.removeItem('pos_user');
         setCurrentUser(user);
         setIsSwitchModalOpen(false);
         fetchPermissions();
@@ -141,7 +149,7 @@ export const AuthProvider = ({ children }) => {
         setCurrentUser(updated);
         try {
           sessionStorage.setItem('pos_user', JSON.stringify(updated));
-          localStorage.setItem('pos_user', JSON.stringify(updated));
+          localStorage.removeItem('pos_user');
         } catch (_) {}
       }
       return { success: res.data?.status === 'SUCCESS', message: res.data?.message, user: res.data?.data };
@@ -156,6 +164,7 @@ export const AuthProvider = ({ children }) => {
   // Switch User / Logout: prompts for username & password
   const logout = () => {
     sessionStorage.removeItem('pos_user');
+    sessionStorage.removeItem('token');
     localStorage.removeItem('pos_user');
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
