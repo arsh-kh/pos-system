@@ -1,28 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  RotateCcw, 
-  Search, 
-  Printer, 
-  CheckCircle2, 
-  AlertCircle, 
-  Package, 
-  Calendar, 
-  User, 
-  Receipt, 
-  X,
-  FileText,
-  ShoppingCart,
-  Scan,
-  Plus,
-  Minus,
-  Check,
-  CreditCard,
-  Banknote
-} from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
-import { formatDate, formatDateTime, formatCurrency } from '../utils/dateFormatter';
+import { formatDate, formatDateTime } from '../utils/dateFormatter';
 import './Dashboard.css';
 
 const REASON_OPTIONS = [
@@ -36,68 +16,33 @@ const REASON_OPTIONS = [
 const Returns = () => {
   const navigate = useNavigate();
 
-  // Active Tab: 'DIRECT' (خێرا بە بارکۆد) vs 'INVOICE' (بەپێی پسووڵە)
-  const [activeTab, setActiveTab] = useState('DIRECT');
-
-  // Products & Customers for Direct Return
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
-
-  // Fast Direct Return State
-  const [directSearchQuery, setDirectSearchQuery] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [directQty, setDirectQty] = useState(1);
-  const [directRefundMethod, setDirectRefundMethod] = useState('CASH');
-  const [directCustomerId, setDirectCustomerId] = useState('');
-  const [directReason, setDirectReason] = useState(REASON_OPTIONS[0]);
-  const [isSubmittingDirect, setIsSubmittingDirect] = useState(false);
-  const [directSuccessMsg, setDirectSuccessMsg] = useState('');
-  const [directErrorMsg, setDirectErrorMsg] = useState('');
-  const directInputRef = useRef(null);
-
-  // Search Sale (Invoice Mode)
+  // Search Sale State (By Invoice ID only)
   const [saleIdInput, setSaleIdInput] = useState('');
   const [searchedSale, setSearchedSale] = useState(null);
   const [isSearchingSale, setIsSearchingSale] = useState(false);
   const [searchError, setSearchError] = useState('');
 
-  // Invoice Return Processing
+  // Invoice Return Processing State
   const [returnQtys, setReturnQtys] = useState({});
   const [returnReasons, setReturnReasons] = useState({});
   const [refundMethod, setRefundMethod] = useState('CASH');
   const [processingItemId, setProcessingItemId] = useState(null);
 
-  // History & Stats
+  // History & Stats State
   const [returnsHistory, setReturnsHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historySearch, setHistorySearch] = useState('');
 
-  // Refund Receipt Modal
+  // Receipt Modal State
   const [selectedReceipt, setSelectedReceipt] = useState(null);
 
-  // Fetch initial products, customers, and history
-  const loadInitialData = async () => {
-    try {
-      setLoadingData(true);
-      const [prodRes, custRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/products').catch(() => ({ data: { data: [] } })),
-        axios.get('http://localhost:3001/api/customers').catch(() => ({ data: { data: [] } }))
-      ]);
-      setProducts(prodRes.data?.data || prodRes.data || []);
-      setCustomers(custRes.data?.data || custRes.data || []);
-    } catch (err) {
-      console.error('Failed to load products/customers:', err);
-    } finally {
-      setLoadingData(false);
-    }
-  };
+  const saleInputRef = useRef(null);
 
   const fetchReturnsHistory = async () => {
     try {
       setHistoryLoading(true);
       const res = await axios.get('http://localhost:3001/api/returns');
-      if (res.data.status === 'SUCCESS') {
+      if (res.data?.status === 'SUCCESS') {
         setReturnsHistory(res.data.data || []);
       }
     } catch (err) {
@@ -108,11 +53,9 @@ const Returns = () => {
   };
 
   useEffect(() => {
-    loadInitialData();
     fetchReturnsHistory();
-    // Focus barcode input by default
     setTimeout(() => {
-      directInputRef.current?.focus();
+      saleInputRef.current?.focus();
     }, 150);
   }, []);
 
@@ -128,138 +71,29 @@ const Returns = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedReceipt, navigate]);
 
-  // Direct Product Filter (Search by Barcode or Name)
-  const matchingProducts = useMemo(() => {
-    const q = directSearchQuery.trim();
-    if (!q || !products.length) return [];
-    return products.filter(p => {
-      const matchBarcode = p.barcode && String(p.barcode).trim().toLowerCase() === q.toLowerCase();
-      const matchBoxBarcode = p.box_barcode && String(p.box_barcode).trim().toLowerCase() === q.toLowerCase();
-      const matchName = kurdishSearchMatch([p.name], q);
-      return matchBarcode || matchBoxBarcode || matchName;
-    }).slice(0, 8);
-  }, [directSearchQuery, products]);
-
-  // Handle direct barcode search / scan auto-detect
-  const handleBarcodeChange = (val) => {
-    setDirectSearchQuery(val);
-    setDirectErrorMsg('');
-    const clean = val.trim();
-    if (!clean) return;
-
-    // Check if exact barcode matches
-    const exactMatch = products.find(p => 
-      (p.barcode && String(p.barcode).trim() === clean) ||
-      (p.box_barcode && String(p.box_barcode).trim() === clean)
-    );
-
-    if (exactMatch) {
-      setSelectedProduct(exactMatch);
-      setDirectQty(1);
-    }
-  };
-
-  const selectDirectProduct = (product) => {
-    setSelectedProduct(product);
-    setDirectQty(1);
-    setDirectSearchQuery('');
-    setDirectErrorMsg('');
-  };
-
-  // Submit Fast Direct Return
-  const handleExecuteDirectReturn = async (e) => {
-    e?.preventDefault();
-    if (!selectedProduct) {
-      setDirectErrorMsg('تکایە سەرەتا کاڵایەک سکان بکە یان دیاری بکە');
-      return;
-    }
-    const qty = parseFloat(directQty);
-    if (isNaN(qty) || qty <= 0) {
-      setDirectErrorMsg('تکایە بڕی گەڕاندنەوە بە دروستی بنووسە');
-      return;
-    }
-
-    setIsSubmittingDirect(true);
-    setDirectErrorMsg('');
-    setDirectSuccessMsg('');
-
-    try {
-      const unitPrice = Number(selectedProduct.selling_price || selectedProduct.price || 0);
-      const res = await axios.post('http://localhost:3001/api/returns/direct', {
-        product_id: selectedProduct.id,
-        quantity: qty,
-        reason: directReason,
-        refund_method: directRefundMethod,
-        customer_id: directRefundMethod === 'DEBT' ? directCustomerId || null : null,
-        unit_type: 'PIECE',
-        price: unitPrice
-      });
-
-      if (res.data.status === 'SUCCESS') {
-        const refundAmt = res.data.data?.refunded_amount || Math.round(unitPrice * qty);
-        const successText = `✓ کاڵای (${selectedProduct.name}) بە بڕی (${qty} ${selectedProduct.unit || 'دانە'}) گەڕێنرایەوە بۆ مەخزەن و ${refundAmt.toLocaleString()} د.ع درایەوە.`;
-        setDirectSuccessMsg(successText);
-
-        // Open Cash Drawer if Cash
-        if (directRefundMethod === 'CASH' && window.require) {
-          try {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('open-cash-drawer');
-          } catch (_) {}
-        }
-
-        // Prepare Receipt
-        const receiptData = {
-          sale_id: `RET-${res.data.data?.return_id || Date.now().toString().slice(-4)}`,
-          product_name: selectedProduct.name,
-          barcode: selectedProduct.barcode,
-          quantity: qty,
-          unit: selectedProduct.unit || 'دانە',
-          price_at_sale: unitPrice,
-          refunded_amount: refundAmt,
-          refund_method: directRefundMethod,
-          customer_name: directRefundMethod === 'DEBT' && directCustomerId 
-            ? customers.find(c => String(c.id) === String(directCustomerId))?.name || 'کڕیاری دیاریکراو' 
-            : 'کڕیاری گشتی',
-          reason: directReason,
-          created_at: new Date().toISOString()
-        };
-        setSelectedReceipt(receiptData);
-
-        // Reset inputs for next return
-        setSelectedProduct(null);
-        setDirectSearchQuery('');
-        setDirectQty(1);
-
-        // Refresh products stock & history
-        loadInitialData();
-        fetchReturnsHistory();
-
-        // Refocus on barcode input
-        setTimeout(() => directInputRef.current?.focus(), 100);
-      }
-    } catch (err) {
-      console.error('Direct return error:', err);
-      setDirectErrorMsg(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە گەڕاندنەوەی کاڵا');
-    } finally {
-      setIsSubmittingDirect(false);
-    }
-  };
-
-  // Search Sale (Invoice Mode)
+  // Search Sale by Invoice ID (Supports manual typing or Barcode Scanner)
   const handleSearchSale = async (e) => {
     e?.preventDefault();
-    const id = saleIdInput.trim();
-    if (!id) return;
+    const raw = saleIdInput.trim();
+    let cleanId = raw;
+    if (/shrm\/\d+\//i.test(cleanId)) {
+      const parts = cleanId.split('/');
+      const lastPart = parts[parts.length - 1];
+      cleanId = String(parseInt(lastPart, 10) || '');
+    } else {
+      cleanId = cleanId.replace(/[^0-9]/g, '');
+    }
+    if (!cleanId) return;
 
     setIsSearchingSale(true);
     setSearchError('');
     setSearchedSale(null);
 
     try {
-      const res = await axios.get(`http://localhost:3001/api/returns/sale/${id}`);
-      if (res.data.status === 'SUCCESS') {
+      const res = await axios.get(`http://localhost:3001/api/returns/sale/${cleanId}`);
+      if (res.data?.status === 'SUCCESS') {
         setSearchedSale(res.data.data);
+        setSaleIdInput(String(res.data.data.id));
         setRefundMethod(res.data.data.recommended_refund_method || 'CASH');
         const initQtys = {};
         const initReasons = {};
@@ -277,16 +111,17 @@ const Returns = () => {
     }
   };
 
+  // Process Item Return
   const handleProcessInvoiceReturn = async (item) => {
     const qtyToReturn = parseFloat(returnQtys[item.product_id]) || 0;
     if (qtyToReturn <= 0) {
-      return alert('تکایە بڕی گەڕاندنەوەی دروست دیاری بکە');
+      return alert('تکایە بڕی گەڕاندنەوەی دروست بنووسە');
     }
     if (qtyToReturn > item.returnable_qty) {
       return alert(`بڕی گەڕاندنەوە ناتوانێت لە ${item.returnable_qty} زیاتر بێت`);
     }
 
-    const reason = returnReasons[item.product_id] || 'گەڕاندنەوە لە کڕیار';
+    const reason = returnReasons[item.product_id] || 'خواستی کڕیار';
 
     const confirmMsg = refundMethod === 'DEBT'
       ? `دڵنیایت لە گەڕاندنەوەی ${qtyToReturn} ${item.unit || 'دانە'} لە "${item.product_name}"؟ (پارەکەی لە قەرزی کڕیار کەم دەکرێتەوە)`
@@ -306,7 +141,7 @@ const Returns = () => {
         refund_method: refundMethod
       });
 
-      if (res.data.status === 'SUCCESS') {
+      if (res.data?.status === 'SUCCESS') {
         const receiptData = {
           sale_id: searchedSale.id,
           product_name: item.product_name,
@@ -322,12 +157,12 @@ const Returns = () => {
         };
         setSelectedReceipt(receiptData);
 
+        // Refresh sale data to update remaining returnable quantities
         handleSearchSale();
         fetchReturnsHistory();
-        loadInitialData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە گەڕاندنەوەی کاڵا');
+      alert(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی گەڕاندنەوەی کاڵا');
     } finally {
       setProcessingItemId(null);
     }
@@ -337,756 +172,477 @@ const Returns = () => {
     window.print();
   };
 
-  // KPI Calculations
-  const totalRefundedAmount = returnsHistory.reduce((sum, r) => sum + (Number(r.refunded_amount) || 0), 0);
-  const totalReturnedQty = returnsHistory.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  // Compact Stats
+  const totalRefundedAmount = useMemo(() => {
+    return returnsHistory.reduce((sum, r) => sum + (Number(r.refunded_amount) || 0), 0);
+  }, [returnsHistory]);
+
+  const totalReturnedQty = useMemo(() => {
+    return returnsHistory.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  }, [returnsHistory]);
+
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayRefundedAmount = returnsHistory
-    .filter(r => r.created_at?.startsWith(todayStr))
-    .reduce((sum, r) => sum + (Number(r.refunded_amount) || 0), 0);
+  const todayRefundedAmount = useMemo(() => {
+    return returnsHistory
+      .filter(r => r.created_at?.startsWith(todayStr))
+      .reduce((sum, r) => sum + (Number(r.refunded_amount) || 0), 0);
+  }, [returnsHistory, todayStr]);
 
-  const filteredHistory = returnsHistory.filter(r => 
-    kurdishSearchMatch([r.product_name, r.barcode, r.sale_id, r.customer_name, r.reason], historySearch)
-  );
-
-  const currentUnitRefundPrice = Number(selectedProduct?.selling_price || selectedProduct?.price || 0);
-  const calculatedDirectTotal = Math.round(currentUnitRefundPrice * (parseFloat(directQty) || 0));
+  // Filtered History
+  const filteredHistory = returnsHistory;
 
   return (
-    <div className="dashboard-page p-8" dir="rtl">
-      {/* Header with Quick Back to Cashier Button */}
-      <div className="page-header mb-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <RotateCcw className="text-secondary" size={30} color="#f59e0b" />
-            گەڕاندنەوەی کاڵا لە کڕیار
-          </h1>
-          <p className="text-secondary" style={{ marginTop: '4px', fontSize: '0.88rem' }}>
-            گەڕاندنەوەی کاڵا بە بارکۆد، زیادکردنەوە بۆ مەخزەن و دانەوەی پارەی کڕیار
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => navigate('/cashier')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '10px',
-            background: 'var(--primary-color)',
-            color: '#ffffff',
-            border: 'none',
-            fontWeight: 800,
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-            transition: 'all 0.15s ease'
-          }}
-          title="گەڕانەوە بۆ شاشەی کاشێر (F1)"
-        >
-          <ShoppingCart size={18} /> گەڕانەوە بۆ کاشێر (F1)
-        </button>
-      </div>
-
-      {/* Mode Switcher Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('DIRECT');
-            setTimeout(() => directInputRef.current?.focus(), 100);
-          }}
-          style={{
-            flex: 1,
-            padding: '12px 18px',
-            borderRadius: '12px',
-            border: activeTab === 'DIRECT' ? '2px solid #f59e0b' : '1px solid var(--border-color)',
-            background: activeTab === 'DIRECT' ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-tertiary)',
-            color: activeTab === 'DIRECT' ? '#f59e0b' : 'var(--text-secondary)',
-            fontWeight: 800,
-            fontSize: '1rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <Scan size={18} /> گەڕاندنەوەی خێرا بە بارکۆد (بێ پسووڵە)
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('INVOICE')}
-          style={{
-            flex: 1,
-            padding: '12px 18px',
-            borderRadius: '12px',
-            border: activeTab === 'INVOICE' ? '2px solid #0284c7' : '1px solid var(--border-color)',
-            background: activeTab === 'INVOICE' ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-tertiary)',
-            color: activeTab === 'INVOICE' ? '#0284c7' : 'var(--text-secondary)',
-            fontWeight: 800,
-            fontSize: '1rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <Receipt size={18} /> گەڕاندنەوە بەپێی ژمارەی پسووڵە
-        </button>
-      </div>
-
-      {/* TAB 1: FAST DIRECT BARCODE RETURN */}
-      {activeTab === 'DIRECT' && (
-        <div className="glass-panel mb-8" style={{ padding: '24px', borderRadius: '18px', border: '1.5px solid rgba(245, 158, 11, 0.3)' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
-            <Scan size={22} color="#f59e0b" />
-            سکانکردنی بارکۆد و گەڕاندنەوەی دەستبەجێ
-          </h2>
-
-          {/* Barcode Search Bar */}
-          <div style={{ position: 'relative', maxWidth: '700px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <input
-                  ref={directInputRef}
-                  type="text"
-                  value={directSearchQuery}
-                  onChange={(e) => handleBarcodeChange(e.target.value)}
-                  placeholder="بارکۆدی کاڵاکە سکان بکە یان ناوی کاڵا بنووسە..."
-                  style={{
-                    width: '100%',
-                    padding: '13px 42px 13px 16px',
-                    borderRadius: '12px',
-                    background: 'var(--bg-secondary)',
-                    border: '2px solid var(--border-color)',
-                    color: 'var(--text-primary)',
-                    fontSize: '1.05rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => e.target.select()}
-                />
-                <Scan size={20} color="#f59e0b" style={{ position: 'absolute', right: '14px', top: '14px' }} />
-              </div>
-
-              {directSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDirectSearchQuery('');
-                    directInputRef.current?.focus();
-                  }}
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-
-            {/* Dropdown for Matching Products (if typed by name) */}
-            {directSearchQuery && !selectedProduct && matchingProducts.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '105%',
-                right: 0,
-                left: 0,
-                background: 'var(--bg-card)',
-                borderRadius: '12px',
-                border: '1px solid var(--border-color)',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                zIndex: 50,
-                maxHeight: '260px',
-                overflowY: 'auto'
-              }}>
-                {matchingProducts.map(p => (
-                  <div
-                    key={p.id}
-                    onClick={() => selectDirectProduct(p)}
-                    style={{
-                      padding: '12px 16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      borderBottom: '1px solid var(--border-color)',
-                      cursor: 'pointer',
-                      transition: 'background 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{p.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>بارکۆد: {p.barcode || 'بێ بارکۆد'}</div>
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 800, color: '#10b981' }}>{Number(p.selling_price || 0).toLocaleString()} د.ع</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>مەخزەن: {Number(p.stock || 0)} {p.unit || 'دانە'}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Feedback messages */}
-          {directErrorMsg && (
-            <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', color: '#ef4444', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={18} /> {directErrorMsg}
-            </div>
-          )}
-
-          {directSuccessMsg && (
-            <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.35)', color: '#10b981', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={18} /> {directSuccessMsg}
-            </div>
-          )}
-
-          {/* Selected Product Return Form Card */}
-          {selectedProduct ? (
-            <form onSubmit={handleExecuteDirectReturn} style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '14px', border: '1.5px solid var(--border-color)', maxWidth: '700px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', marginBottom: '16px' }}>
-                <div>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
-                    کاڵای دیاریکراو
-                  </span>
-                  <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.25rem', color: 'var(--text-primary)' }}>
-                    {selectedProduct.name}
-                  </h3>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                    بارکۆد: {selectedProduct.barcode || '—'}
-                  </span>
-                </div>
-
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>مەخزەنی ئێستا</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    {Number(selectedProduct.stock || 0)} {selectedProduct.unit || 'دانە'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Quantity, Reason, & Refund Method Controls */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '18px' }}>
-                {/* Quantity */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    بڕی گەڕێنراوە ({selectedProduct.unit || 'دانە'}):
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setDirectQty(prev => Math.max(1, (parseFloat(prev) || 1) - 1))}
-                      style={{ width: '38px', height: '38px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <input
-                      type="number"
-                      min="0.001"
-                      step="any"
-                      value={directQty}
-                      onChange={(e) => setDirectQty(e.target.value)}
-                      style={{ flex: 1, height: '38px', textAlign: 'center', fontWeight: 800, fontSize: '1.1rem', borderRadius: '8px', border: '1.5px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', outline: 'none' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setDirectQty(prev => (parseFloat(prev) || 0) + 1)}
-                      style={{ width: '38px', height: '38px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Refund Method */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    شێوازی دانەوەی پارە:
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setDirectRefundMethod('CASH')}
-                      style={{
-                        flex: 1,
-                        height: '38px',
-                        borderRadius: '8px',
-                        border: directRefundMethod === 'CASH' ? '2px solid #10b981' : '1px solid var(--border-color)',
-                        background: directRefundMethod === 'CASH' ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-tertiary)',
-                        color: directRefundMethod === 'CASH' ? '#10b981' : 'var(--text-secondary)',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Banknote size={16} /> نەقد
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDirectRefundMethod('DEBT')}
-                      style={{
-                        flex: 1,
-                        height: '38px',
-                        borderRadius: '8px',
-                        border: directRefundMethod === 'DEBT' ? '2px solid #ef4444' : '1px solid var(--border-color)',
-                        background: directRefundMethod === 'DEBT' ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-tertiary)',
-                        color: directRefundMethod === 'DEBT' ? '#ef4444' : 'var(--text-secondary)',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <CreditCard size={16} /> قەرز
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* If DEBT: Customer Selector */}
-              {directRefundMethod === 'DEBT' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                    کڕیار بۆ کەمکردنەوە لە قەرزەکەی:
-                  </label>
-                  <select
-                    value={directCustomerId}
-                    onChange={(e) => setDirectCustomerId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-tertiary)',
-                      border: '1.5px solid var(--border-color)',
-                      color: 'var(--text-primary)',
-                      fontWeight: 700,
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="">-- کڕیارێک هەڵبژێرە --</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''} - قەرز: {Number(c.total_debt || 0).toLocaleString()} د.ع
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Reason */}
-              <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                  هۆکاری گەڕاندنەوە:
-                </label>
-                <select
-                  value={directReason}
-                  onChange={(e) => setDirectReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1.5px solid var(--border-color)',
-                    color: 'var(--text-primary)',
-                    fontWeight: 700,
-                    outline: 'none'
-                  }}
-                >
-                  {REASON_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Big Total Refund Banner & Submit Button */}
-              <div style={{
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1.5px solid rgba(16, 185, 129, 0.35)',
-                borderRadius: '12px',
-                padding: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 700 }}>کۆی پارەی گەڕاوە بە کڕیار:</span>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981' }}>
-                    {calculatedDirectTotal.toLocaleString()} دینار
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedProduct(null);
-                      directInputRef.current?.focus();
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border-color)',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontWeight: 700
-                    }}
-                  >
-                    پەشیمانبوونەوە
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmittingDirect || calculatedDirectTotal <= 0}
-                    style={{
-                      padding: '12px 24px',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #10b981, #059669)',
-                      color: '#ffffff',
-                      border: 'none',
-                      cursor: isSubmittingDirect ? 'wait' : 'pointer',
-                      fontWeight: 900,
-                      fontSize: '1rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
-                    }}
-                  >
-                    <RotateCcw size={18} />
-                    {isSubmittingDirect ? 'تۆمار دەکرێت...' : 'پەسەندکردنی گەڕاندنەوە'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          ) : (
-            <div style={{ padding: '30px', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px dashed var(--border-color)', color: 'var(--text-muted)' }}>
-              <Package size={40} style={{ opacity: 0.4, marginBottom: '8px' }} />
-              <div style={{ fontSize: '1rem', fontWeight: 700 }}>بارکۆدی کاڵاکە سکان بکە یان لە سەرەوە ناوی بنووسە</div>
-              <div style={{ fontSize: '0.82rem', marginTop: '4px' }}>دەستبەجێ زانیاری کاڵاکە و کۆگاکەت پیشان دەدات</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: RETURN BY INVOICE ID */}
-      {activeTab === 'INVOICE' && (
-        <div className="glass-panel mb-8" style={{ padding: '24px', borderRadius: '18px', border: '1.5px solid rgba(2, 132, 199, 0.3)' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
-            <Search size={22} color="#0284c7" />
-            گەڕان بەدوای پسووڵەی فرۆشتن بۆ گەڕاندنەوە
-          </h2>
-
-          <form onSubmit={handleSearchSale} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', maxWidth: '600px' }}>
+    <div className="dashboard-page p-6" dir="rtl" style={{ background: '#f8fafc', minHeight: '100vh' }}>
+      
+      {/* Search Invoice & Stats Section: Unified Header */}
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '10px',
+        padding: '14px 18px',
+        marginBottom: '16px'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          {/* Right: Search Invoice Input + Find Button */}
+          <form onSubmit={handleSearchSale} style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: '1 1 360px', maxWidth: '460px' }}>
             <input 
-              type="number" 
-              placeholder="ژمارەی پسووڵە بنووسە (نموونە: 9)..."
+              ref={saleInputRef}
+              type="text" 
+              placeholder="ژمارەی پسووڵە یان باڕکۆد..."
               value={saleIdInput}
               onChange={(e) => setSaleIdInput(e.target.value)}
-              style={{ flex: 1, padding: '12px 18px', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none' }}
+              style={{
+                flex: 1,
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '6px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                color: '#0f172a',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
             />
             <button 
               type="submit" 
-              disabled={isSearchingSale}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '12px', background: '#0284c7', color: '#ffffff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+              disabled={isSearchingSale || !saleIdInput.trim()}
+              style={{
+                height: '38px',
+                padding: '0 18px',
+                borderRadius: '6px',
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                cursor: isSearchingSale ? 'wait' : 'pointer',
+                fontWeight: 700,
+                fontSize: '0.86rem',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
             >
-              <Search size={18} /> {isSearchingSale ? 'دەگەڕێت...' : 'دۆزینەوەی پسووڵە'}
+              {isSearchingSale ? 'دەگەڕێت...' : 'دۆزینەوەی پسووڵە'}
             </button>
           </form>
 
-          {searchError && (
-            <div style={{ marginTop: '16px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={18} /> {searchError}
+          {/* Left / Beside Button: KPI Stat Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              color: '#475569',
+              whiteSpace: 'nowrap'
+            }}>
+              <span>کۆی گەڕێنراوە:</span>
+              <strong style={{ color: '#ef4444', fontWeight: 700 }}>
+                {totalRefundedAmount.toLocaleString()} د.ع
+              </strong>
             </div>
-          )}
 
-          {/* Searched Sale Items */}
-          {searchedSale && (
-            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                background: searchedSale.payment_method === 'DEBT' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', 
-                padding: '16px 20px', 
-                borderRadius: '14px', 
-                marginBottom: '20px', 
-                border: `1px solid ${searchedSale.payment_method === 'DEBT' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
-                flexWrap: 'wrap', 
-                gap: '1rem' 
-              }}>
+            <div style={{
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              color: '#475569',
+              whiteSpace: 'nowrap'
+            }}>
+              <span>گەڕێنراوەی ئەمڕۆ:</span>
+              <strong style={{ color: '#b45309', fontWeight: 700 }}>
+                {todayRefundedAmount.toLocaleString()} د.ع
+              </strong>
+            </div>
+
+            <div style={{
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.82rem',
+              color: '#475569',
+              whiteSpace: 'nowrap'
+            }}>
+              <span>کۆی کاڵا:</span>
+              <strong style={{ color: '#0284c7', fontWeight: 700 }}>
+                {totalReturnedQty.toLocaleString()} دانە
+              </strong>
+            </div>
+
+
+          </div>
+        </div>
+
+        {searchError && (
+          <div style={{ marginTop: '10px', color: '#ef4444', fontSize: '0.86rem', fontWeight: 700 }}>
+            {searchError}
+          </div>
+        )}
+
+        {/* Found Sale Invoice Details & Returnable Items */}
+        {searchedSale && (
+          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+            
+            {/* Invoice Meta Bar: Clean, Single Line */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              marginBottom: '14px',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '0.86rem' }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ color: '#0284c7', fontWeight: 'bold', fontSize: '1.2rem' }}>پسووڵەی ژمارە #{searchedSale.id}</span>
-                    <span style={{ 
-                      padding: '4px 12px', 
-                      borderRadius: '8px', 
-                      fontSize: '0.8rem', 
-                      fontWeight: 'bold',
-                      background: searchedSale.payment_method === 'DEBT' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                      color: searchedSale.payment_method === 'DEBT' ? '#ef4444' : '#10b981'
-                    }}>
-                      {searchedSale.payment_method === 'DEBT' ? 'قەرز' : 'نەقد'}
-                    </span>
-                  </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '6px' }}>
-                    کڕیار: <strong style={{ color: 'var(--text-primary)' }}>{searchedSale.customer_name}</strong>
-                  </div>
+                  <span style={{ color: '#64748b' }}>ژمارەی پسووڵە: </span>
+                  <b style={{ color: '#0284c7', fontFamily: 'monospace' }}>#{searchedSale.id}</b>
                 </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setRefundMethod('CASH')}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '8px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      border: refundMethod === 'CASH' ? '2px solid #10b981' : '1px solid var(--border-color)',
-                      background: refundMethod === 'CASH' ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-tertiary)',
-                      color: refundMethod === 'CASH' ? '#10b981' : 'var(--text-secondary)'
-                    }}
-                  >
-                    💵 دانەوەی نەقد
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRefundMethod('DEBT')}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '8px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      border: refundMethod === 'DEBT' ? '2px solid #ef4444' : '1px solid var(--border-color)',
-                      background: refundMethod === 'DEBT' ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-tertiary)',
-                      color: refundMethod === 'DEBT' ? '#ef4444' : 'var(--text-secondary)'
-                    }}
-                  >
-                    💳 کەمکردنەوە لە قەرز
-                  </button>
+                <div>
+                  <span style={{ color: '#64748b' }}>کڕیار: </span>
+                  <b style={{ color: '#0f172a' }}>{searchedSale.customer_name}</b>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>بەروار: </span>
+                  <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatDate(searchedSale.created_at)}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>شێوازی فرۆشتن: </span>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    background: searchedSale.payment_method === 'DEBT' ? '#fef2f2' : '#f0fdf4',
+                    color: searchedSale.payment_method === 'DEBT' ? '#ef4444' : '#16a34a'
+                  }}>
+                    {searchedSale.payment_method === 'DEBT' ? 'قەرز' : 'نەقد'}
+                  </span>
                 </div>
               </div>
 
-              {/* Items Table */}
-              <div className="table-responsive">
-                <table className="data-table" style={{ width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: '12px 16px' }}>ناوی کاڵا</th>
-                      <th style={{ padding: '12px 16px' }}>فرۆشراو</th>
-                      <th style={{ padding: '12px 16px' }}>ماوە بۆ گەڕاندنەوە</th>
-                      <th style={{ padding: '12px 16px' }}>بڕی گەڕاندنەوە</th>
-                      <th style={{ padding: '12px 16px' }}>کردار</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {searchedSale.items?.map(it => (
-                      <tr key={it.product_id}>
-                        <td style={{ padding: '14px 16px', fontWeight: 800 }}>
-                          {it.product_name}
-                          {it.has_discount && (
-                            <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, marginTop: '2px' }}>
-                              ({Number(it.effective_unit_price).toLocaleString()} د.ع بە داشکاندنەوە)
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: '14px 16px' }}>{it.quantity} {it.unit || 'دانە'}</td>
-                        <td style={{ padding: '14px 16px', color: '#10b981', fontWeight: 800 }}>{it.returnable_qty} {it.unit || 'دانە'}</td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <input
-                            type="number"
-                            min="1"
-                            max={it.returnable_qty}
-                            value={returnQtys[it.product_id] || ''}
-                            onChange={(e) => setReturnQtys(prev => ({ ...prev, [it.product_id]: e.target.value }))}
-                            disabled={it.returnable_qty <= 0}
-                            style={{ width: '70px', padding: '6px', borderRadius: '6px', textAlign: 'center', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
-                          />
-                        </td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleProcessInvoiceReturn(it)}
-                            disabled={it.returnable_qty <= 0 || processingItemId === it.product_id}
-                            style={{
-                              padding: '8px 14px',
-                              borderRadius: '8px',
-                              background: it.returnable_qty > 0 ? '#f59e0b' : 'var(--bg-tertiary)',
-                              color: it.returnable_qty > 0 ? '#ffffff' : 'var(--text-muted)',
-                              border: 'none',
-                              fontWeight: 800,
-                              cursor: it.returnable_qty > 0 ? 'pointer' : 'not-allowed',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <RotateCcw size={14} />
-                            {processingItemId === it.product_id ? 'دەگەڕێتەوە...' : 'گەڕاندنەوە'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Refund Method Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 700 }}>شێوازی دانەوەی پارە:</span>
+                <button
+                  type="button"
+                  onClick={() => setRefundMethod('CASH')}
+                  style={{
+                    height: '30px',
+                    padding: '0 12px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    border: refundMethod === 'CASH' ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+                    background: refundMethod === 'CASH' ? '#f0fdf4' : '#ffffff',
+                    color: refundMethod === 'CASH' ? '#16a34a' : '#475569'
+                  }}
+                >
+                  دانەوەی نەقد
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefundMethod('DEBT')}
+                  disabled={!searchedSale.customer_id}
+                  style={{
+                    height: '30px',
+                    padding: '0 12px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: !searchedSale.customer_id ? 'not-allowed' : 'pointer',
+                    opacity: !searchedSale.customer_id ? 0.45 : 1,
+                    border: refundMethod === 'DEBT' ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    background: refundMethod === 'DEBT' ? '#fef2f2' : '#ffffff',
+                    color: refundMethod === 'DEBT' ? '#ef4444' : '#475569'
+                  }}
+                  title={!searchedSale.customer_id ? 'ئەم پسووڵەیە هی کڕیاری دیاریکراو نییە' : ''}
+                >
+                  کەمکردنەوە لە قەرز
+                </button>
               </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* KPI Stats Grid */}
-      <div className="stats-grid mb-8">
-        <div className="stat-card glass-panel" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.25)' }}>
-          <h3>کۆی پارەی دراوەتەوە بە کڕیار</h3>
-          <div className="value" style={{ color: '#f87171' }}>
-            {totalRefundedAmount.toLocaleString()} دینار
-          </div>
-          <div className="sub-text">کۆی گشتی پارەی گەڕێنراوە</div>
-        </div>
+            {/* Sale Items Table */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <thead>
+                  <tr style={{ height: '36px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569', fontWeight: 700 }}>
+                    <th style={{ padding: '0 14px', textAlign: 'right' }}>ناوی کاڵا</th>
+                    <th style={{ padding: '0 10px', textAlign: 'center' }}>بارکۆد</th>
+                    <th style={{ padding: '0 10px', textAlign: 'center' }}>بڕی فرۆشراو</th>
+                    <th style={{ padding: '0 10px', textAlign: 'center' }}>ماوە بۆ گەڕاندنەوە</th>
+                    <th style={{ padding: '0 10px', textAlign: 'center' }}>نرخی فرۆشتن</th>
+                    <th style={{ padding: '0 10px', textAlign: 'center' }}>بڕی گەڕاندنەوە</th>
+                    <th style={{ padding: '0 10px', textAlign: 'center' }}>هۆکاری گەڕاندنەوە</th>
+                    <th style={{ padding: '0 14px', textAlign: 'left' }}>کردار</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!searchedSale.items || searchedSale.items.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ height: '40px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>
+                        هیچ کاڵایەک نەدۆزرایەوە
+                      </td>
+                    </tr>
+                  ) : (
+                    searchedSale.items.map((it) => {
+                      const isReturnable = it.returnable_qty > 0;
+                      return (
+                        <tr 
+                          key={it.product_id}
+                          style={{ height: '40px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <td style={{ padding: '0 14px', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>
+                            {it.product_name}
+                          </td>
+                          <td style={{ padding: '0 10px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b', fontSize: '0.82rem' }}>
+                            {it.barcode || '—'}
+                          </td>
+                          <td style={{ padding: '0 10px', textAlign: 'center', color: '#475569', fontSize: '0.84rem' }}>
+                            {it.quantity} {it.unit || 'دانە'}
+                          </td>
+                          <td style={{ padding: '0 10px', textAlign: 'center', fontWeight: 700, color: isReturnable ? '#10b981' : '#94a3b8', fontSize: '0.86rem' }}>
+                            {isReturnable ? `${it.returnable_qty} ${it.unit || 'دانە'}` : 'تەواوی بڕەکەی گەڕاوەتەوە'}
+                          </td>
+                          <td style={{ padding: '0 10px', textAlign: 'center', fontWeight: 700, color: '#0f172a', fontSize: '0.86rem' }}>
+                            {Number(it.effective_unit_price || it.price_at_sale).toLocaleString()} د.ع
+                          </td>
+                          <td style={{ padding: '0 10px', textAlign: 'center' }}>
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="any"
+                              max={it.returnable_qty}
+                              value={returnQtys[it.product_id] || ''}
+                              onChange={(e) => setReturnQtys(prev => ({ ...prev, [it.product_id]: e.target.value }))}
+                              disabled={!isReturnable}
+                              style={{
+                                width: '70px',
+                                height: '28px',
+                                padding: '0 6px',
+                                borderRadius: '4px',
+                                textAlign: 'center',
+                                border: '1px solid #cbd5e1',
+                                background: isReturnable ? '#ffffff' : '#f1f5f9',
+                                color: '#0f172a',
+                                fontWeight: 700,
+                                fontSize: '0.84rem',
+                                outline: 'none'
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '0 10px', textAlign: 'center' }}>
+                            <select
+                              value={returnReasons[it.product_id] || REASON_OPTIONS[0]}
+                              onChange={(e) => setReturnReasons(prev => ({ ...prev, [it.product_id]: e.target.value }))}
+                              disabled={!isReturnable}
+                              style={{
+                                height: '28px',
+                                padding: '0 6px',
+                                borderRadius: '4px',
+                                border: '1px solid #cbd5e1',
+                                background: isReturnable ? '#ffffff' : '#f1f5f9',
+                                color: '#0f172a',
+                                fontSize: '0.80rem',
+                                fontWeight: 600,
+                                outline: 'none'
+                              }}
+                            >
+                              {REASON_OPTIONS.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td style={{ padding: '0 14px', textAlign: 'left' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleProcessInvoiceReturn(it)}
+                              disabled={!isReturnable || processingItemId === it.product_id}
+                              style={{
+                                height: '28px',
+                                padding: '0 14px',
+                                borderRadius: '4px',
+                                background: isReturnable ? '#0284c7' : '#f1f5f9',
+                                color: isReturnable ? '#ffffff' : '#94a3b8',
+                                border: 'none',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                cursor: isReturnable ? 'pointer' : 'not-allowed',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {processingItemId === it.product_id ? 'چاوەڕێبە...' : 'گەڕاندنەوە'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-        <div className="stat-card glass-panel" style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.25)' }}>
-          <h3>گەڕێنراوەی ئەمڕۆ</h3>
-          <div className="value" style={{ color: '#fbbf24' }}>
-            {todayRefundedAmount.toLocaleString()} دینار
           </div>
-          <div className="sub-text">پارەی گەڕێنراوە لە بەرواری ئەمڕۆ</div>
-        </div>
+        )}
 
-        <div className="stat-card glass-panel" style={{ background: 'rgba(59, 130, 246, 0.08)', borderColor: 'rgba(59, 130, 246, 0.25)' }}>
-          <h3>کۆی ژمارەی کاڵا گەڕاوەکان</h3>
-          <div className="value" style={{ color: '#60a5fa' }}>
-            {totalReturnedQty.toLocaleString()} دانە
-          </div>
-          <div className="sub-text">زیادکراوەتەوە سەر باڵانسی مەخزەن</div>
-        </div>
-
-        <div className="stat-card glass-panel" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
-          <h3>ژمارەی گەڕاندنەوەکان</h3>
-          <div className="value" style={{ color: '#34d399' }}>
-            {returnsHistory.length} کرداری گەڕاندنەوە
-          </div>
-          <div className="sub-text">تۆمارکراو لە سیستەمدا</div>
-        </div>
       </div>
 
-      {/* Returns History Table */}
-      <div className="glass-panel" style={{ padding: '24px', borderRadius: '18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '1rem' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem', margin: 0 }}>
-            <FileText size={22} color="#10b981" />
-            مێژووی گەڕاندنەوەی کاڵاکان
+      {/* Returns History Table: Clean Data Grid */}
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '10px',
+        padding: '16px 20px',
+        overflow: 'hidden'
+      }}>
+        <div style={{ marginBottom: '14px' }}>
+          <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+            مێژووی گەڕاندنەوەکان
           </h2>
-
-          <div style={{ position: 'relative', width: '300px' }}>
-            <input 
-              type="text" 
-              placeholder="گەڕان بەدوای کاڵا، بارکۆد، کڕیار..."
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              style={{ width: '100%', padding: '10px 38px 10px 14px', borderRadius: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-            />
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', right: '12px', top: '12px' }} />
-          </div>
         </div>
 
-        <div className="table-responsive">
-          <table className="data-table" style={{ width: '100%' }}>
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
             <thead>
-              <tr>
-                <th style={{ padding: '14px 18px' }}>#</th>
-                <th style={{ padding: '14px 18px' }}>ناوی کاڵا</th>
-                <th style={{ padding: '14px 18px' }}>بڕ</th>
-                <th style={{ padding: '14px 18px' }}>پارەی دراوەتەوە</th>
-                <th style={{ padding: '14px 18px' }}>شێوازی دانەوە</th>
-                <th style={{ padding: '14px 18px' }}>کڕیار</th>
-                <th style={{ padding: '14px 18px' }}>هۆکار</th>
-                <th style={{ padding: '14px 18px' }}>بەروار و کات</th>
-                <th style={{ padding: '14px 18px' }}>چاپکردن</th>
+              <tr style={{ height: '36px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569', fontWeight: 700 }}>
+                <th style={{ padding: '0 12px', textAlign: 'center', width: '40px' }}>#</th>
+                <th style={{ padding: '0 10px', textAlign: 'center', width: '90px' }}>ژمارەی پسووڵە</th>
+                <th style={{ padding: '0 12px', textAlign: 'right' }}>ناوی کاڵا</th>
+                <th style={{ padding: '0 10px', textAlign: 'center' }}>بڕ</th>
+                <th style={{ padding: '0 10px', textAlign: 'center' }}>پارەی گەڕاوە</th>
+                <th style={{ padding: '0 10px', textAlign: 'center' }}>شێوازی دانەوە</th>
+                <th style={{ padding: '0 12px', textAlign: 'right' }}>کڕیار</th>
+                <th style={{ padding: '0 12px', textAlign: 'right' }}>هۆکار</th>
+                <th style={{ padding: '0 10px', textAlign: 'center' }}>بەروار</th>
+                <th style={{ padding: '0 14px', textAlign: 'left', width: '80px' }}>چاپکردن</th>
               </tr>
             </thead>
             <tbody>
               {historyLoading ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '30px' }}>چاوەڕێبە... داتاکان باردەکرێن</td>
+                  <td colSpan="10" style={{ height: '40px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>
+                    باردەکرێت...
+                  </td>
                 </tr>
               ) : filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                    هیچ تۆمارێکی گەڕاندنەوە نەدۆزرایەوە.
+                  <td colSpan="10" style={{ height: '40px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>
+                    هیچ تۆمارێکی گەڕاندنەوە نەدۆزرایەوە
                   </td>
                 </tr>
               ) : (
                 filteredHistory.map((ret) => (
-                  <tr key={ret.id}>
-                    <td style={{ padding: '14px 18px', fontWeight: 'bold', color: 'var(--accent-color)' }}>#{ret.id}</td>
-                    <td style={{ padding: '14px 18px', fontWeight: 'bold' }}>{ret.product_name}</td>
-                    <td style={{ padding: '14px 18px' }}>{ret.quantity} {ret.unit || 'دانە'}</td>
-                    <td style={{ padding: '14px 18px', fontWeight: 'bold', color: '#f87171' }}>
-                      {Number(ret.refunded_amount).toLocaleString()} دینار
+                  <tr 
+                    key={ret.id}
+                    style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '0 12px', textAlign: 'center', color: '#64748b', fontSize: '0.80rem' }}>
+                      {ret.id}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <span style={{ 
-                        padding: '4px 10px', 
-                        borderRadius: '6px', 
-                        fontSize: '0.8rem', 
-                        fontWeight: 'bold',
-                        background: ret.refund_method === 'DEBT' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                        color: ret.refund_method === 'DEBT' ? '#ef4444' : '#10b981'
+                    <td style={{ padding: '0 10px', textAlign: 'center', fontFamily: 'monospace', color: '#0284c7', fontWeight: 700, fontSize: '0.82rem' }}>
+                      #{ret.sale_id}
+                    </td>
+                    <td style={{ padding: '0 12px', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>
+                      {ret.product_name}
+                    </td>
+                    <td style={{ padding: '0 10px', textAlign: 'center', color: '#475569', fontSize: '0.84rem' }}>
+                      {ret.quantity} {ret.unit || 'دانە'}
+                    </td>
+                    <td style={{ padding: '0 10px', textAlign: 'center', fontWeight: 700, color: '#ef4444', fontSize: '0.86rem' }}>
+                      {Number(ret.refunded_amount).toLocaleString()} د.ع
+                    </td>
+                    <td style={{ padding: '0 10px', textAlign: 'center', fontSize: '0.80rem' }}>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        background: ret.refund_method === 'DEBT' ? '#fef2f2' : '#f0fdf4',
+                        color: ret.refund_method === 'DEBT' ? '#ef4444' : '#16a34a'
                       }}>
-                        {ret.refund_method === 'DEBT' ? '💳 قەرز' : '💵 نەقد'}
+                        {ret.refund_method === 'DEBT' ? 'قەرز' : 'نەقد'}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 18px' }}>{ret.customer_name || 'کڕیاری گشتی'}</td>
-                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{ret.reason || 'گەڕاندنەوە'}</td>
-                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    <td style={{ padding: '0 12px', color: '#334155', fontSize: '0.84rem' }}>
+                      {ret.customer_name || 'کڕیاری گشتی'}
+                    </td>
+                    <td style={{ padding: '0 12px', color: '#64748b', fontSize: '0.82rem' }}>
+                      {ret.reason || 'گەڕاندنەوە'}
+                    </td>
+                    <td style={{ padding: '0 10px', textAlign: 'center', color: '#64748b', fontSize: '0.80rem' }}>
                       {formatDateTime(ret.created_at, { twelveHour: true })}
                     </td>
-                    <td style={{ padding: '14px 18px' }}>
+                    <td style={{ padding: '0 14px', textAlign: 'left' }}>
                       <button
                         type="button"
                         onClick={() => setSelectedReceipt(ret)}
-                        title="چاپکردنەوەی وەسڵی گەڕاندنەوە"
                         style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          background: 'rgba(56, 189, 248, 0.12)',
+                          height: '26px',
+                          padding: '0 10px',
+                          borderRadius: '4px',
+                          background: '#ffffff',
                           color: '#0284c7',
-                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          border: '1px solid #cbd5e1',
                           cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.8rem',
-                          fontWeight: 700
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          transition: 'all 0.15s ease'
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
                       >
-                        <Printer size={13} /> وەسڵ
+                        وەسڵ
                       </button>
                     </td>
                   </tr>
@@ -1100,98 +656,134 @@ const Returns = () => {
       {/* Modal: Refund Receipt Preview & Print */}
       {selectedReceipt && (
         <div className="pos-modal-overlay" onClick={() => setSelectedReceipt(null)}>
-          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.15rem', margin: 0, color: '#f87171', fontWeight: 800 }}>
-                <Receipt size={20} /> وەسڵی گەڕاندنەوەی کاڵا
-              </h2>
-              <button onClick={() => setSelectedReceipt(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18} />
+          <div 
+            className="pos-modal-card" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '380px',
+              width: '92%',
+              padding: '16px',
+              borderRadius: '12px',
+              background: '#ffffff',
+              direction: 'rtl',
+              border: '1px solid #cbd5e1',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                وەسڵی گەڕاندنەوەی کاڵا
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setSelectedReceipt(null)} 
+                style={{ 
+                  background: '#f1f5f9', 
+                  border: '1px solid #cbd5e1', 
+                  color: '#64748b', 
+                  cursor: 'pointer', 
+                  width: '28px', 
+                  height: '28px', 
+                  borderRadius: '6px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '16px', 
+                  fontWeight: 700 
+                }}
+              >
+                ×
               </button>
             </div>
 
-            <div id="refund-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '20px 18px', borderRadius: '8px', fontFamily: 'monospace, Tahoma', fontSize: '13px', lineHeight: '1.5', direction: 'rtl' }}>
-              <div style={{ textAlign: 'center', borderBottom: '2px dashed #000', paddingBottom: '12px', marginBottom: '12px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>
+            <div id="refund-receipt-printable-area" style={{ background: '#ffffff', color: '#000000', padding: '12px 10px', borderRadius: '6px', fontFamily: 'monospace, Tahoma', fontSize: '12px', lineHeight: '1.4', direction: 'rtl' }}>
+              <div style={{ textAlign: 'center', borderBottom: '1.5px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
+                <h4 style={{ margin: '0 0 2px 0', fontSize: '15px', fontWeight: 'bold' }}>
                   {localStorage.getItem('pos_store_name') || 'مارکێتی شارەکەم'}
-                </h3>
-                <div style={{ textAlign: 'center', fontSize: '11px', color: '#555', marginBottom: '4px' }}>
-                  پەیوەندی: {localStorage.getItem('pos_store_phone') || '0770 000 0000'}
-                </div>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#b91c1c' }}>وەسڵی گەڕاندنەوەی کاڵا</h4>
-                <div style={{ fontSize: '12px' }}>ژمارەی مامەڵە: #{selectedReceipt.sale_id || selectedReceipt.id}</div>
+                </h4>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#b91c1c' }}>وەسڵی گەڕاندنەوەی کاڵا</div>
+                <div style={{ fontSize: '11px' }}>ژمارەی پسووڵە: #{selectedReceipt.sale_id || selectedReceipt.id}</div>
               </div>
 
-              <div style={{ fontSize: '11px', marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '8px' }}>
+              <div style={{ fontSize: '11px', marginBottom: '8px', borderBottom: '1px solid #ddd', paddingBottom: '6px' }}>
                 <div>بەروار: {formatDateTime(selectedReceipt.created_at, { twelveHour: true })}</div>
                 <div>کڕیار: {selectedReceipt.customer_name || 'کڕیاری گشتی'}</div>
               </div>
 
-              <div style={{ borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontWeight: 'bold' }}>
+              <div style={{ borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontWeight: 'bold' }}>
                   <span>ناوی کاڵا:</span>
                   <span>{selectedReceipt.product_name}</span>
                 </div>
                 {selectedReceipt.barcode && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px', color: '#555' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '11px', color: '#555' }}>
                     <span>بارکۆد:</span>
                     <span>{selectedReceipt.barcode}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                   <span>بڕی گەڕێنراوە:</span>
                   <span>{selectedReceipt.quantity} {selectedReceipt.unit || 'دانە'}</span>
                 </div>
                 {selectedReceipt.reason && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px', color: '#555' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '11px', color: '#555' }}>
                     <span>هۆکار:</span>
                     <span>{selectedReceipt.reason}</span>
                   </div>
                 )}
               </div>
 
-              <div style={{ borderBottom: '2px dashed #000', paddingBottom: '10px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', color: '#000', marginBottom: '6px' }}>
+              <div style={{ borderBottom: '1.5px dashed #000', paddingBottom: '8px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', color: '#000', marginBottom: '4px' }}>
                   <span>کۆی پارەی گەڕێنراوە:</span>
-                  <span>{Number(selectedReceipt.refunded_amount || 0).toLocaleString()} دینار</span>
+                  <span>{Number(selectedReceipt.refunded_amount || 0).toLocaleString()} د.ع</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold', color: selectedReceipt.refund_method === 'DEBT' ? '#b45309' : '#047857' }}>
-                  <span>شێوازی پاکتاوکردن:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
+                  <span>شێوازی دانەوە:</span>
                   <span>
-                    {selectedReceipt.refund_method === 'DEBT' ? '💳 داشکاندن لە قەرزی کڕیار' : '💵 دانەوەی نەقد لە سندوق'}
+                    {selectedReceipt.refund_method === 'DEBT' ? 'داشکاندن لە قەرز' : 'دانەوەی نەقد لە سندوق'}
                   </span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', paddingTop: '10px', fontSize: '11px', textAlign: 'center' }}>
-                <div style={{ width: '45%' }}>
-                  <div>واژۆی کڕیار</div>
-                  <div style={{ marginTop: '25px', borderBottom: '1px dotted #000' }}></div>
-                </div>
-                <div style={{ width: '45%' }}>
-                  <div>واژۆی کاشێر</div>
-                  <div style={{ marginTop: '25px', borderBottom: '1px dotted #000' }}></div>
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '10px', color: '#555' }}>
+              <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '10px', color: '#777' }}>
                 سوپاس بۆ مامەڵەکردنتان
               </div>
             </div>
 
-            {/* Print Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+            {/* Print & Close Buttons */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
               <button 
                 type="button"
                 onClick={printReceipt}
-                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                style={{
+                  flex: 1,
+                  height: '36px',
+                  borderRadius: '6px',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '0.84rem'
+                }}
               >
-                <Printer size={18} /> چاپکردنی وەسڵ
+                چاپکردنی وەسڵ
               </button>
               <button 
                 type="button"
                 onClick={() => setSelectedReceipt(null)}
-                style={{ padding: '12px 20px', borderRadius: '12px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 700 }}
+                style={{
+                  height: '36px',
+                  padding: '0 16px',
+                  borderRadius: '6px',
+                  background: '#ffffff',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '0.84rem'
+                }}
               >
                 داخستن
               </button>

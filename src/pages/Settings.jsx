@@ -951,6 +951,8 @@ const Settings = () => {
               try {
                 const res = await changePassword(oldPassword, newPassword || undefined, adminUsername.trim());
                 if (res?.success) {
+                  localStorage.setItem('pos_admin_username', adminUsername.trim());
+                  localStorage.setItem('pos_last_username', adminUsername.trim());
                   setPasswordChangeSuccess('زانیارییەکانی هەژمار بە سەرکەوتوویی نوێکرانەوە!');
                   setOldPassword('');
                   setNewPassword('');

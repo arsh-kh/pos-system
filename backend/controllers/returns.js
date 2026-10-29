@@ -28,13 +28,12 @@ exports.getSaleForReturn = async (req, res) => {
         const customerTotalDebt = Number(sale.customer_total_debt || 0);
 
         // Smart recommendation:
-        // If sale was DEBT, recommended is DEBT
-        // If sale was SPLIT and customer currently has debt, recommend DEBT (to clear debt first), else CASH
-        // If sale was CASH, recommend CASH
+        // If sale had DEBT and customer currently has debt, recommend DEBT (to clear debt first), else CASH
+        // If sale was CASH or customer is anonymous, recommend CASH
         let recommendedRefundMethod = 'CASH';
-        if (sale.payment_method === 'DEBT') {
-            recommendedRefundMethod = 'DEBT';
-        } else if (sale.payment_method === 'SPLIT') {
+        if (sale.customer_id && (sale.payment_method === 'DEBT' || Number(sale.debt_amount) > 0)) {
+            recommendedRefundMethod = customerTotalDebt > 0 ? 'DEBT' : 'CASH';
+        } else if (sale.customer_id && sale.payment_method === 'SPLIT') {
             recommendedRefundMethod = customerTotalDebt > 0 ? 'DEBT' : 'CASH';
         }
 
@@ -61,6 +60,10 @@ exports.getSaleForReturn = async (req, res) => {
             LEFT JOIN Products p ON si.product_id = p.id
             WHERE si.sale_id = ?
         `, [id]);
+
+        if (items.length === 0) {
+            return res.status(400).json({ status: 'ERROR', message: 'ئەم پسووڵەیە هیچ کاڵایەکی تێدا نییە بۆ گەڕاندنەوە' });
+        }
 
         // Calculate sale subtotal and proportional discount ratio
         const calculatedSubtotal = items.reduce(
@@ -94,6 +97,8 @@ exports.getSaleForReturn = async (req, res) => {
             };
         });
 
+        const isFullyReturned = formattedItems.every(it => it.returnable_qty <= 0);
+
         res.json({
             status: 'SUCCESS',
             data: {
@@ -104,6 +109,7 @@ exports.getSaleForReturn = async (req, res) => {
                 remaining_refundable_total: remainingRefundableTotal,
                 customer_total_debt: customerTotalDebt,
                 recommended_refund_method: recommendedRefundMethod,
+                is_fully_returned: isFullyReturned,
                 items: formattedItems
             }
         });
@@ -507,3 +513,38 @@ exports.processDirectReturn = async (req, res) => {
         connection.release();
     }
 };
+
+// Return list of recent sales with returnable items for quick return selection
+exports.getRecentSalesForReturn = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT s.id,
+                   s.total_amount,
+                   s.paid_amount,
+                   s.debt_amount,
+                   s.payment_method,
+                   s.created_at,
+                   COALESCE(c.name, 'کڕیاری گشتی') as customer_name,
+                   c.phone as customer_phone,
+                   COUNT(si.id) as item_count,
+                   COALESCE(SUM(si.quantity), 0) as total_items_qty,
+                   COALESCE((
+                       SELECT SUM(r.quantity) 
+                       FROM Returns r 
+                       WHERE r.sale_id = s.id
+                   ), 0) as total_returned_qty
+            FROM Sales s
+            LEFT JOIN Customers c ON s.customer_id = c.id
+            INNER JOIN Sale_Items si ON s.id = si.sale_id
+            GROUP BY s.id
+            HAVING (total_items_qty - total_returned_qty) > 0
+            ORDER BY s.created_at DESC, s.id DESC
+            LIMIT 15
+        `);
+        res.json({ status: 'SUCCESS', data: rows });
+    } catch (error) {
+        console.error('Get Recent Sales For Return Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+

@@ -393,14 +393,15 @@ const Cashier = () => {
   // Cart Add & Update
   const addToCart = (product, addQty = 1, unitType = 'PIECE') => {
     const isBox = unitType === 'BOX';
-    const unitsPerBox = Math.max(1, parseFloat(product.units_per_box) || 1);
+    // Active FIFO batch multiplier: NEVER fall back to product.units_per_box
+    const unitsPerBox = Math.max(1, parseFloat(product.active_units_per_box) || 1);
     const addingUnits = isBox ? (Number(addQty) * unitsPerBox) : Number(addQty);
     const availableStock = Number(product.stock) || 0;
 
     // Strict Stock Enforcement (Permanently active: cannot add or exceed available stock)
     if (!product.is_weighted) {
       if (availableStock <= 0) {
-        alert(`ئەم کاڵایە (${product.name}) لە کۆگا نەماوە!`);
+        toast.error(`ئەم کاڵایە (${product.name}) لە کۆگا نەماوە!`);
         return;
       }
 
@@ -416,16 +417,16 @@ const Cashier = () => {
       if (totalRequested > availableStock) {
         const remainingCanAdd = availableStock - currentCartUnits;
         if (remainingCanAdd <= 0) {
-          alert(`ناتوانیت لەم کاڵایە زیاتر زیاد بکەیت! هەموو بڕی بەردەست لە سەبەتەدایە.`);
+          toast.error(`ناتوانیت لەم کاڵایە زیاتر زیاد بکەیت! هەموو بڕی بەردەست لە سەبەتەدایە.`);
         } else {
-          alert(`ناتوانیت لە بڕی بەردەستی مەغزەن زیاتر زیاد بکەیت!`);
+          toast.error(`ناتوانیت لە بڕی بەردەستی مەغزەن زیاتر زیاد بکەیت!`);
         }
         return;
       }
     }
 
     setCart(prevCart => {
-      const singlePrice = Number(product.selling_price) || 0;
+      const singlePrice = Number(product.active_batch_selling_price || product.selling_price) || 0;
       const boxPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(singlePrice * unitsPerBox);
       const effectivePrice = isBox ? boxPrice : singlePrice;
       const cartKey = `${product.id}_${unitType}`;
@@ -515,7 +516,7 @@ const Cashier = () => {
       }, 0);
 
       if (requestedUnits + otherUnits > availableStock) {
-        alert(`ناتوانیت لە بڕی بەردەستی مەغزەن زیاتر زیاد بکەیت!`);
+        toast.error(`ناتوانیت لە بڕی بەردەستی مەغزەن زیاتر زیاد بکەیت!`);
         return;
       }
     }
@@ -718,13 +719,15 @@ const Cashier = () => {
       returnInputRef.current?.focus();
     }, 100);
 
-    // Fetch latest 10 sales for dropdown suggestions
+    // Fetch latest sales that have returnable items for quick return selection
     try {
-      const res = await axios.get('http://localhost:3001/api/checkout');
-      if (Array.isArray(res.data)) {
-        setReturnRecentSales(res.data.slice(0, 10));
-      } else if (res.data?.data && Array.isArray(res.data.data)) {
-        setReturnRecentSales(res.data.data.slice(0, 10));
+      const res = await axios.get('http://localhost:3001/api/returns/recent-sales');
+      if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
+        setReturnRecentSales(res.data.data.slice(0, 15));
+      } else {
+        const fallback = await axios.get('http://localhost:3001/api/checkout');
+        const list = Array.isArray(fallback.data) ? fallback.data : (fallback.data?.data || []);
+        setReturnRecentSales(list.filter(s => Number(s.item_count) > 0).slice(0, 15));
       }
     } catch (_) {}
   };
@@ -754,14 +757,20 @@ const Cashier = () => {
       const res = await axios.get(`http://localhost:3001/api/returns/sale/${cleanId}`);
       if (res.data.status === 'SUCCESS' && res.data.data) {
         const saleData = res.data.data;
-        setReturnSearchedSale(saleData);
-        setReturnSaleIdInput(String(saleData.id));
+
+        if (!saleData.items || saleData.items.length === 0) {
+          setReturnModalNotice({ type: 'error', text: 'ئەم پسووڵەیە هیچ کاڵایەکی تێدا نییە بۆ گەڕاندنەوە' });
+          return;
+        }
 
         const availableItems = (saleData.items || []).filter(it => it.returnable_qty > 0);
         if (availableItems.length >= 1) {
+          setReturnSearchedSale(saleData);
+          setReturnSaleIdInput(String(saleData.id));
           setReturnSelectedSaleItem(availableItems[0]);
-          setReturnQtyInput(1);
+          setReturnQtyInput(availableItems[0].returnable_qty);
         } else {
+          setReturnSearchedSale(null);
           setReturnSelectedSaleItem(null);
           setReturnModalNotice({ type: 'error', text: 'هەموو کاڵاکانی ئەم پسووڵەیە پێشتر گەڕێنراونەتەوە' });
         }
@@ -3438,20 +3447,43 @@ const Cashier = () => {
                     const hasDiscount = returnSelectedSaleItem.has_discount || (Number(returnSearchedSale?.discount_amount) > 0);
 
                     return (
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        padding: '10px 14px', 
-                        borderRadius: '10px', 
-                        background: 'var(--bg-tertiary)' 
-                      }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 600 }}>
-                          کۆی پارەی گەڕاوە:
-                        </span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 900, fontSize: '1.25rem' }}>
-                          {computedRefund.toLocaleString()} دینار
-                        </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          padding: '10px 14px', 
+                          borderRadius: '10px', 
+                          background: 'var(--bg-tertiary)' 
+                        }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', fontWeight: 600 }}>
+                            کۆی پارەی گەڕاوە:
+                          </span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 900, fontSize: '1.25rem' }}>
+                            {computedRefund.toLocaleString()} دینار
+                          </span>
+                        </div>
+
+                        {/* Settlement Indicator for Cashier (DEBT vs CASH) */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          background: returnSearchedSale.recommended_refund_method === 'DEBT' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          border: returnSearchedSale.recommended_refund_method === 'DEBT' ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(16, 185, 129, 0.25)',
+                          color: returnSearchedSale.recommended_refund_method === 'DEBT' ? '#ef4444' : '#10b981'
+                        }}>
+                          <span>شێوازی دانەوە:</span>
+                          <span>
+                            {returnSearchedSale.recommended_refund_method === 'DEBT'
+                              ? `داشکاندن لە قەرزی ${returnSearchedSale.customer_name || 'کڕیار'} (نەقد مەدە)`
+                              : 'دانەوەی نەقد لە سندوق'}
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}

@@ -118,6 +118,12 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.setItem('pos_user', JSON.stringify(user));
         localStorage.setItem('token', token);
         localStorage.removeItem('pos_user');
+        if (user.username) {
+          localStorage.setItem('pos_last_username', user.username);
+          if (user.role === 'ADMIN') {
+            localStorage.setItem('pos_admin_username', user.username);
+          }
+        }
         setCurrentUser(user);
         setIsSwitchModalOpen(false);
         fetchPermissions();
@@ -150,6 +156,10 @@ export const AuthProvider = ({ children }) => {
         try {
           sessionStorage.setItem('pos_user', JSON.stringify(updated));
           localStorage.removeItem('pos_user');
+          if (updated.username) {
+            localStorage.setItem('pos_admin_username', updated.username);
+            localStorage.setItem('pos_last_username', updated.username);
+          }
         } catch (_) {}
       }
       return { success: res.data?.status === 'SUCCESS', message: res.data?.message, user: res.data?.data };

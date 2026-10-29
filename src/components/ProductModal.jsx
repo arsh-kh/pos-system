@@ -3,6 +3,7 @@ import axios from 'axios';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
+import { toast } from '../context/ToastContext';
 
 const cleanNumericValue = (val, defaultVal = '') => {
   if (val === undefined || val === null || val === '') return defaultVal;
@@ -50,7 +51,7 @@ const ProductModal = ({
     cost_price: '',
     selling_price: '',
     wholesale_price: '',
-    stock: isPurchaseMode ? '0' : '',
+    stock: '',
     low_stock_threshold: '5',
     expiry_date: '',
     category_id: '',
@@ -118,8 +119,8 @@ const ProductModal = ({
         barcode: presetBarcode ? String(presetBarcode).trim() : '',
         cost_price: '',
         selling_price: '',
-        stock: isPurchaseMode ? '0' : '',
-        category_id: isPurchaseMode && categories.length > 0 ? categories[0].id : '',
+        stock: '',
+        category_id: '',
         wholesale_price: '',
         expiry_date: '',
         low_stock_threshold: '5',
@@ -129,9 +130,6 @@ const ProductModal = ({
         is_weighted: false,
         unit: 'دانە'
       });
-      if (isPurchaseMode && categories.length > 0) {
-        setCategoryInput(categories[0].name);
-      }
     }
   }, [isOpen, editProduct, presetBarcode, isPurchaseMode]);
 
@@ -202,12 +200,12 @@ const ProductModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      alert('تکایە ناوی کاڵا بنووسە');
+      toast.error('تکایە ناوی کاڵا بنووسە');
       return;
     }
     const finalBarcode = formData.barcode ? String(formData.barcode).trim() : '';
     if (!finalBarcode) {
-      alert('تکایە بارکۆد بنووسە یان دروستی بکە');
+      toast.error('تکایە بارکۆد بنووسە یان دروستی بکە');
       return;
     }
 
@@ -264,6 +262,20 @@ const ProductModal = ({
         if (onSuccess) {
           onSuccess({ ...payload, id: editProduct.id, box_cost_price: formData.box_cost_price }, true);
         }
+      } else if (isPurchaseMode) {
+        // Pure local draft: push to invoice items array without premature DB POST
+        const tempDraftId = 'draft_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        if (onSuccess) {
+          onSuccess({ 
+            ...payload, 
+            id: tempDraftId, 
+            is_draft: true, 
+            box_cost_price: formData.box_cost_price,
+            initial_qty: (formData.stock !== undefined && formData.stock !== null && formData.stock !== '') 
+              ? parseFloat(formData.stock) 
+              : null
+          }, false);
+        }
       } else {
         const res = await axios.post('http://localhost:3001/api/products', payload, config);
         const newId = res.data?.id || res.data?.data?.id;
@@ -274,7 +286,7 @@ const ProductModal = ({
 
       onClose();
     } catch (error) {
-      alert(error.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی پاشەکەوتکردنی کاڵاکە');
+      toast.error(error.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی پاشەکەوتکردنی کاڵاکە');
     } finally {
       setIsSubmitting(false);
     }
@@ -288,7 +300,7 @@ const ProductModal = ({
 
   const primaryBtnText = isSubmitting 
     ? 'تکایە چاوەڕوان بە...' 
-    : (submitText || (isPurchaseMode ? 'تۆمارکردن و خستنەسەر پسووڵە' : 'پاشەکەوتکردن'));
+    : (submitText || (isPurchaseMode ? 'زیادکردن' : 'پاشەکەوتکردن'));
 
   return (
     <div className="pos-modal-overlay" onClick={onClose}>
@@ -692,9 +704,7 @@ const ProductModal = ({
           {/* Row 3: Pricing & Inventory */}
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: isPurchaseMode 
-              ? (formData.is_weighted ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)') 
-              : (formData.is_weighted ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)'), 
+            gridTemplateColumns: formData.is_weighted ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)', 
             gap: '12px',
             borderTop: !formData.is_weighted ? '1px solid #f1f5f9' : 'none',
             paddingTop: !formData.is_weighted ? '12px' : '0'
@@ -730,33 +740,32 @@ const ProductModal = ({
               />
             </div>
 
-            {/* Stock Field: Only shown in full Warehouse mode, hidden in Purchase Invoice mode */}
-            {!isPurchaseMode && (
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
-                  {formData.is_weighted ? 'کێش لە کۆگا' : 'دانە لە کۆگا'}
-                </label>
-                <input 
-                  type="number" 
-                  step={formData.is_weighted ? '0.001' : '1'}
-                  placeholder="0"
-                  value={formData.stock} 
-                  onChange={e => setFormData({ ...formData, stock: e.target.value })} 
-                  style={{ 
-                    width: '100%', 
-                    height: '38px', 
-                    padding: '0 10px', 
-                    borderRadius: '8px', 
-                    background: '#ffffff', 
-                    border: '1px solid #cbd5e1', 
-                    color: '#1e293b', 
-                    boxSizing: 'border-box', 
-                    fontSize: '0.88rem', 
-                    textAlign: 'center'
-                  }} 
-                />
-              </div>
-            )}
+            {/* Stock / Weight Field: Always available so user can record how many kg or pieces they have / brought */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                {formData.is_weighted ? (isPurchaseMode ? 'کێش (کگم)' : 'کێش لە کۆگا (کگم)') : (isPurchaseMode ? 'بڕ (دانە)' : 'دانە لە کۆگا')}
+              </label>
+              <input 
+                type="number" 
+                step={formData.is_weighted ? '0.001' : '1'}
+                min="0"
+                placeholder="0"
+                value={formData.stock} 
+                onChange={e => setFormData({ ...formData, stock: e.target.value })} 
+                style={{ 
+                  width: '100%', 
+                  height: '38px', 
+                  padding: '0 10px', 
+                  borderRadius: '8px', 
+                  background: '#ffffff', 
+                  border: '1px solid #cbd5e1', 
+                  color: '#1e293b', 
+                  boxSizing: 'border-box', 
+                  fontSize: '0.88rem', 
+                  textAlign: 'center'
+                }} 
+              />
+            </div>
 
             <div>
               <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
@@ -764,6 +773,8 @@ const ProductModal = ({
               </label>
               <input 
                 type="number" 
+                step={formData.is_weighted ? '0.001' : '1'}
+                min="0"
                 placeholder="5"
                 value={formData.low_stock_threshold} 
                 onChange={e => setFormData({ ...formData, low_stock_threshold: e.target.value })} 
@@ -788,14 +799,13 @@ const ProductModal = ({
             )}
           </div>
 
-          {/* Footer Row: Full Width Primary Button (or Dual Buttons in Purchase Mode) */}
-          <div style={{ marginTop: '4px', display: 'flex', gap: '10px' }}>
+          {/* Footer Row: Full Width Primary Button */}
+          <div style={{ marginTop: '4px', display: 'flex' }}>
             <button 
               type="submit" 
               disabled={isSubmitting}
               style={{ 
-                flex: 1,
-                width: isPurchaseMode ? 'auto' : '100%', 
+                width: '100%', 
                 height: '42px', 
                 borderRadius: '8px', 
                 background: '#2563eb', 
@@ -810,26 +820,6 @@ const ProductModal = ({
             >
               {primaryBtnText}
             </button>
-
-            {isPurchaseMode && (
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  height: '42px',
-                  padding: '0 20px',
-                  borderRadius: '8px',
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  color: '#475569',
-                  fontWeight: 700,
-                  fontSize: '0.90rem',
-                  cursor: 'pointer'
-                }}
-              >
-                داخستن
-              </button>
-            )}
           </div>
         </form>
       </div>

@@ -4,6 +4,7 @@ const shiftsController = require('../controllers/shifts');
 
 router.get('/current', shiftsController.getCurrentShift);
 router.post('/open', shiftsController.openShift);
+router.post('/opening-cash', shiftsController.setOpeningCash);
 router.post('/close/:id', shiftsController.closeShift);
 router.get('/z-report/:id', shiftsController.getZReport);
 router.post('/z-report/:id/telegram', shiftsController.sendZReportTelegram);

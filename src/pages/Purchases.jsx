@@ -5,7 +5,18 @@ import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
 import { formatDate } from '../utils/dateFormatter';
 import ProductModal from '../components/ProductModal';
+import { toast } from '../context/ToastContext';
+import { generateA4InvoiceHTML, exportInvoiceToPdf } from '../utils/invoicePdfGenerator';
 import './Dashboard.css';
+
+// Safe Electron IPC Detection
+let ipcRenderer = null;
+if (typeof window !== 'undefined' && typeof window.require === 'function') {
+  try {
+    const electron = window.require('electron');
+    ipcRenderer = electron?.ipcRenderer || null;
+  } catch (_) {}
+}
 
 const Purchases = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -13,16 +24,25 @@ const Purchases = () => {
   const [categories, setCategories] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Draft persistence helper
+  const getInitialDraft = () => {
+    try {
+      const draft = JSON.parse(localStorage.getItem('pos_purchase_draft') || '{}');
+      return draft && typeof draft === 'object' ? draft : {};
+    } catch (_) { return {}; }
+  };
+  const initialDraft = getInitialDraft();
+
   // Invoice Header State
-  const [supplierId, setSupplierId] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState(() => `INV-${Date.now().toString().slice(-6)}`);
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState('CASH'); // CASH, DEBT, PARTIAL
-  const [paidAmount, setPaidAmount] = useState('');
-  const [additionalCost, setAdditionalCost] = useState('');
+  const [supplierId, setSupplierId] = useState(() => initialDraft.supplierId || '');
+  const [invoiceNumber, setInvoiceNumber] = useState(() => initialDraft.invoiceNumber || `INV-${Date.now().toString().slice(-6)}`);
+  const [invoiceDate, setInvoiceDate] = useState(() => initialDraft.invoiceDate || new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState(() => initialDraft.paymentMethod || 'CASH'); // CASH, DEBT, PARTIAL
+  const [paidAmount, setPaidAmount] = useState(() => initialDraft.paidAmount || '');
+  const [additionalCost, setAdditionalCost] = useState(() => initialDraft.additionalCost || '');
 
   // Invoice Items State
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => Array.isArray(initialDraft.items) ? initialDraft.items : []);
 
   // Barcode Scanner & Search State
   const [scanBarcode, setScanBarcode] = useState('');
@@ -36,6 +56,7 @@ const Purchases = () => {
   // Printable Invoice Voucher State
   const [printedInvoice, setPrintedInvoice] = useState(null);
   const [companyWarningOpen, setCompanyWarningOpen] = useState(false);
+  const [invoiceErrorMessage, setInvoiceErrorMessage] = useState(null);
   const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی شارەکەم';
   const storePhone = localStorage.getItem('pos_store_phone') || '';
 
@@ -69,6 +90,27 @@ const Purchases = () => {
     fetchData();
   }, []);
 
+  // Auto-sync draft to localStorage
+  useEffect(() => {
+    if (items.length > 0 || supplierId) {
+      try {
+        localStorage.setItem('pos_purchase_draft', JSON.stringify({
+          supplierId,
+          invoiceNumber,
+          invoiceDate,
+          paymentMethod,
+          paidAmount,
+          additionalCost,
+          items
+        }));
+      } catch (err) {
+        console.error('Failed to save purchase draft:', err);
+      }
+    } else {
+      localStorage.removeItem('pos_purchase_draft');
+    }
+  }, [supplierId, invoiceNumber, invoiceDate, paymentMethod, paidAmount, additionalCost, items]);
+
   const openQuickAddModal = (presetBarcode = '') => {
     setQuickAddBarcode(presetBarcode || '');
     setIsQuickAddOpen(true);
@@ -83,8 +125,9 @@ const Purchases = () => {
     );
 
     if (existing) {
-      const unitsPerBox = Math.max(1, parseFloat(existing.units_per_box) || 1);
-      const isScannedBox = Boolean(existing.box_barcode && normalizeBarcode(existing.box_barcode) === cleanCode);
+      const isWeighted = Boolean(existing.is_weighted || existing.unit === 'کگم');
+      const unitsPerBox = (!isWeighted && existing.units_per_box) ? Math.max(1, parseFloat(existing.units_per_box) || 1) : 1;
+      const isScannedBox = Boolean(!isWeighted && existing.box_barcode && normalizeBarcode(existing.box_barcode) === cleanCode);
       const initialUnitType = isScannedBox ? 'BOX' : (unitsPerBox > 1 ? 'BOX' : 'PIECE');
 
       setItems(prevItems => {
@@ -127,7 +170,9 @@ const Purchases = () => {
               quantity: initialUnitType === 'BOX' ? String(unitsPerBox) : '1',
               cost_price: String(effectivePieceCost),
               selling_price: existing.selling_price || 0,
-              stock_before: existing.stock || 0
+              stock_before: existing.stock || 0,
+              is_weighted: isWeighted,
+              unit: isWeighted ? 'کگم' : (existing.unit || 'دانە')
             }
           ];
         }
@@ -151,10 +196,18 @@ const Purchases = () => {
   };
 
   const handleQuickAddSuccess = (newProd) => {
-    const unitsPerBox = Math.max(1, parseFloat(newProd.units_per_box) || 1);
+    const isWeighted = Boolean(newProd.is_weighted || newProd.unit === 'کگم');
+    const unitsPerBox = (!isWeighted && newProd.units_per_box) ? Math.max(1, parseFloat(newProd.units_per_box) || 1) : 1;
     const boxCost = Math.max(0, Number(newProd.box_cost_price) || (Number(newProd.cost_price) * unitsPerBox) || 0);
     const pieceCost = Math.max(0, Number(newProd.cost_price) || 0);
-    const initialUnitType = (!newProd.is_weighted && unitsPerBox > 1) ? 'BOX' : 'PIECE';
+    const initialUnitType = (!isWeighted && unitsPerBox > 1) ? 'BOX' : 'PIECE';
+
+    let initialQty = '1';
+    if (newProd.initial_qty !== null && newProd.initial_qty !== undefined && !isNaN(Number(newProd.initial_qty)) && Number(newProd.initial_qty) > 0) {
+      initialQty = String(newProd.initial_qty);
+    } else if (initialUnitType === 'BOX') {
+      initialQty = String(unitsPerBox);
+    }
 
     setItems(prev => {
       const existingIdx = prev.findIndex(i => i.product_id === newProd.id);
@@ -166,40 +219,47 @@ const Purchases = () => {
           it.box_quantity = String(newBoxQty);
           it.quantity = String(Math.round(newBoxQty * unitsPerBox));
         } else {
-          const newQty = (parseFloat(it.quantity) || 0) + 1;
+          const added = parseFloat(initialQty) || 1;
+          const newQty = (parseFloat(it.quantity) || 0) + added;
           it.quantity = String(newQty);
           it.box_quantity = unitsPerBox > 0 ? String(parseFloat((newQty / unitsPerBox).toFixed(2)) || 0) : String(newQty);
         }
         updated[existingIdx] = it;
         return updated;
       }
-          const effectivePieceCost = (initialUnitType === 'BOX' && unitsPerBox > 0)
-            ? Math.round(boxCost / unitsPerBox)
-            : pieceCost;
+      const effectivePieceCost = (initialUnitType === 'BOX' && unitsPerBox > 0)
+        ? Math.round(boxCost / unitsPerBox)
+        : pieceCost;
 
-          return [
-            ...prev,
-            {
-              product_id: newProd.id,
-              name: newProd.name,
-              barcode: newProd.barcode,
-              box_barcode: newProd.box_barcode || '',
-              units_per_box: unitsPerBox,
-              unit_type: initialUnitType,
-              box_quantity: '1',
-              box_cost_price: String(boxCost || (pieceCost * unitsPerBox)),
-              quantity: initialUnitType === 'BOX' ? String(unitsPerBox) : '1',
-              cost_price: String(effectivePieceCost),
-              selling_price: newProd.selling_price || 0,
-              stock_before: 0
-            }
-          ];
+      return [
+        ...prev,
+        {
+          product_id: newProd.id,
+          name: newProd.name,
+          barcode: newProd.barcode,
+          box_barcode: newProd.box_barcode || '',
+          units_per_box: unitsPerBox,
+          unit_type: initialUnitType,
+          box_quantity: '1',
+          box_cost_price: String(boxCost || (pieceCost * unitsPerBox)),
+          quantity: initialQty,
+          cost_price: String(effectivePieceCost),
+          selling_price: newProd.selling_price || 0,
+          stock_before: 0,
+          is_draft: Boolean(newProd.is_draft),
+          draft_payload: newProd.is_draft ? newProd : null,
+          is_weighted: isWeighted,
+          unit: isWeighted ? 'کگم' : (newProd.unit || 'دانە')
+        }
+      ];
     });
 
-    const config = getAuthConfig();
-    axios.get('http://localhost:3001/api/products', config).then(res => {
-      if (res.data?.status === 'SUCCESS') setProducts(res.data.data);
-    }).catch(() => {});
+    if (!newProd.is_draft) {
+      const config = getAuthConfig();
+      axios.get('http://localhost:3001/api/products', config).then(res => {
+        if (res.data?.status === 'SUCCESS') setProducts(res.data.data);
+      }).catch(() => {});
+    }
   };
 
   const updateItem = (index, field, value) => {
@@ -211,22 +271,66 @@ const Purchases = () => {
       if (field === 'unit_type') {
         it.unit_type = value;
         if (value === 'BOX') {
-          const bQty = Math.max(1, parseFloat(it.box_quantity) || 1);
+          const prod = products.find(p => p.id === it.product_id);
+          const currentMult = Math.max(1, parseFloat(it.last_box_multiplier) || parseFloat(it.units_per_box) || parseFloat(prod?.units_per_box) || 12);
+          it.units_per_box = String(currentMult);
+          it.last_box_multiplier = currentMult;
+
+          // Convert pieces quantity to carton quantity: box_quantity = quantity / currentMult
+          const totalPieces = parseFloat(it.quantity) || currentMult;
+          const bQty = Math.max(0.001, parseFloat((totalPieces / currentMult).toFixed(3)));
           it.box_quantity = String(bQty);
-          it.quantity = String(Math.round(bQty * unitsPerBox));
-          if (!it.box_cost_price || Number(it.box_cost_price) === 0) {
-            it.box_cost_price = String(Math.round((Number(it.cost_price) || 0) * unitsPerBox));
-          }
-          it.cost_price = unitsPerBox > 0 ? String(Math.round((Number(it.box_cost_price) || 0) / unitsPerBox)) : String(it.box_cost_price);
+          it.quantity = String(Math.round(bQty * currentMult));
+
+          // Carton purchase price = piece purchase price * multiplier
+          const pieceCost = (it.exact_cost_price !== undefined && it.exact_cost_price !== null && Number(it.exact_cost_price) > 0)
+            ? Number(it.exact_cost_price)
+            : (Number(it.cost_price) || 0);
+          it.exact_cost_price = pieceCost;
+          it.cost_price = String(Math.round(pieceCost));
+          it.box_cost_price = String(Math.round(pieceCost * currentMult));
         } else {
-          const pQty = Math.max(1, parseFloat(it.quantity) || 1);
-          it.quantity = String(pQty);
-          if (!it.cost_price || Number(it.cost_price) === 0) {
-            it.cost_price = unitsPerBox > 0 ? String(Math.round((Number(it.box_cost_price) || 0) / unitsPerBox)) : '0';
+          // If "دانە", input is DISABLED (grayed out visually) and defaults to 1
+          const currentMult = Math.max(1, parseFloat(it.units_per_box) || parseFloat(it.last_box_multiplier) || 1);
+          it.last_box_multiplier = currentMult;
+          it.units_per_box = '1';
+
+          // Ensure quantity is in single pieces
+          const bQty = parseFloat(it.box_quantity) || 0;
+          const totalPieces = Math.max(1, parseFloat(it.quantity) || (bQty * currentMult) || 1);
+          it.quantity = String(Math.round(totalPieces));
+          it.box_quantity = String(parseFloat((totalPieces / currentMult).toFixed(2)) || 1);
+
+          // CRITICAL: Calculate single piece purchase price: pieceCost = carton_cost / multiplier
+          let pieceCost = 0;
+          if (it.exact_cost_price !== undefined && it.exact_cost_price !== null && Number(it.exact_cost_price) > 0) {
+            pieceCost = Number(it.exact_cost_price);
+          } else if (Number(it.box_cost_price) > 0 && currentMult > 1) {
+            pieceCost = Number(it.box_cost_price) / currentMult;
+          } else {
+            pieceCost = Number(it.cost_price) || 0;
           }
-          it.box_cost_price = String(Math.round((Number(it.cost_price) || 0) * unitsPerBox));
+
+          it.exact_cost_price = pieceCost;
+          it.cost_price = String(Math.round(pieceCost));
+          it.box_cost_price = String(Math.round(pieceCost * currentMult));
+        }
+      } else if (field === 'units_per_box') {
+        it.units_per_box = value;
+        const newUnits = Math.max(1, parseFloat(value) || 1);
+        if (it.unit_type === 'BOX') {
+          const bQty = Math.max(0.001, parseFloat(it.box_quantity) || 1);
+          it.quantity = String(Math.round(bQty * newUnits));
+          // Instantly recalculate Line Total based on this specific batch multiplier
+          const pieceCost = (it.exact_cost_price !== undefined && it.exact_cost_price !== null)
+            ? Number(it.exact_cost_price)
+            : (Number(it.cost_price) || 0);
+          it.box_cost_price = String(Math.round(pieceCost * newUnits));
+        } else {
+          it.units_per_box = '1';
         }
       } else if (field === 'box_quantity') {
+        const mult = Math.max(1, parseFloat(it.units_per_box) || 1);
         if (value === '') {
           it.box_quantity = '';
           it.quantity = '';
@@ -234,29 +338,34 @@ const Purchases = () => {
           const parsed = parseFloat(value);
           if (parsed < 0 || isNaN(parsed)) {
             it.box_quantity = '1';
-            it.quantity = String(unitsPerBox);
+            it.quantity = String(mult);
           } else {
             const safeVal = Math.max(0.001, parsed);
             it.box_quantity = value;
-            it.quantity = String(Math.round(safeVal * unitsPerBox));
+            it.quantity = String(Math.round(safeVal * mult));
           }
         }
       } else if (field === 'box_cost_price') {
+        const mult = Math.max(1, parseFloat(it.units_per_box) || 1);
         if (value === '') {
           it.box_cost_price = '';
           it.cost_price = '';
+          delete it.exact_cost_price;
         } else {
           const parsed = parseFloat(value);
           if (parsed < 0 || isNaN(parsed)) {
             it.box_cost_price = '0';
             it.cost_price = '0';
+            it.exact_cost_price = 0;
           } else {
             const safeVal = Math.max(0, parsed);
             it.box_cost_price = value;
-            it.cost_price = unitsPerBox > 0 ? String(Math.round(safeVal / unitsPerBox)) : String(safeVal);
+            it.exact_cost_price = mult > 0 ? (safeVal / mult) : safeVal;
+            it.cost_price = String(Math.round(it.exact_cost_price));
           }
         }
       } else if (field === 'quantity') {
+        const mult = Math.max(1, parseFloat(it.units_per_box) || 1);
         if (value === '') {
           it.quantity = '';
           it.box_quantity = '';
@@ -264,26 +373,30 @@ const Purchases = () => {
           const parsed = parseFloat(value);
           if (parsed < 0 || isNaN(parsed)) {
             it.quantity = '1';
-            it.box_quantity = unitsPerBox > 0 ? String(parseFloat((1 / unitsPerBox).toFixed(2))) : '1';
+            it.box_quantity = mult > 0 ? String(parseFloat((1 / mult).toFixed(2))) : '1';
           } else {
             const safeVal = Math.max(0.001, parsed);
             it.quantity = value;
-            it.box_quantity = unitsPerBox > 0 ? String(parseFloat((safeVal / unitsPerBox).toFixed(2)) || 0) : String(safeVal);
+            it.box_quantity = mult > 0 ? String(parseFloat((safeVal / mult).toFixed(2)) || 0) : String(safeVal);
           }
         }
       } else if (field === 'cost_price') {
+        const mult = Math.max(1, parseFloat(it.units_per_box) || 1);
         if (value === '') {
           it.cost_price = '';
+          delete it.exact_cost_price;
           it.box_cost_price = '';
         } else {
           const parsed = parseFloat(value);
           if (parsed < 0 || isNaN(parsed)) {
             it.cost_price = '0';
+            it.exact_cost_price = 0;
             it.box_cost_price = '0';
           } else {
             const safeVal = Math.max(0, parsed);
             it.cost_price = value;
-            it.box_cost_price = String(Math.round(safeVal * unitsPerBox));
+            it.exact_cost_price = safeVal;
+            it.box_cost_price = String(Math.round(safeVal * mult));
           }
         }
       } else if (field === 'selling_price') {
@@ -308,7 +421,7 @@ const Purchases = () => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Mathematical Line Item Total Helper (Always: Quantity × Purchase Price)
+  // Mathematical Line Item Total Helper (Always: Quantity × Purchase Price, locking exact floating-point precision)
   const getItemLineTotal = (item) => {
     if (item.unit_type === 'BOX') {
       const bQty = Math.max(0, parseFloat(item.box_quantity) || 0);
@@ -316,7 +429,9 @@ const Purchases = () => {
       return Math.round(bQty * bPrice);
     } else {
       const pQty = Math.max(0, parseFloat(item.quantity) || 0);
-      const pPrice = Math.max(0, parseFloat(item.cost_price) || 0);
+      const pPrice = (item.exact_cost_price !== undefined && item.exact_cost_price !== null)
+        ? Number(item.exact_cost_price)
+        : Math.max(0, parseFloat(item.cost_price) || 0);
       return Math.round(pQty * pPrice);
     }
   };
@@ -422,28 +537,98 @@ const Purchases = () => {
 
   const isSaveDisabled = isSubmitting || items.length === 0;
 
-  const handleSaveInvoice = async (andPrint = false) => {
+  const handleExportPDF = async (invData, preSelectedFileHandle = null) => {
+    return await exportInvoiceToPdf(invData, storeName, storePhone, preSelectedFileHandle);
+  };
+
+  const onSaveAndPdf = async () => {
     if (!supplierId) {
       setCompanyWarningOpen(true);
       return;
     }
     if (items.length === 0) {
-      alert('تکایە لانیکەم یەک کاڵا زیاد بکە');
+      toast.error('تکایە لانیکەم یەک کاڵا زیاد بکە');
       return;
     }
     if (effectivePaid < 0 || effectivePaid > totalInvoiceCost) {
-      alert('بڕی پارەی دراو نادروستە');
+      toast.error('بڕی پارەی دراو نادروستە');
+      return;
+    }
+
+    let fileHandle = null;
+    // In web browser (Chrome), open the native Windows Save dialog IMMEDIATELY upon user click!
+    if (!ipcRenderer && typeof window.showSaveFilePicker === 'function') {
+      try {
+        const cleanInvNum = (invoiceNumber || `INV-${Date.now().toString().slice(-6)}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: `Invoice_${cleanInvNum}.pdf`,
+          types: [{
+            description: 'فایلی PDF پسووڵە',
+            accept: { 'application/pdf': ['.pdf'] }
+          }]
+        });
+      } catch (pickerErr) {
+        if (pickerErr.name === 'AbortError') {
+          // User clicked Cancel on the file dialog - abort without saving
+          return;
+        }
+      }
+    }
+
+    await handleSaveInvoice(true, fileHandle);
+  };
+
+  const handleSaveInvoice = async (exportPdf = false, preSelectedFileHandle = null) => {
+    if (!supplierId) {
+      setCompanyWarningOpen(true);
+      return;
+    }
+    if (items.length === 0) {
+      toast.error('تکایە لانیکەم یەک کاڵا زیاد بکە');
+      return;
+    }
+    if (effectivePaid < 0 || effectivePaid > totalInvoiceCost) {
+      toast.error('بڕی پارەی دراو نادروستە');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const config = getAuthConfig();
+
+      // Step 1: Persist any drafted products to DB before saving invoice
+      const draftMap = new Map();
+      for (const item of items) {
+        const isDraft = item.is_draft || String(item.product_id).startsWith('draft_');
+        if (isDraft && !draftMap.has(item.product_id)) {
+          const draftPayload = item.draft_payload || {
+            name: item.name,
+            barcode: item.barcode,
+            cost_price: Number(item.cost_price) || 0,
+            selling_price: Number(item.selling_price) || 0,
+            stock: 0,
+            wholesale_price: 0,
+            expiry_date: null,
+            low_stock_threshold: 5,
+            box_barcode: item.box_barcode || null,
+            units_per_box: item.units_per_box || 1,
+            is_weighted: item.is_weighted ? 1 : 0,
+            unit: item.is_weighted ? 'کگم' : (item.unit || 'دانە'),
+            category_id: item.category_id || null
+          };
+          const createRes = await axios.post('http://localhost:3001/api/products', draftPayload, config);
+          const realId = createRes.data?.id || createRes.data?.data?.id;
+          draftMap.set(item.product_id, realId);
+        }
+      }
+
       const payload = {
         supplier_id: supplierId,
         invoice_number: invoiceNumber || null,
         invoice_date: invoiceDate,
         payment_method: paymentMethod,
         additional_cost: effectiveAdditionalCost,
+        total_amount: totalInvoiceCost,
         paid_amount: effectivePaid,
         remaining_amount: totalRemaining,
         items: items.map(i => {
@@ -452,20 +637,32 @@ const Purchases = () => {
           const totalPieces = isBox 
             ? Math.max(0.001, (parseFloat(i.box_quantity) || 0) * unitsPerBox)
             : Math.max(0.001, parseFloat(i.quantity) || 1);
+          const lineTotal = getItemLineTotal(i);
           const pieceCost = isBox
             ? Math.max(0, (Number(i.box_cost_price) || 0) / unitsPerBox)
-            : Math.max(0, Number(i.cost_price) || 0);
+            : ((i.exact_cost_price !== undefined && i.exact_cost_price !== null)
+                ? Number(i.exact_cost_price)
+                : Math.max(0, Number(i.cost_price) || 0));
+
+          const finalProductId = draftMap.has(i.product_id) ? draftMap.get(i.product_id) : i.product_id;
 
           return {
-            product_id: i.product_id,
+            product_id: finalProductId,
             quantity: Math.round(totalPieces * 1000) / 1000,
             cost_price: Math.round(pieceCost),
-            selling_price: Math.max(0, Number(i.selling_price) || 0)
+            purchase_price: Math.round(pieceCost),
+            selling_price: Math.max(0, Number(i.selling_price) || 0),
+            sell_price: Math.max(0, Number(i.selling_price) || 0),
+            units_per_box: unitsPerBox,
+            unit_type: i.unit_type || 'PIECE',
+            box_quantity: isBox ? (parseFloat(i.box_quantity) || 1) : null,
+            box_cost_price: isBox ? (Number(i.box_cost_price) || 0) : null,
+            line_total: lineTotal
           };
         })
       };
 
-      await axios.post('http://localhost:3001/api/purchase-invoices', payload);
+      await axios.post('http://localhost:3001/api/purchase-invoices', payload, config);
 
       const savedSupplier = suppliers.find(s => String(s.id) === String(supplierId));
       const invoiceReceiptData = {
@@ -485,6 +682,7 @@ const Purchases = () => {
 
           return {
             name: i.name,
+            barcode: i.barcode || '',
             quantity: unitDesc,
             cost_price: i.unit_type === 'BOX' ? Number(i.box_cost_price) : Number(i.cost_price),
             landedUnitCost: i.landedUnitCost || Number(i.cost_price) || 0,
@@ -494,13 +692,14 @@ const Purchases = () => {
       };
 
       setPrintedInvoice(invoiceReceiptData);
-      if (andPrint) {
-        setTimeout(() => window.print(), 100);
+
+      // If "تۆمارکردن و PDF" was clicked, trigger native Electron Save As dialog & PDF export
+      if (exportPdf) {
+        await handleExportPDF(invoiceReceiptData, preSelectedFileHandle);
       }
 
-      alert('پسووڵەی کڕین بە سەرکەوتوویی تۆمارکرا');
-      
-      // Reset form
+      // SILENT SUCCESS: Silently clear/reset the invoice form/table state to indicate readiness for the next invoice.
+      localStorage.removeItem('pos_purchase_draft');
       setSupplierId('');
       setInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
       setItems([]);
@@ -509,11 +708,13 @@ const Purchases = () => {
       setAdditionalCost('');
       setProductSearch('');
 
-      const prodRes = await axios.get('http://localhost:3001/api/products', getAuthConfig());
+      const prodRes = await axios.get('http://localhost:3001/api/products', config);
       if (prodRes.data.status === 'SUCCESS') setProducts(prodRes.data.data);
 
     } catch (error) {
-      alert(error.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی پاشەکەوتکردن');
+      // EXPLICIT FAILURE (UX): Catch the API error and display it using the minimalist warning UI (No alert())
+      const errorMsg = error.response?.data?.message || error.message || 'هەڵەیەکی نەزانراو لە ڕاژەکارەوە';
+      setInvoiceErrorMessage(`کێشەیەک ڕوویدا، پسووڵەکە تۆمار نەکرا. هۆکار: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -835,13 +1036,15 @@ const Purchases = () => {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>{p.name}</span>
-                    {Number(p.units_per_box) > 1 && (
-                      <span style={{ fontSize: '0.74rem', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
-                        {p.units_per_box} دانە/کارتۆن
+                    {parseFloat(Number(p.units_per_box)) > 1 && (
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500 }}>
+                        ({parseFloat(Number(p.units_per_box))} دانە لە کارتۆندا)
                       </span>
                     )}
                   </div>
-                  <span style={{ color: '#1e293b', fontWeight: 700, fontSize: '0.84rem' }}>{Number(p.cost_price || 0).toLocaleString()} د.ع</span>
+                  <span style={{ color: '#1e293b', fontWeight: 700, fontSize: '0.84rem' }}>
+                    {Math.round(Number(p.cost_price || 0)).toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>
@@ -885,14 +1088,15 @@ const Purchases = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'right', whiteSpace: 'nowrap' }}>
           <colgroup>
             <col style={{ width: '3%' }} />
-            <col style={{ width: '21%' }} />
-            <col style={{ width: '11%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '8%' }} />
             <col style={{ width: '9%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
-            <col style={{ width: '12%' }} />
             <col style={{ width: '10%' }} />
-            <col style={{ width: '9%' }} />
             <col style={{ width: '5%' }} />
           </colgroup>
           <thead style={{
@@ -909,6 +1113,7 @@ const Purchases = () => {
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>هەبوو</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>شێوازی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بڕ</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>دانە لە کارتۆنێکدا</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی فرۆشتن (تاک)</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center' }}>کۆی کڕین</th>
@@ -918,7 +1123,7 @@ const Purchases = () => {
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan="10" style={{ border: '1px solid #e2e8f0', padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+                <td colSpan="11" style={{ border: '1px solid #e2e8f0', padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
                   هیچ کاڵایەک لە پسووڵەکەدا نییە. بارکۆد لێبدە یان بە ناوی کاڵا بگەڕێ.
                 </td>
               </tr>
@@ -952,55 +1157,59 @@ const Purchases = () => {
 
                     {/* Current Stock (عەمباری ئێستا) */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.84rem' }}>
-                      {Number(item.stock_before || 0).toLocaleString()} دانە
+                      {Number(item.stock_before || 0).toLocaleString()} {item.is_weighted ? 'کگم' : 'دانە'}
                     </td>
 
-                    {/* Unit Selector: Carton or Piece */}
+                    {/* Unit Selector: Carton or Piece or KG */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
-                      <div style={{
-                        display: 'inline-flex',
-                        background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        padding: '2px',
-                        height: '28px',
-                        boxSizing: 'border-box'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => updateItem(index, 'unit_type', 'BOX')}
-                          style={{
-                            padding: '0 8px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            background: isBox ? '#2563eb' : 'transparent',
-                            color: isBox ? '#ffffff' : '#64748b',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          کارتۆن
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateItem(index, 'unit_type', 'PIECE')}
-                          style={{
-                            padding: '0 8px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            background: !isBox ? '#2563eb' : 'transparent',
-                            color: !isBox ? '#ffffff' : '#64748b',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          دانە
-                        </button>
-                      </div>
+                      {item.is_weighted ? (
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2563eb' }}>کگم</span>
+                      ) : (
+                        <div style={{
+                          display: 'inline-flex',
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '2px',
+                          height: '28px',
+                          boxSizing: 'border-box'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => updateItem(index, 'unit_type', 'BOX')}
+                            style={{
+                              padding: '0 8px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              background: isBox ? '#2563eb' : 'transparent',
+                              color: isBox ? '#ffffff' : '#64748b',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            کارتۆن
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateItem(index, 'unit_type', 'PIECE')}
+                            style={{
+                              padding: '0 8px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              background: !isBox ? '#2563eb' : 'transparent',
+                              color: !isBox ? '#ffffff' : '#64748b',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            دانە
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     {/* Quantity Input - Clean Single Centered Input */}
@@ -1025,6 +1234,36 @@ const Purchases = () => {
                           outline: 'none'
                         }} 
                       />
+                    </td>
+
+                    {/* Units per Box Input ("دانە لە کارتۆنێکدا") */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
+                      {item.is_weighted ? (
+                        <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
+                      ) : (
+                        <input 
+                          type="number" 
+                          step="any"
+                          min="1" 
+                          disabled={!isBox}
+                          value={isBox ? (item.units_per_box ?? '') : '1'} 
+                          onChange={(e) => updateItem(index, 'units_per_box', e.target.value)} 
+                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+                          style={{
+                            width: '75px',
+                            height: '28px',
+                            borderRadius: '4px',
+                            background: !isBox ? '#f1f5f9' : '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            color: !isBox ? '#94a3b8' : '#1e293b',
+                            textAlign: 'center',
+                            fontWeight: 700,
+                            fontSize: '0.86rem',
+                            outline: 'none',
+                            cursor: !isBox ? 'not-allowed' : 'text'
+                          }} 
+                        />
+                      )}
                     </td>
 
                     {/* Cost Price Input - Clean Single Centered Input */}
@@ -1163,7 +1402,7 @@ const Purchases = () => {
           {printedInvoice && (
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => handleExportPDF(printedInvoice)}
               style={{
                 height: '36px',
                 padding: '0 12px',
@@ -1177,7 +1416,7 @@ const Purchases = () => {
                 whiteSpace: 'nowrap'
               }}
             >
-              چاپکردنەوەی وەسڵ
+              دەرکردنی فایلی PDF
             </button>
           )}
 
@@ -1198,12 +1437,12 @@ const Purchases = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            پاشەکەوت
+            تۆمارکردن
           </button>
 
           <button 
             type="button"
-            onClick={() => handleSaveInvoice(true)}
+            onClick={onSaveAndPdf}
             disabled={isSaveDisabled}
             style={{
               height: '36px',
@@ -1215,10 +1454,11 @@ const Purchases = () => {
               fontSize: '0.86rem',
               fontWeight: 800,
               cursor: isSaveDisabled ? 'not-allowed' : 'pointer',
+              boxShadow: isSaveDisabled ? 'none' : '0 2px 6px rgba(37,99,235,0.25)',
               whiteSpace: 'nowrap'
             }}
           >
-            پاشەکەوت و چاپ
+            تۆمارکردن و PDF
           </button>
         </div>
       </div>
@@ -1238,7 +1478,7 @@ const Purchases = () => {
           });
         }}
         title="تۆمارکردنی کاڵای نوێ بۆ کۆگا"
-        submitText="تۆمارکردن و خستنەسەر پسووڵە"
+        submitText="زیادکردن"
       />
 
       {/* Hidden Thermal Purchase Receipt (Targeted by @media print) */}
@@ -1416,6 +1656,73 @@ const Purchases = () => {
                 padding: '0 32px',
                 borderRadius: '6px',
                 background: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.86rem',
+                cursor: 'pointer'
+              }}
+            >
+              باشە
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Clean & Minimalist Explicit Failure Modal */}
+      {invoiceErrorMessage && (
+        <div 
+          onClick={() => setInvoiceErrorMessage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            direction: 'rtl'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              padding: '24px 32px',
+              width: '380px',
+              maxWidth: '90vw',
+              textAlign: 'center',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <p style={{
+              margin: 0,
+              fontSize: '0.96rem',
+              fontWeight: 700,
+              color: '#dc2626',
+              lineHeight: 1.6
+            }}>
+              {invoiceErrorMessage}
+            </p>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setInvoiceErrorMessage(null)}
+              style={{
+                height: '36px',
+                padding: '0 32px',
+                borderRadius: '6px',
+                background: '#dc2626',
                 color: '#ffffff',
                 border: 'none',
                 fontWeight: 700,

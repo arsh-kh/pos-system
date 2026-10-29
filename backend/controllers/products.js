@@ -11,7 +11,22 @@ ensureProductsSchema();
 exports.getAllProducts = async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT p.*, c.name as category_name 
+            SELECT p.*, 
+                   COALESCE((
+                       SELECT pb.units_per_box 
+                       FROM Product_Batches pb 
+                       WHERE pb.product_id = p.id AND pb.status = 'ACTIVE' AND pb.remaining_quantity > 0 
+                       ORDER BY pb.created_at ASC, pb.id ASC 
+                       LIMIT 1
+                   ), 1) AS active_units_per_box,
+                   (
+                       SELECT pb.selling_price 
+                       FROM Product_Batches pb 
+                       WHERE pb.product_id = p.id AND pb.status = 'ACTIVE' AND pb.remaining_quantity > 0 
+                       ORDER BY pb.created_at ASC, pb.id ASC 
+                       LIMIT 1
+                   ) AS active_batch_selling_price,
+                   c.name as category_name 
             FROM Products p 
             LEFT JOIN Categories c ON p.category_id = c.id
             ORDER BY p.id DESC
@@ -64,9 +79,10 @@ exports.addProduct = async (req, res) => {
                     remaining_quantity,
                     cost_price,
                     selling_price,
+                    units_per_box,
                     expiry_date,
                     status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
             `, [
                 result.insertId,
                 `INIT-${result.insertId}`,
@@ -74,6 +90,7 @@ exports.addProduct = async (req, res) => {
                 stock,
                 BigInt(Math.round(Number(cost_price) || 0)).toString(),
                 BigInt(Math.round(Number(selling_price) || 0)).toString(),
+                cleanUnitsPerBox,
                 expiry_date || null
             ]);
         }

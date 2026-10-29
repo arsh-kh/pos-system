@@ -8,13 +8,15 @@ const safeBigInt = (val) => {
     return BigInt(num);
 };
 
-// Ensure columns for custom invoice number, payment method, additional cost, and landed cost price exist
+// Ensure columns for custom invoice number, payment method, additional cost, units_per_box, and landed cost price exist
 const ensureInvoicesSchema = async () => {
     try {
         try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN invoice_number VARCHAR(100) DEFAULT NULL"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN payment_method VARCHAR(50) DEFAULT 'CASH'"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN additional_cost BIGINT NOT NULL DEFAULT 0"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN landed_cost_price BIGINT DEFAULT NULL"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
+        try { await db.query("ALTER TABLE Product_Batches ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
     } catch (err) {
         console.error('Invoice schema ensure error:', err.message);
     }
@@ -41,16 +43,22 @@ exports.createPurchaseInvoice = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // Calculate items subtotal from items safely (supports fractional quantities like 1.5 kg)
+        // Calculate items subtotal from items safely, respecting client exact line_total to prevent integer rounding loss on boxes
         let items_subtotal = 0n;
         for (const item of items) {
-            const rawCostNum = Math.max(0, Math.round(Number(item.cost_price) || 0));
+            const rawCostNum = Math.max(0, Number(item.cost_price) || 0);
             const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
-            items_subtotal += safeBigInt(Math.round(rawCostNum * itemQtyNum));
+            const lineTotal = (item.line_total !== undefined && item.line_total !== null && Number(item.line_total) >= 0)
+                ? safeBigInt(Math.round(Number(item.line_total)))
+                : safeBigInt(Math.round(rawCostNum * itemQtyNum));
+            items_subtotal += lineTotal;
         }
 
         // Grand Total = Items Subtotal + Additional Cost (Delivery / Lifting / Transport)
-        const total_amount = items_subtotal + additionalCostBigInt;
+        let total_amount = items_subtotal + additionalCostBigInt;
+        if (req.body.total_amount !== undefined && req.body.total_amount !== null && Number(req.body.total_amount) > 0) {
+            total_amount = safeBigInt(Math.round(Number(req.body.total_amount)));
+        }
 
         // 1. Create Invoice
         const dateVal = invoice_date ? new Date(invoice_date) : new Date();
@@ -83,9 +91,11 @@ exports.createPurchaseInvoice = async (req, res) => {
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const rawCostNum = Math.max(0, Math.round(Number(item.cost_price) || 0));
+            const rawCostNum = Math.max(0, Number(item.cost_price) || 0);
             const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
-            const itemSubtotal = safeBigInt(Math.round(rawCostNum * itemQtyNum));
+            const itemSubtotal = (item.line_total !== undefined && item.line_total !== null && Number(item.line_total) >= 0)
+                ? safeBigInt(Math.round(Number(item.line_total)))
+                : safeBigInt(Math.round(rawCostNum * itemQtyNum));
 
             let allocatedCostForItem = 0n;
             if (additionalCostBigInt > 0n && items_subtotal > 0n) {
@@ -101,20 +111,30 @@ exports.createPurchaseInvoice = async (req, res) => {
             const additionalPerUnit = itemQtyNum > 0 ? Math.round(Number(allocatedCostForItem) / itemQtyNum) : 0;
             const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
 
-            // Record both raw supplier invoice cost and landed unit cost
+            const itemUnitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+            const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
+                ? safeBigInt(item.selling_price ?? item.sell_price).toString()
+                : null;
+
+            // Record raw supplier invoice cost, landed unit cost, packaging details and exact line total
             await connection.query(
-                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price) VALUES (?, ?, ?, ?, ?, ?)',
+                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     invoice_id, 
                     item.product_id, 
                     itemQtyNum, 
                     safeBigInt(rawCostNum).toString(), 
                     landedUnitCost.toString(), 
-                    item.selling_price ? safeBigInt(item.selling_price).toString() : null
+                    sellingPriceVal,
+                    itemUnitsPerBox,
+                    item.unit_type || 'PIECE',
+                    item.box_quantity ? item.box_quantity : null,
+                    item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
+                    itemSubtotal.toString()
                 ]
             );
 
-            // Insert new FIFO batch with landedUnitCost so Checkout sales deduct accurate cost
+            // Insert new FIFO batch with landedUnitCost and specific units_per_box
             const batchNum = item.batch_number || `BATCH-${invoice_id}-${item.product_id}`;
             await connection.query(`
                 INSERT INTO Product_Batches (
@@ -125,10 +145,11 @@ exports.createPurchaseInvoice = async (req, res) => {
                     remaining_quantity,
                     cost_price,
                     selling_price,
+                    units_per_box,
                     expiry_date,
                     status,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
             `, [
                 item.product_id,
                 invoice_id,
@@ -136,17 +157,18 @@ exports.createPurchaseInvoice = async (req, res) => {
                 itemQtyNum,
                 itemQtyNum,
                 landedUnitCost.toString(),
-                item.selling_price ? safeBigInt(item.selling_price).toString() : null,
+                sellingPriceVal,
+                itemUnitsPerBox,
                 item.expiry_date || null,
                 dateVal
             ]);
 
-            // Update Products stock, update cost_price to landedUnitCost, box_cost_price if provided, and only update selling_price if provided
-            const newSellPrice = item.selling_price ? safeBigInt(item.selling_price).toString() : null;
-            const newBoxCost = item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null;
+            // HISTORICAL PRICE & STOCK INTEGRITY (CORE ACCOUNTING):
+            // DO NOT overwrite global Product flat prices/packaging (cost_price, box_cost_price, selling_price, units_per_box).
+            // ONLY increment inventory stock!
             await connection.query(
-                'UPDATE Products SET stock = stock + ?, cost_price = ?, box_cost_price = COALESCE(?, box_cost_price), selling_price = COALESCE(?, selling_price) WHERE id = ?',
-                [itemQtyNum, landedUnitCost.toString(), newBoxCost, newSellPrice, item.product_id]
+                'UPDATE Products SET stock = stock + ? WHERE id = ?',
+                [itemQtyNum, item.product_id]
             );
         }
 
@@ -250,3 +272,61 @@ exports.getPurchaseInvoiceDetails = async (req, res) => {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
+
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+exports.generateInvoicePdf = async (req, res) => {
+    let tempHtml = null;
+    let tempPdf = null;
+    try {
+        const { htmlContent } = req.body;
+        if (!htmlContent) {
+            return res.status(400).json({ status: 'ERROR', message: 'htmlContent is required' });
+        }
+
+        const potentialChromePaths = [
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            process.env.CHROME_BIN || '',
+            process.env.PUPPETEER_EXECUTABLE_PATH || ''
+        ].filter(Boolean);
+
+        const chromePath = potentialChromePaths.find(p => fs.existsSync(p));
+        if (!chromePath) {
+            return res.status(500).json({ status: 'ERROR', message: 'Google Chrome executable not found on host machine' });
+        }
+
+        const id = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        tempHtml = path.join(os.tmpdir(), `inv_html_${id}.html`);
+        tempPdf = path.join(os.tmpdir(), `inv_pdf_${id}.pdf`);
+
+        fs.writeFileSync(tempHtml, htmlContent, 'utf8');
+
+        execSync(`"${chromePath}" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="${tempPdf}" "${tempHtml}"`, {
+            timeout: 15000
+        });
+
+        if (!fs.existsSync(tempPdf)) {
+            throw new Error('PDF output file was not created');
+        }
+
+        const pdfBuffer = fs.readFileSync(tempPdf);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="invoice.pdf"');
+        res.send(pdfBuffer);
+    } catch (err) {
+        console.error('generateInvoicePdf error:', err);
+        res.status(500).json({ status: 'ERROR', message: 'Failed to generate PDF: ' + err.message });
+    } finally {
+        if (tempHtml && fs.existsSync(tempHtml)) {
+            try { fs.unlinkSync(tempHtml); } catch (_) {}
+        }
+        if (tempPdf && fs.existsSync(tempPdf)) {
+            try { fs.unlinkSync(tempPdf); } catch (_) {}
+        }
+    }
+};
+

@@ -3,7 +3,6 @@ import {
   Lock, 
   User, 
   ShieldCheck, 
-  LogIn, 
   Eye, 
   EyeOff, 
   AlertCircle,
@@ -18,12 +17,24 @@ import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const { login, isSubmitting } = useAuth();
-  const [username, setUsername] = useState('');
+  const [usersList, setUsersList] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pos_login_users');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    const adminUser = localStorage.getItem('pos_admin_username') || 'admin';
+    return [{ id: 1, username: adminUser }];
+  });
+  const [username, setUsername] = useState(() => {
+    return localStorage.getItem('pos_last_username') || localStorage.getItem('pos_admin_username') || 'admin';
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [cashiersList, setCashiersList] = useState([]);
-  const [loadingCashiers, setLoadingCashiers] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'light');
 
   // Toggle Theme
@@ -41,22 +52,43 @@ const Login = () => {
     }
   };
 
-  // Fetch available cashiers for quick-select profile chips
+  // Fetch available users dynamically for login selection
   useEffect(() => {
-    const fetchCashiers = async () => {
+    const fetchUsers = async () => {
       try {
-        setLoadingCashiers(true);
-        const res = await axios.get('http://localhost:3001/api/users/cashiers');
-        if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
-          setCashiersList(res.data.data);
+        setLoadingUsers(true);
+        let loadedUsers = [];
+        try {
+          const res = await axios.get('http://localhost:3001/api/users/login-list');
+          if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data) && res.data.data.length > 0) {
+            loadedUsers = res.data.data;
+          }
+        } catch (_) {}
+
+        if (loadedUsers.length === 0) {
+          const adminName = localStorage.getItem('pos_admin_username') || 'admin';
+          const resCashiers = await axios.get('http://localhost:3001/api/users/cashiers');
+          const cashiers = (resCashiers.data?.status === 'SUCCESS' && Array.isArray(resCashiers.data.data))
+            ? resCashiers.data.data
+            : [];
+          loadedUsers = [{ id: 1, username: adminName }, ...cashiers];
+        }
+
+        if (loadedUsers.length > 0) {
+          setUsersList(loadedUsers);
+          localStorage.setItem('pos_login_users', JSON.stringify(loadedUsers));
+          setUsername(prev => {
+            const exists = loadedUsers.some(u => u.username === prev);
+            return exists ? prev : loadedUsers[0].username;
+          });
         }
       } catch (err) {
-        console.warn('Could not load cashiers for quick selection:', err.message);
+        console.warn('Could not load users for login selection:', err.message);
       } finally {
-        setLoadingCashiers(false);
+        setLoadingUsers(false);
       }
     };
-    fetchCashiers();
+    fetchUsers();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -176,7 +208,7 @@ const Login = () => {
           {/* Username Dropdown Option Selector */}
           <div style={{ marginBottom: '18px' }}>
             <label htmlFor="pos-login-username" style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-              ناوی بەکارهێنەر (Username)
+              ناوی بەکارهێنەر
             </label>
             <div style={{ position: 'relative' }}>
               <User size={17} color="var(--text-muted)" style={{ position: 'absolute', right: '12px', top: '13px', pointerEvents: 'none' }} />
@@ -193,11 +225,11 @@ const Login = () => {
                 }}
                 style={{
                   width: '100%',
-                  padding: '11px 38px 11px 36px',
+                  padding: '11px 38px 11px 38px',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
                   background: 'var(--bg-primary)',
-                  color: username ? 'var(--text-primary)' : 'var(--text-muted)',
+                  color: 'var(--text-primary)',
                   fontSize: '0.92rem',
                   outline: 'none',
                   boxSizing: 'border-box',
@@ -205,18 +237,14 @@ const Login = () => {
                   cursor: 'pointer',
                   appearance: 'none',
                   WebkitAppearance: 'none',
-                  MozAppearance: 'none'
+                  MozAppearance: 'none',
+                  textAlign: 'center',
+                  textAlignLast: 'center'
                 }}
               >
-                <option value="" disabled style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
-                  ناوی بەکارهێنەر هەڵبژێرە...
-                </option>
-                <option value="admin" style={{ color: 'var(--text-primary)', background: 'var(--bg-secondary)' }}>
-                  بەڕێوەبەر (Admin)
-                </option>
-                {cashiersList.map((c) => (
-                  <option key={c.id || c.username} value={c.username} style={{ color: 'var(--text-primary)', background: 'var(--bg-secondary)' }}>
-                    {c.full_name ? `${c.full_name} (${c.username})` : c.username}
+                {usersList.map((u) => (
+                  <option key={u.id || u.username} value={u.username} style={{ color: 'var(--text-primary)', background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    {u.username}
                   </option>
                 ))}
               </select>
@@ -226,21 +254,22 @@ const Login = () => {
 
           {/* Password Input */}
           <div style={{ marginBottom: '22px' }}>
-            <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-              وشەی نهێنی (Password)
+            <label htmlFor="pos-login-password" style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+              وشەی نهێنی
             </label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={17} color="var(--text-muted)" style={{ position: 'absolute', right: '12px', top: '12px' }} />
+            <div style={{ position: 'relative', direction: 'ltr' }}>
+              <Lock size={17} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '12px', pointerEvents: 'none' }} />
               <input
                 id="pos-login-password"
                 type={showPassword ? 'text' : 'password'}
                 required
+                dir="ltr"
                 placeholder="وشەی نهێنی بنووسە..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '11px 38px 11px 40px',
+                  padding: '11px 38px 11px 38px',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
                   background: 'var(--bg-primary)',
@@ -248,7 +277,9 @@ const Login = () => {
                   fontSize: '0.92rem',
                   outline: 'none',
                   boxSizing: 'border-box',
-                  fontFamily: 'inherit'
+                  fontFamily: 'inherit',
+                  textAlign: 'center',
+                  direction: 'ltr'
                 }}
               />
               <button
@@ -257,7 +288,7 @@ const Login = () => {
                 tabIndex={-1}
                 style={{
                   position: 'absolute',
-                  left: '10px',
+                  right: '10px',
                   top: '10px',
                   background: 'none',
                   border: 'none',
@@ -288,13 +319,12 @@ const Login = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
               boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
               opacity: isSubmitting ? 0.7 : 1,
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
+              textAlign: 'center'
             }}
           >
-            <LogIn size={18} />
             <span>{isSubmitting ? 'پشکنین...' : 'چوونەژوورەوە'}</span>
           </button>
         </form>

@@ -25,6 +25,8 @@ async function runFifoTests() {
     console.log('=== دەستپێکردنی تاقیکردنەوەی سیستەمی قازانجی ورد بە FIFO ===');
     let testProductId = null;
     let testSupplierId = null;
+    let sale1Id = null;
+    let sale2Id = null;
     const testBarcode = 'OIL_TEST_' + Date.now();
 
     try {
@@ -127,7 +129,7 @@ async function runFifoTests() {
         if (sale1Res.statusCode !== 201) {
             throw new Error(`شکستی فرۆشتن: ${JSON.stringify(sale1Res.responseData)}`);
         }
-        const sale1Id = sale1Res.responseData.saleId;
+        sale1Id = sale1Res.responseData.saleId;
         console.log(`✓ فرۆشتن سەرکەوتوو بوو، ژمارەی پسووڵە: #${sale1Id}`);
 
         // Verify Sale 1 in database
@@ -202,7 +204,7 @@ async function runFifoTests() {
             discount_amount: 0
         });
         await checkoutController.processCheckout(sale2Mock.req, sale2Mock.res);
-        const sale2Id = sale2Mock.getResult().responseData.saleId;
+        sale2Id = sale2Mock.getResult().responseData.saleId;
 
         const [sale2Record] = await db.query('SELECT * FROM Sales WHERE id = ?', [sale2Id]);
         const s2Profit = Number(sale2Record[0].total_profit);
@@ -234,6 +236,10 @@ async function runFifoTests() {
                 await db.query('DELETE FROM Purchase_Invoice_Items WHERE product_id = ?', [testProductId]);
                 await db.query('DELETE FROM Products WHERE id = ?', [testProductId]);
                 console.log('✓ کاڵای تاقیکاری و وەجبەکانی پاککرانەوە');
+            }
+            if (sale1Id || sale2Id) {
+                await db.query('DELETE FROM Sales WHERE id IN (?, ?)', [sale1Id || 0, sale2Id || 0]);
+                console.log('✓ پسووڵەکانی تاقیکاری پاککرانەوە');
             }
             if (testSupplierId) {
                 await db.query('DELETE FROM Purchase_Invoices WHERE supplier_id = ?', [testSupplierId]);

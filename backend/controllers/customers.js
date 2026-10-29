@@ -47,22 +47,32 @@ exports.getCustomerProfile = async (req, res) => {
         const [history] = await db.query(`
             SELECT cd.*,
                    s.id AS invoice_id,
+                   (CASE 
+                       WHEN cd.transaction_type = 'PAY' AND (cd.note LIKE '%گەڕاندنەوە%' OR cd.note LIKE '%گەڕاوە%' OR EXISTS (SELECT 1 FROM Returns r WHERE r.debt_transaction_id = cd.id)) THEN 1 
+                       ELSE 0 
+                   END) AS is_return,
                    (
-                       SELECT GROUP_CONCAT(
-                           CONCAT(
-                               p.name, 
-                               ' (', 
-                               TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM FORMAT(si.quantity, 2))),
-                               ' ', 
-                               CASE WHEN p.is_weighted = 1 OR p.unit = 'کگم' THEN 'کگم' ELSE 'دانە' END,
-                               ' × ', 
-                               FORMAT(si.price_at_sale, 0),
-                               ')'
-                           ) SEPARATOR ' ، '
-                       )
-                       FROM Sale_Items si
-                       JOIN Products p ON si.product_id = p.id
-                       WHERE si.sale_id = cd.sale_id
+                       CASE 
+                           WHEN cd.transaction_type = 'ADD' THEN
+                               (
+                                   SELECT GROUP_CONCAT(
+                                       CONCAT(
+                                           p.name, 
+                                           ' (', 
+                                           TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM FORMAT(si.quantity, 2))),
+                                           ' ', 
+                                           CASE WHEN p.is_weighted = 1 OR p.unit = 'کگم' THEN 'کگم' ELSE 'دانە' END,
+                                           ' × ', 
+                                           FORMAT(si.price_at_sale, 0),
+                                           ')'
+                                       ) SEPARATOR ' ، '
+                                   )
+                                   FROM Sale_Items si
+                                   JOIN Products p ON si.product_id = p.id
+                                   WHERE si.sale_id = cd.sale_id
+                               )
+                           ELSE NULL
+                       END
                    ) AS sale_items_summary
             FROM Customer_Debts cd
             LEFT JOIN Sales s ON cd.sale_id = s.id

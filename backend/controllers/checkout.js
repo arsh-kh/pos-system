@@ -7,6 +7,13 @@ const safeBigInt = (val) => {
     return BigInt(num);
 };
 
+const ensureBatchesSchema = async () => {
+    try {
+        try { await db.query("ALTER TABLE Product_Batches ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
+    } catch (_) {}
+};
+ensureBatchesSchema();
+
 exports.processCheckout = async (req, res) => {
     const { items, customer_id, discount_id, pay_later_amount, discount_amount, paid_amount, payment_method } = req.body;
     
@@ -47,12 +54,32 @@ exports.processCheckout = async (req, res) => {
                 }
 
                 const product = rows[0];
-                const regularPrice = Number(product.selling_price);
-                const costPrice = Number(product.cost_price || 0);
 
                 // Detect if this line item is a carton/box
                 const isBox = (item.unit_type === 'BOX') || (Boolean(product.box_barcode) && String(product.box_barcode).trim() === String(item.barcode).trim());
-                const unitsPerBox = isBox ? Math.max(1, parseFloat(product.units_per_box) || 1) : 1;
+
+                // --- FIFO Batch Depletion & Accurate Profit Logic ---
+                // Query active FIFO batches for this product in chronological order
+                const [activeBatches] = await connection.query(`
+                    SELECT id, remaining_quantity, cost_price, selling_price, units_per_box, batch_number
+                    FROM Product_Batches
+                    WHERE product_id = ? AND status = 'ACTIVE' AND remaining_quantity > 0
+                    ORDER BY created_at ASC, id ASC
+                    FOR UPDATE
+                `, [product.id]);
+
+                // Active FIFO batch currently selling from
+                const activeBatch = activeBatches.length > 0 ? activeBatches[0] : null;
+
+                // CRITICAL FIFO ACCOUNTING INTEGRITY:
+                // When deducting stock or calculating carton prices during a sale, the POS MUST multiply by
+                // the specific units_per_box of the active FIFO batch it is selling from.
+                // It MUST NEVER fall back to the global product.units_per_box.
+                const activeBatchUnitsPerBox = (activeBatch && parseFloat(activeBatch.units_per_box) > 0)
+                    ? parseFloat(activeBatch.units_per_box)
+                    : 1;
+
+                const unitsPerBox = isBox ? activeBatchUnitsPerBox : 1;
                 const stockDeductionQty = isBox ? (itemQty * unitsPerBox) : itemQty;
 
                 // Strict Stock Enforcement (Permanently active: cannot sell without sufficient inventory)
@@ -60,12 +87,18 @@ exports.processCheckout = async (req, res) => {
                     throw new Error(`بڕی بەردەستی (${item.name || product.name || 'کاڵا'}) لە کۆگا بەشی فرۆشتن ناکات`);
                 }
 
+                const regularPrice = (activeBatch && activeBatch.selling_price)
+                    ? Number(activeBatch.selling_price)
+                    : Number(product.selling_price);
+
                 let itemSellTotal = 0;
                 let effectivePriceAtSale = regularPrice;
 
                 if (isBox) {
-                    // Carton / wholesale price calculation
-                    const cartonPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(regularPrice * unitsPerBox);
+                    // Carton / wholesale price calculation: MUST multiply by the specific units_per_box of the active FIFO batch
+                    const cartonPrice = Number(product.wholesale_price) > 0 
+                        ? Number(product.wholesale_price) 
+                        : Math.round(regularPrice * unitsPerBox);
                     effectivePriceAtSale = cartonPrice;
                     itemSellTotal = Math.round(cartonPrice * itemQty);
                 } else {
@@ -97,15 +130,6 @@ exports.processCheckout = async (req, res) => {
                         itemSellTotal = Math.round(regularPrice * itemQty);
                     }
                 }
-
-                // --- FIFO Batch Depletion & Accurate Profit Logic ---
-                const [activeBatches] = await connection.query(`
-                    SELECT id, remaining_quantity, cost_price, batch_number
-                    FROM Product_Batches
-                    WHERE product_id = ? AND status = 'ACTIVE' AND remaining_quantity > 0
-                    ORDER BY created_at ASC, id ASC
-                    FOR UPDATE
-                `, [product.id]);
 
                 let remainingToDeduct = Number(stockDeductionQty);
                 let itemCostTotal = 0;
@@ -351,9 +375,10 @@ exports.getAllSales = async (req, res) => {
                    COUNT(si.id) as item_count
             FROM Sales s
             LEFT JOIN Customers c ON s.customer_id = c.id
-            LEFT JOIN Sale_Items si ON s.id = si.sale_id
+            INNER JOIN Sale_Items si ON s.id = si.sale_id
             GROUP BY s.id
-            ORDER BY s.created_at DESC
+            HAVING item_count > 0
+            ORDER BY s.created_at DESC, s.id DESC
         `);
         res.json({ status: 'SUCCESS', data: rows });
     } catch (error) {

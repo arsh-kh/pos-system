@@ -68,6 +68,14 @@ const Owes = () => {
 
   useEffect(() => {
     fetchCustomers();
+
+    const handleAfterPrint = () => {
+      setPrintVoucher(null);
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
   }, []);
 
   const handleAddCustomer = async (e) => {
@@ -299,6 +307,25 @@ const Owes = () => {
 
   // Print receipt for any transaction in the debt history (both previous POS sales and cash repayments/additions)
   const handlePrintHistoryReceipt = async (h) => {
+    const isReturn = Boolean(h.is_return) || (h.transaction_type === 'PAY' && (h.note?.includes('گەڕاندنەوە') || h.note?.includes('گەڕاوە')));
+    if (isReturn) {
+      setPrintVoucher({
+        isSale: false,
+        isReturn: true,
+        transactionType: 'RETURN',
+        customerName: selectedProfile.name,
+        customerPhone: selectedProfile.phone,
+        date: formatDateTime(h.created_at, { twelveHour: true }),
+        amountPaid: Number(h.amount),
+        remainingDebt: Number(h.running_balance),
+        note: h.note || `گەڕاندنەوەی کاڵا بۆ پسووڵەی #${h.sale_id}`
+      });
+      setTimeout(() => {
+        window.print();
+      }, 150);
+      return;
+    }
+
     if (h.sale_id) {
       try {
         const res = await axios.get(`http://localhost:3001/api/sales/${h.sale_id}`);
@@ -363,6 +390,17 @@ const Owes = () => {
       
       {/* Print Stylesheet for 80mm / 58mm Thermal Repayment Receipt Voucher */}
       <style>{`
+        #thermal-voucher-receipt {
+          display: none !important;
+        }
+        @media screen {
+          #thermal-voucher-receipt {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
+          }
+        }
         @media print {
           @page {
             size: auto;
@@ -371,10 +409,9 @@ const Owes = () => {
           body * {
             visibility: hidden !important;
           }
-          #thermal-voucher-receipt, #thermal-voucher-receipt * {
-            visibility: visible !important;
-          }
           #thermal-voucher-receipt {
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -391,7 +428,16 @@ const Owes = () => {
             direction: rtl !important;
           }
           #thermal-voucher-receipt * {
+            visibility: visible !important;
             box-sizing: border-box !important;
+          }
+          #thermal-voucher-receipt table,
+          #thermal-voucher-receipt table th,
+          #thermal-voucher-receipt table td {
+            color: #000000 !important;
+            font-weight: bold !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .voucher-divider {
             border-bottom: 1px dashed #000 !important;
@@ -933,10 +979,13 @@ const Owes = () => {
                       ) : (
                         historyWithBalance.map(h => {
                           const isAdd = h.transaction_type === 'ADD';
+                          const isReturn = Boolean(h.is_return) || (h.transaction_type === 'PAY' && (h.note?.includes('گەڕاندنەوە') || h.note?.includes('گەڕاوە')));
                           
                           // Construct detailed itemized invoice string or manual note
                           let detailsText = '';
-                          if (h.sale_items_summary) {
+                          if (isReturn) {
+                            detailsText = h.note || `گەڕاندنەوەی کاڵا بۆ پسووڵەی #${h.sale_id}`;
+                          } else if (h.sale_items_summary) {
                             detailsText = `پسووڵەی #${h.invoice_id || h.sale_id}: ${h.sale_items_summary}`;
                           } else if (h.sale_id) {
                             detailsText = `پسووڵەی #${h.sale_id}${h.note ? ` (${h.note})` : ''}`;
@@ -958,8 +1007,8 @@ const Owes = () => {
 
                               {/* 2. جۆری مامەڵە (Plain text without icons) */}
                               <td style={{ border: '1px solid #e2e8f0', padding: '6px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                <span style={{ fontWeight: 700, fontSize: '0.84rem', color: isAdd ? '#ef4444' : '#10b981' }}>
-                                  {isAdd ? 'بردنی قەرز (+)' : 'دانەوەی قەرز (-)'}
+                                <span style={{ fontWeight: 700, fontSize: '0.84rem', color: isAdd ? '#ef4444' : (isReturn ? '#0284c7' : '#10b981') }}>
+                                  {isAdd ? 'بردنی قەرز (+)' : (isReturn ? 'گەڕاوە (-)' : 'دانەوەی قەرز (-)')}
                                 </span>
                               </td>
 
@@ -1007,7 +1056,7 @@ const Owes = () => {
 
       {/* Hidden Thermal Receipt Container (Targeted by @media print) */}
       {printVoucher && (
-        <div id="thermal-voucher-receipt">
+        <div id="thermal-voucher-receipt" style={{ display: 'none' }}>
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>مارکێتی شارەکەم</div>
 
           {/* Unique Barcode directly below store name */}
@@ -1131,7 +1180,7 @@ const Owes = () => {
             /* Debt Repayment or Manual Debt Addition */
             <>
               <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-                {printVoucher.transactionType === 'ADD' ? 'وەسڵی زیادکردنی قەرز' : 'وەسڵی وەرگرتنی پارەی قەرز'}
+                {printVoucher.isReturn ? 'وەسڵی گەڕاندنەوەی کاڵا (داشکاندن لە قەرز)' : (printVoucher.transactionType === 'ADD' ? 'وەسڵی زیادکردنی قەرز' : 'وەسڵی وەرگرتنی پارەی قەرز')}
               </div>
               <div className="voucher-divider"></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>

@@ -3,6 +3,24 @@ const bcrypt = require('bcryptjs');
 const { logAuditAction } = require('../middleware/auditLogger');
 
 /**
+ * Get all active users for login selection (Dynamic exact usernames: Admin & Cashiers)
+ */
+exports.getLoginUsers = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, username, full_name, role FROM Users WHERE is_active = 1 ORDER BY id ASC'
+    );
+    res.json({
+      status: 'SUCCESS',
+      data: rows
+    });
+  } catch (error) {
+    console.error('Error fetching login users:', error);
+    res.status(500).json({ status: 'ERROR', message: 'هەڵە لە وەرگرتنی لیستی بەکارهێنەران' });
+  }
+};
+
+/**
  * Get all cashier users (role = 'CASHIER')
  */
 exports.getCashiers = async (req, res) => {

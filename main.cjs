@@ -371,3 +371,60 @@ ipcMain.handle('save-backup-dialog', async (event, { defaultFileName, content })
     return { success: false, error: err.message };
   }
 });
+
+// -------------------------------------------------------------
+// Native A4 Invoice PDF Export via Dialog & printToPDF
+// -------------------------------------------------------------
+ipcMain.handle('save-invoice-pdf', async (event, { defaultFileName, htmlContent }) => {
+  let pdfWindow = null;
+  let tempHtmlPath = null;
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'پاشەکەوتکردنی پسووڵەی کڕین بە شێوەی فایلی PDF',
+      defaultPath: defaultFileName || `purchase_invoice_${Date.now()}.pdf`,
+      filters: [{ name: 'PDF Document (*.pdf)', extensions: ['pdf'] }]
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    tempHtmlPath = path.join(app.getPath('temp'), `inv_pdf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.html`);
+    fs.writeFileSync(tempHtmlPath, htmlContent, 'utf8');
+
+    pdfWindow = new BrowserWindow({
+      show: false,
+      width: 1024,
+      height: 1400,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
+
+    await pdfWindow.loadFile(tempHtmlPath);
+
+    const pdfBuffer = await pdfWindow.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      margins: {
+        marginType: 'default'
+      }
+    });
+
+    fs.writeFileSync(filePath, pdfBuffer);
+
+    return { success: true, filePath };
+  } catch (err) {
+    console.error('Failed to export invoice PDF via dialog:', err);
+    return { success: false, error: err.message };
+  } finally {
+    if (pdfWindow && !pdfWindow.isDestroyed()) {
+      pdfWindow.destroy();
+    }
+    if (tempHtmlPath && fs.existsSync(tempHtmlPath)) {
+      try { fs.unlinkSync(tempHtmlPath); } catch (_) {}
+    }
+  }
+});
+

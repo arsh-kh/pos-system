@@ -8,6 +8,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/authMiddlewar
 router.post('/', returnsController.processReturn);
 router.post('/direct', returnsController.processDirectReturn);
 router.get('/', returnsController.getReturnsHistory);
+router.get('/recent-sales', returnsController.getRecentSalesForReturn);
 router.get('/sale/:id', returnsController.getSaleForReturn);
 
 module.exports = router;

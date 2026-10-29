@@ -122,6 +122,34 @@ exports.openShift = async (req, res) => {
     }
 };
 
+exports.setOpeningCash = async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const cashAmount = Math.max(0, Math.round(Number(amount) || 0));
+
+        const [rows] = await db.query("SELECT * FROM Shifts WHERE status = 'OPEN' ORDER BY id DESC LIMIT 1");
+        if (rows.length > 0) {
+            await db.query("UPDATE Shifts SET opening_cash = ? WHERE id = ?", [cashAmount, rows[0].id]);
+        } else {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            await db.query(
+                "INSERT INTO Shifts (cashier_name, opened_at, opening_cash, status) VALUES ('کاشێری سەرەکی', ?, ?, 'OPEN')",
+                [today, cashAmount]
+            );
+        }
+
+        res.json({
+            status: 'SUCCESS',
+            message: 'پارەی ناو داخیلە بە سەرکەوتوویی تۆمارکرا',
+            data: { opening_cash: cashAmount }
+        });
+    } catch (error) {
+        console.error('Set Opening Cash Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
 exports.closeShift = async (req, res) => {
     const { id } = req.params;
     const { actual_cash, notes } = req.body;
@@ -191,6 +219,8 @@ exports.closeShift = async (req, res) => {
                 closed_at = CURRENT_TIMESTAMP,
                 cash_sales = ?,
                 debt_sales = ?,
+                debt_repaid_cash = ?,
+                cash_refunds = ?,
                 expenses_paid = ?,
                 expected_cash = ?,
                 actual_cash = ?,
@@ -198,7 +228,7 @@ exports.closeShift = async (req, res) => {
                 status = 'CLOSED',
                 notes = ?
             WHERE id = ?
-        `, [cashSales, debtSales, expensesPaid, expectedCash, countedCash, diff, notes || null, id]);
+        `, [cashSales, debtSales, debtRepaidCash, cashRefunds, expensesPaid, expectedCash, countedCash, diff, notes || null, id]);
 
         const [updatedRows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [id]);
         const closedShift = updatedRows[0];
@@ -223,6 +253,7 @@ exports.closeShift = async (req, res) => {
             total_sales: totalSales,
             cash_sales: cashSales,
             debt_sales: debtSales,
+            debt_repaid_cash: debtRepaidCash,
             cash_refunds: cashRefunds,
             expenses_paid: expensesPaid,
             expected_cash: expectedCash,
@@ -356,6 +387,8 @@ exports.sendZReportTelegram = async (req, res) => {
             cash_sales: shift.cash_sales,
             debt_sales: shift.debt_sales,
             total_sales: (Number(shift.cash_sales) || 0) + (Number(shift.debt_sales) || 0),
+            debt_repaid_cash: shift.debt_repaid_cash || 0,
+            cash_refunds: shift.cash_refunds || 0,
             expenses_paid: shift.expenses_paid,
             expected_cash: shift.expected_cash,
             actual_cash: shift.actual_cash,

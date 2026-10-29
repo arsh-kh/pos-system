@@ -32,6 +32,7 @@ const checkAdminRole = (req, res, next) => {
 
 // Public/POS route: get cashiers list for login selection
 router.get('/cashiers', usersController.getCashiers);
+router.get('/login-list', usersController.getLoginUsers);
 
 // Admin routes:
 router.get('/', checkAdminRole, usersController.getAllUsers);
