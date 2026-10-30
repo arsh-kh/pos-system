@@ -94,6 +94,7 @@ const Cashier = () => {
   const [productSearch, setProductSearch] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
   const barcodeInputRef = useRef(null);
+  const barcodeDebounceRef = useRef(null);
   const discountInputRef = useRef(null);
   const splitCashInputRef = useRef(null);
 
@@ -226,6 +227,9 @@ const Cashier = () => {
 
   useEffect(() => {
     fetchData();
+    const handleFocus = () => { fetchData(); };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   // Hardware Wedge Barcode Scanner Listener
@@ -234,7 +238,49 @@ const Cashier = () => {
   });
 
   // Reprint Last Receipt Directly (F8 Shortcut or Header Button)
-  const handleReprintLastReceipt = () => {
+  // Direct Native Thermal Printing (XP-80C / Default Thermal Printer)
+  const printThermalReceipt = (explicitData = null) => {
+    const dataToPrint = explicitData || printedReceipt;
+    if (dataToPrint) {
+      setPrintedReceipt(dataToPrint);
+    }
+    // Give React time to render #cashier-thermal-receipt into the DOM, then print
+    setTimeout(async () => {
+      // 1. Electron Desktop Environment: 100% Silent direct thermal print with zero dialogs
+      if (window.require) {
+        try {
+          const { ipcRenderer } = window.require('electron');
+          let receiptEl = document.getElementById('cashier-thermal-receipt');
+          if (!receiptEl || !receiptEl.innerHTML) {
+            await new Promise(r => setTimeout(r, 120));
+            receiptEl = document.getElementById('cashier-thermal-receipt');
+          }
+          if (receiptEl && receiptEl.innerHTML) {
+            const chosenPrinter = localStorage.getItem('pos_selected_printer') || '';
+            const chosenWidth = localStorage.getItem('pos_paper_width') || '80mm';
+            const isSilent = localStorage.getItem('pos_silent_print') !== 'false';
+            const printRes = await ipcRenderer.invoke('print-thermal-receipt', {
+              htmlContent: receiptEl.innerHTML,
+              deviceName: chosenPrinter,
+              paperWidth: chosenWidth,
+              silent: isSilent
+            });
+            if (printRes && printRes.success) {
+              return;
+            }
+            console.warn('IPC Silent print returned non-success, attempting window.print fallback...', printRes);
+          }
+        } catch (ipcErr) {
+          console.warn('IPC Silent print error, falling back to window.print:', ipcErr);
+        }
+      }
+
+      // 2. Web Browser Fallback / Secondary Print: Standard print
+      window.print();
+    }, 150);
+  };
+
+  const handleReprintLastReceipt = async () => {
     let targetReceipt = printedReceipt;
     if (!targetReceipt) {
       try {
@@ -242,18 +288,58 @@ const Cashier = () => {
         if (saved) targetReceipt = JSON.parse(saved);
       } catch (_) {}
     }
+
+    // Smart Fallback: If no receipt in memory or localStorage, fetch the latest completed sale from backend!
+    if (!targetReceipt) {
+      try {
+        const res = await axios.get('http://localhost:3001/api/sales');
+        if (res.data.status === 'SUCCESS' && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          const latestSale = res.data.data[0];
+          const detailRes = await axios.get(`http://localhost:3001/api/sales/${latestSale.id}`);
+          if (detailRes.data.status === 'SUCCESS') {
+            const sale = detailRes.data.data;
+            targetReceipt = {
+              saleId: sale.id,
+              date: formatDateTime(sale.created_at, { twelveHour: true }),
+              cashierName: sale.cashier_name || currentUser?.full_name || currentUser?.username || 'کاشێر',
+              customerName: sale.customer_name || 'کڕیاری گشتی',
+              customerPhone: sale.customer_phone || '',
+              paymentMethod: sale.payment_method,
+              paidAmount: Number(sale.paid_amount || sale.total_amount),
+              debtAmount: Number(sale.pay_later_amount || 0),
+              isDebt: sale.payment_method === 'DEBT',
+              isSplit: sale.payment_method === 'SPLIT',
+              tenderedAmount: null,
+              changeDue: null,
+              subtotal: Number(sale.subtotal_amount || sale.total_amount),
+              promotionalSavings: 0,
+              discount: Number(sale.discount_amount || 0),
+              total: Number(sale.total_amount),
+              items: (sale.items || []).map(i => ({
+                name: i.custom_name || i.product_name || `کاڵا #${i.product_id}`,
+                quantity: Number(i.quantity),
+                price: Number(i.price_at_sale || i.price_per_unit || 0),
+                total: Number(i.total_price || (Number(i.quantity) * Number(i.price_at_sale || 0))),
+                unit: i.unit || 'دانە',
+                unit_type: i.unit_type || 'PIECE'
+              }))
+            };
+            try {
+              localStorage.setItem('pos_last_receipt', JSON.stringify(targetReceipt));
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch latest sale for reprint:', err);
+      }
+    }
+
     if (!targetReceipt) {
       alert('هیچ پسووڵەیەکی پێشوو بۆ چاپکردنەوە نەدۆزرایەوە');
       return;
     }
     setPrintedReceipt(targetReceipt);
-    if (window.require) {
-      try {
-        const { ipcRenderer } = window.require('electron');
-        ipcRenderer.send('print-receipt', targetReceipt);
-      } catch (_) {}
-    }
-    setTimeout(() => window.print(), 300);
+    printThermalReceipt(targetReceipt);
   };
 
   // Open Recent Sales Modal (Fetches Latest 10 Completed Sales)
@@ -326,13 +412,7 @@ const Cashier = () => {
           }))
         };
         setPrintedReceipt(receiptData);
-        if (window.require) {
-          try {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('print-receipt', receiptData);
-          } catch (_) {}
-        }
-        setTimeout(() => window.print(), 300);
+        printThermalReceipt(receiptData);
       }
     } catch (err) {
       alert('هەڵەیەک ڕوویدا لە کاتی ئامادەکردنی پسووڵە بۆ چاپ');
@@ -398,30 +478,23 @@ const Cashier = () => {
     const addingUnits = isBox ? (Number(addQty) * unitsPerBox) : Number(addQty);
     const availableStock = Number(product.stock) || 0;
 
-    // Strict Stock Enforcement (Permanently active: cannot add or exceed available stock)
+    // Allow adding to cart with informative warning if stock is 0 or low
     if (!product.is_weighted) {
       if (availableStock <= 0) {
-        toast.error(`ئەم کاڵایە (${product.name}) لە کۆگا نەماوە!`);
-        return;
-      }
+        toast.warning(`ئاگاداری: مەوجودی لە کۆگا نییە (${product.name}) بەڵام زیادکرا`, { duration: 2500 });
+      } else {
+        const currentCartUnits = cart.reduce((sum, it) => {
+          if (it.id === product.id) {
+            const itUnitsPerBox = it.unit_type === 'BOX' ? (Number(it.units_per_box) || 1) : 1;
+            return sum + (Number(it.quantity) * itUnitsPerBox);
+          }
+          return sum;
+        }, 0);
 
-      const currentCartUnits = cart.reduce((sum, it) => {
-        if (it.id === product.id) {
-          const itUnitsPerBox = it.unit_type === 'BOX' ? (Number(it.units_per_box) || 1) : 1;
-          return sum + (Number(it.quantity) * itUnitsPerBox);
+        const totalRequested = currentCartUnits + addingUnits;
+        if (totalRequested > availableStock) {
+          toast.warning(`ئاگاداری: داواکراو (${totalRequested}) لە بڕی مەغزەن (${availableStock}) زیاترە`, { duration: 2500 });
         }
-        return sum;
-      }, 0);
-
-      const totalRequested = currentCartUnits + addingUnits;
-      if (totalRequested > availableStock) {
-        const remainingCanAdd = availableStock - currentCartUnits;
-        if (remainingCanAdd <= 0) {
-          toast.error(`ناتوانیت لەم کاڵایە زیاتر زیاد بکەیت! هەموو بڕی بەردەست لە سەبەتەدایە.`);
-        } else {
-          toast.error(`ناتوانیت لە بڕی بەردەستی مەغزەن زیاتر زیاد بکەیت!`);
-        }
-        return;
       }
     }
 
@@ -499,14 +572,13 @@ const Cashier = () => {
 
     const targetItem = cart.find(item => item.cartKey === key || item.barcode === key);
 
-    // Strict Stock Enforcement (Permanently active)
+    // Stock Check: Non-blocking informative warning
     if (targetItem && !targetItem.is_weighted) {
       const prod = products.find(p => p.id === targetItem.id);
       const availableStock = prod ? (Number(prod.stock) || 0) : (Number(targetItem.stock) || 0);
       const unitsPerBox = targetItem.unit_type === 'BOX' ? (Number(targetItem.units_per_box) || 1) : 1;
       const requestedUnits = qty * unitsPerBox;
 
-      // Count units in other cart lines for the same product
       const otherUnits = cart.reduce((sum, it) => {
         if (it.id === targetItem.id && it !== targetItem) {
           const itMult = it.unit_type === 'BOX' ? (Number(it.units_per_box) || 1) : 1;
@@ -515,9 +587,8 @@ const Cashier = () => {
         return sum;
       }, 0);
 
-      if (requestedUnits + otherUnits > availableStock) {
-        toast.error(`ناتوانیت لە بڕی بەردەستی مەغزەن زیاتر زیاد بکەیت!`);
-        return;
+      if (availableStock > 0 && (requestedUnits + otherUnits > availableStock)) {
+        toast.warning(`ئاگاداری: بڕی دیاریکراو زیاترە لە مەوجودی بەردەست (${availableStock} دانە)`, { duration: 2500 });
       }
     }
 
@@ -886,9 +957,11 @@ const Cashier = () => {
   };
 
   // Barcode Handler (Hardware wedge + manual input + electronic scale barcodes)
-  const handleProcessBarcode = (code) => {
+  const handleProcessBarcode = async (code) => {
     if (!code) return;
+    if (barcodeDebounceRef.current) clearTimeout(barcodeDebounceRef.current);
     const cleanCode = normalizeBarcode(code).trim();
+    if (!cleanCode) return;
 
     // 0. Receipt Barcode Check (Auto-Open Return Modal with Receipt)
     if (/shrm\/\d+\//i.test(cleanCode) || /^shrm/i.test(cleanCode)) {
@@ -897,8 +970,25 @@ const Cashier = () => {
       return;
     }
 
-    // 1. Check if barcode matches a carton/box barcode directly
-    const productBox = products.find(p => p.box_barcode && String(p.box_barcode).trim() === cleanCode);
+    // 1. Check in local products list
+    let productBox = products.find(p => p.box_barcode && String(p.box_barcode).trim().toLowerCase() === cleanCode.toLowerCase());
+    let productPiece = products.find(p => p.barcode && String(p.barcode).trim().toLowerCase() === cleanCode.toLowerCase());
+
+    // 1b. If not found locally, fetch fresh from backend immediately!
+    if (!productBox && !productPiece) {
+      try {
+        const res = await axios.get('http://localhost:3001/api/products');
+        if (res.data?.data && Array.isArray(res.data.data)) {
+          const freshList = res.data.data;
+          setProducts(freshList);
+          productBox = freshList.find(p => p.box_barcode && String(p.box_barcode).trim().toLowerCase() === cleanCode.toLowerCase());
+          productPiece = freshList.find(p => p.barcode && String(p.barcode).trim().toLowerCase() === cleanCode.toLowerCase());
+        }
+      } catch (err) {
+        console.warn('API lookup error:', err);
+      }
+    }
+
     if (productBox) {
       addToCart(productBox, 1, 'BOX');
       setBarcodeInput('');
@@ -906,8 +996,6 @@ const Cashier = () => {
       return;
     }
 
-    // 2. Check if barcode matches a single piece barcode directly
-    const productPiece = products.find(p => String(p.barcode).trim() === cleanCode);
     if (productPiece) {
       addToCart(productPiece, 1, 'PIECE');
       setBarcodeInput('');
@@ -976,10 +1064,55 @@ const Cashier = () => {
     barcodeInputRef.current?.focus();
   };
 
+  const handleBarcodeInputKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      if (barcodeDebounceRef.current) clearTimeout(barcodeDebounceRef.current);
+      if (barcodeInput && barcodeInput.trim()) {
+        handleProcessBarcode(barcodeInput.trim());
+      }
+    }
+  };
+
+  const handleBarcodeInputOnChange = (e) => {
+    const rawVal = normalizeBarcode(e.target.value);
+    setBarcodeInput(rawVal);
+    const clean = rawVal.trim();
+    if (!clean) return;
+
+    if (barcodeDebounceRef.current) {
+      clearTimeout(barcodeDebounceRef.current);
+    }
+
+    // 1. Instant match: If input exactly matches any product barcode or carton barcode in memory
+    const exactMatch = products.find(p => 
+      (p.barcode && String(p.barcode).trim().toLowerCase() === clean.toLowerCase()) ||
+      (p.box_barcode && String(p.box_barcode).trim().toLowerCase() === clean.toLowerCase())
+    );
+    if (exactMatch) {
+      handleProcessBarcode(clean);
+      return;
+    }
+
+    // 2. Instant electronic scale barcode match (starts with 20/21/22 and length 13)
+    if (clean.length === 13 && (clean.startsWith('20') || clean.startsWith('21') || clean.startsWith('22'))) {
+      handleProcessBarcode(clean);
+      return;
+    }
+
+    // 3. Auto-submit timer for hardware scanners that don't emit Enter key (burst complete)
+    if (clean.length >= 4) {
+      barcodeDebounceRef.current = setTimeout(() => {
+        handleProcessBarcode(clean);
+      }, 140);
+    }
+  };
+
   const handleBarcodeSubmit = (e) => {
     e.preventDefault();
-    if (barcodeInput) {
-      handleProcessBarcode(normalizeBarcode(barcodeInput));
+    if (barcodeDebounceRef.current) clearTimeout(barcodeDebounceRef.current);
+    if (barcodeInput && barcodeInput.trim()) {
+      handleProcessBarcode(normalizeBarcode(barcodeInput.trim()));
     }
   };
 
@@ -1305,15 +1438,7 @@ const Cashier = () => {
 
         // Only print if requested
         if (shouldPrint) {
-          if (window.require) {
-            try {
-              const { ipcRenderer } = window.require('electron');
-              ipcRenderer.send('print-receipt', receiptData);
-            } catch (_) {}
-          }
-          setTimeout(() => {
-            window.print();
-          }, 300);
+          printThermalReceipt(receiptData);
         }
 
         // Auto kick cash drawer if cash was received
@@ -1359,7 +1484,7 @@ const Cashier = () => {
   }, [products, productSearch, selectedCategoryId]);
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', padding: '6px 10px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }} dir="rtl">
+    <div id="cashier-page-root" style={{ height: '100vh', overflow: 'hidden', padding: '6px 10px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }} dir="rtl">
       
       {/* Thermal Print Receipt Style */}
       <style>{`
@@ -1376,53 +1501,78 @@ const Cashier = () => {
         }
         @media print {
           @page {
-            size: 80mm auto;
-            margin: 0;
+            margin: 0 !important;
+            size: auto;
           }
-          html, body {
+          html, body, #root, #cashier-page-root {
             margin: 0 !important;
             padding: 0 !important;
-            width: 80mm !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
             background: #ffffff !important;
           }
-          body * {
+          /* Completely hide the interactive UI in print */
+          #cashier-main-ui,
+          .pos-modal-overlay,
+          header,
+          nav,
+          aside,
+          button,
+          input {
+            display: none !important;
             visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
           }
+          /* Print ONLY the receipt, as a normal flowing static block */
           #cashier-thermal-receipt {
             display: block !important;
             visibility: visible !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            max-width: 80mm !important;
+            position: static !important;
+            width: 72mm !important;
+            max-width: 72mm !important;
+            margin: 0 auto !important;
+            padding: 6px 4px 60px 4px !important;
             box-sizing: border-box !important;
-            background: white !important;
-            color: black !important;
-            padding: 4px 6px !important;
-            font-family: monospace, Tahoma, sans-serif !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
             font-size: 12px !important;
             direction: rtl !important;
             text-align: right !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
           }
           #cashier-thermal-receipt * {
             visibility: visible !important;
             box-sizing: border-box !important;
+            color: #000000 !important;
           }
-          #cashier-thermal-receipt table,
+          #cashier-thermal-receipt table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            border: 1px solid #000000 !important;
+            margin: 5px 0 !important;
+            page-break-inside: avoid !important;
+          }
           #cashier-thermal-receipt table th,
           #cashier-thermal-receipt table td {
+            border: 1px solid #000000 !important;
             color: #000000 !important;
             font-weight: bold !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           .receipt-divider {
-            border-bottom: 1px dashed #000 !important;
+            border-bottom: 1px dashed #000000 !important;
             margin: 6px 0 !important;
           }
         }
       `}</style>
+      <div id="cashier-main-ui" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+
 
       {/* Slim Top Cashier Navigation Bar with 3-Zone Alignment matching the 3-Column Layout */}
       <header style={{
@@ -1657,9 +1807,11 @@ const Cashier = () => {
                 <input 
                   ref={barcodeInputRef}
                   type="text"
+                  className="barcode-scanner-input"
                   placeholder="سکانکردنی بارکۆد..."
                   value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(normalizeBarcode(e.target.value))}
+                  onChange={handleBarcodeInputOnChange}
+                  onKeyDown={handleBarcodeInputKeyDown}
                   autoFocus
                   style={{
                     width: '100%',
@@ -2885,6 +3037,8 @@ const Cashier = () => {
 
       </div>
 
+      
+      </div>
       {/* Hidden Thermal Receipt Container (Targeted by @media print) */}
       {printedReceipt && (
         <div id="cashier-thermal-receipt">

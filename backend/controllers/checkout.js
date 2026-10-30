@@ -83,9 +83,9 @@ exports.processCheckout = async (req, res) => {
                 const unitsPerBox = isBox ? activeBatchUnitsPerBox : 1;
                 const stockDeductionQty = isBox ? (itemQty * unitsPerBox) : itemQty;
 
-                // Strict Stock Enforcement (Permanently active: cannot sell without sufficient inventory)
+                // Stock Notice: Proceed with retail checkout even if inventory is low or zero
                 if (!product.is_weighted && Number(product.stock) < stockDeductionQty) {
-                    throw new Error(`بڕی بەردەستی (${item.name || product.name || 'کاڵا'}) لە کۆگا بەشی فرۆشتن ناکات`);
+                    console.warn('[CHECKOUT] Selling item with low or zero stock: ' + (item.name || product.name));
                 }
 
                 const regularPrice = (activeBatch && activeBatch.selling_price)

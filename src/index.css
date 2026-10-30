@@ -508,6 +508,7 @@ input[type="number"] {
   }
 }
 
+@media screen {
 /* Thermal Receipts & Print Containers - NEVER visible on screen, ONLY in print */
 #cashier-thermal-receipt,
 #reprint-thermal-receipt,
@@ -519,6 +520,7 @@ input[type="number"] {
 #repayment-voucher-thermal,
 #vendor-returns-thermal-receipt {
   display: none !important;
+}
 }
 
 /* Global Print Normalization - Ensure ALL Prints are Pure "وەسڵ" */

@@ -51,9 +51,21 @@ const SalesHistory = () => {
 
   const handleReprintReceipt = (sale) => {
     setReprintReceipt(sale);
-    setTimeout(() => {
+    setTimeout(async () => {
+      if (window.require) {
+        try {
+          const { ipcRenderer } = window.require('electron');
+          const receiptEl = document.getElementById('reprint-thermal-receipt');
+          if (receiptEl && receiptEl.innerHTML) {
+            await ipcRenderer.invoke('print-thermal-receipt', {
+              htmlContent: receiptEl.innerHTML
+            });
+            return;
+          }
+        } catch (_) {}
+      }
       window.print();
-    }, 300);
+    }, 120);
   };
 
   // Filter Sales

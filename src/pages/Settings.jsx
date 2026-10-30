@@ -79,7 +79,8 @@ const Settings = () => {
         const res = await ipcRenderer.invoke('print-test-receipt', {
           printerName: selectedPrinter,
           storeName,
-          paperWidth
+          paperWidth,
+          silent: silentPrint
         });
         if (res?.success) {
           setHardwareNotice('پسووڵەی تاقیکردنەوە ڕەوانەی چاپکەر کرا');

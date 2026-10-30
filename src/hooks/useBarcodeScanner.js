@@ -4,19 +4,32 @@ import { getCharFromBarcodeKeyEvent, normalizeBarcode } from '../utils/barcodeNo
 const useBarcodeScanner = (onScan) => {
     const buffer = useRef('');
     const lastKeyTime = useRef(null);
+    const burstTimer = useRef(null);
 
     useEffect(() => {
-        // Initialize if empty
-        if (!lastKeyTime.current) {
-            lastKeyTime.current = Date.now();
-        }
-        
+        const flushBuffer = () => {
+            if (buffer.current.length >= 2) {
+                const cleaned = normalizeBarcode(buffer.current).trim();
+                buffer.current = '';
+                if (cleaned.length >= 2) {
+                    onScan(cleaned);
+                }
+            } else {
+                buffer.current = '';
+            }
+        };
+
         const handleKeyDown = (e) => {
+            // If the key event originated directly inside the dedicated barcode input,
+            // let that input's direct onChange/onKeyDown handle it to avoid duplicate triggers.
+            if (e.target && e.target.classList && e.target.classList.contains('barcode-scanner-input')) {
+                return;
+            }
+
             const currentTime = Date.now();
             
-            // Barcode scanners act like fast keyboards.
-            // Using 90ms timeout ensures Bluetooth, 2D, and wireless scanners never drop characters.
-            if (currentTime - lastKeyTime.current > 90) {
+            // If more than 100ms elapsed since last key, start a new buffer
+            if (lastKeyTime.current && (currentTime - lastKeyTime.current > 100)) {
                 buffer.current = '';
             }
 
@@ -25,32 +38,38 @@ const useBarcodeScanner = (onScan) => {
                 return;
             }
 
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                if (burstTimer.current) clearTimeout(burstTimer.current);
                 if (buffer.current.length >= 2) {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Normalize any Eastern Arabic / Kurdish digits or localized keys (e.g. ث -> P)
-                    const cleaned = normalizeBarcode(buffer.current).trim();
-                    if (cleaned.length >= 2) {
-                        onScan(cleaned);
-                    }
+                    flushBuffer();
                 }
-                buffer.current = '';
             } else {
-                // Extract true physical key character (immune to OS Arabic/Kurdish keyboard layouts)
                 const char = getCharFromBarcodeKeyEvent(e);
                 if (char) {
                     buffer.current += char;
+
+                    // Auto-flush timer: Hardware scanners emit characters in rapid bursts (<35ms per character).
+                    // If no new character arrives within 85ms and we have >= 3 chars, automatically trigger scan!
+                    if (burstTimer.current) clearTimeout(burstTimer.current);
+                    if (buffer.current.length >= 3) {
+                        burstTimer.current = setTimeout(() => {
+                            flushBuffer();
+                        }, 85);
+                    }
                 }
             }
 
             lastKeyTime.current = currentTime;
         };
 
-        window.addEventListener('keydown', handleKeyDown);
+        // Use capture phase so scanner is caught before anything else
+        window.addEventListener('keydown', handleKeyDown, true);
 
         return () => {
-            window.removeEventListener('keydown', handleKeyDown);
+            if (burstTimer.current) clearTimeout(burstTimer.current);
+            window.removeEventListener('keydown', handleKeyDown, true);
         };
     }, [onScan]);
 };

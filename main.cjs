@@ -4,10 +4,13 @@ const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 
+// Enterprise POS: Completely suppress all print dialogs and print directly to thermal printer
+app.commandLine.appendSwitch('kiosk-printing');
+
 // Enforce single-instance lock to prevent port collisions and database locks
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-  console.log('Another instance of Market POS is already running. Quitting.');
+    console.log('Another instance of Market POS is already running. Quitting.');
   app.quit();
 }
 
@@ -107,6 +110,7 @@ async function ensureBackendProcess() {
 }
 
 function createWindow() {
+  
   Menu.setApplicationMenu(null);
 
   const iconCandidates = [
@@ -155,6 +159,7 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(async () => {
+  
   if (!gotTheLock) return;
   await ensureBackendProcess();
   createWindow();
@@ -299,46 +304,216 @@ ipcMain.handle('test-cash-drawer', async () => {
   return { success: true, message: 'فەرمانی کردنەوەی قاسەی پارە بە سەرکەوتوویی نێردرا' };
 });
 
-ipcMain.handle('print-test-receipt', async (event, { printerName, storeName, paperWidth }) => {
-  console.log('🖨️ Printing Test Receipt to:', printerName || 'Default Printer');
-  
-  const width = paperWidth === '58mm' ? 32 : 48;
-  const separator = "=".repeat(width);
-  const thinSep = "-".repeat(width);
+// -------------------------------------------------------------
+// POS Hardware: Unified Robust Thermal Printing Engine (XP-80C / ESC-POS / Windows Spooler)
+// -------------------------------------------------------------
+async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', silent = true }) {
+  let printWin = null;
+  let tempPath = null;
+  return new Promise(async (resolve) => {
+    try {
+      if (!mainWindow || !mainWindow.webContents) {
+        return resolve({ success: false, error: 'Main window unavailable' });
+      }
 
-  let text = "";
-  text += ESC + "@";              // Initialize printer
-  text += ESC + "a" + "1";        // Align Center
-  text += (storeName || "مارکێتی نموونەیی") + "\n";
-  text += "تاقیکردنەوەی دروستی چاپکەر\n";
-  text += separator + "\n";
-  text += ESC + "a" + "0";        // Align Left/Right
-  text += "بەروار: " + new Date().toLocaleDateString('en-GB') + "\n";
-  text += "کات: " + new Date().toLocaleTimeString('en-GB') + "\n";
-  text += "قەبارەی کاغەز: " + (paperWidth || "80mm") + "\n";
-  text += "چاپکەری دیاریکراو: " + (printerName || "چاپکەری سەرەکی سیستم") + "\n";
-  text += thinSep + "\n";
-  text += "پشکنینی پیتە کوردییەکان:\n";
-  text += "پ چ ژ گ ڤ ۆ ێ ڵ ڕ\n";
-  text += "١٢٣٤٥٦٧٨٩٠ - 1234567890\n";
-  text += thinSep + "\n";
-  text += ESC + "a" + "1";        // Align Center
-  text += "چاپکەر و قاسەی پارە ئامادەن!\n";
-  text += "Market POS System v1.0\n";
-  text += "\n\n\n";
-  text += CUT_PAPER;
-  text += DRAWER_KICK;            // Kick cash drawer on test print
+      const printers = await mainWindow.webContents.getPrintersAsync();
+      let targetPrinter = deviceName;
+      if (!targetPrinter) {
+        const xpPrinter = printers.find(p => 
+          p.name.toLowerCase().includes('xp-80') || 
+          p.name.toLowerCase().includes('pos-80') || 
+          p.name.toLowerCase().includes('80c') ||
+          p.name.toLowerCase().includes('thermal')
+        );
+        targetPrinter = xpPrinter ? xpPrinter.name : (printers.find(p => p.isDefault)?.name || '');
+      }
 
-  return { 
-    success: true, 
-    message: 'پسووڵەی تاقیکردنەوە بە سەرکەوتوویی بۆ چاپکەر ڕەوانە کرا',
-    textLength: text.length
-  };
+      const is58 = paperWidth === '58mm';
+      const bodyWidth = is58 ? '48mm' : '72mm';
+      const wrapperWidth = is58 ? '46mm' : '70mm';
+
+      const standaloneHtml = `<!DOCTYPE html>
+<html dir="rtl" lang="ckb">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {
+      size: ${is58 ? '48mm' : '72mm'} auto;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: ${bodyWidth} !important;
+      max-width: ${bodyWidth} !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+      font-size: 12px !important;
+      direction: rtl !important;
+      text-align: right !important;
+      overflow: visible !important;
+      height: auto !important;
+    }
+    .thermal-receipt-wrapper {
+      width: ${wrapperWidth} !important;
+      margin: 0 auto !important;
+      padding: 4px 2px 25mm 2px !important;
+      box-sizing: border-box !important;
+      color: #000000 !important;
+      background: #ffffff !important;
+    }
+    .receipt-divider {
+      border-bottom: 1px dashed #000000 !important;
+      margin: 6px 0 !important;
+      width: 100% !important;
+    }
+    table {
+      width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+      border: 1px solid #000000 !important;
+      direction: rtl !important;
+      margin: 5px 0 !important;
+      color: #000000 !important;
+      page-break-inside: avoid !important;
+    }
+    th, td {
+      border: 1px solid #000000 !important;
+      color: #000000 !important;
+      font-weight: bold !important;
+      padding: 3px 2px !important;
+    }
+    svg {
+      display: block !important;
+      margin: 0 auto !important;
+      max-width: 100% !important;
+      height: auto !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="thermal-receipt-wrapper">
+    ${htmlContent}
+  </div>
+</body>
+</html>`;
+
+      tempPath = path.join(app.getPath('temp'), `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.html`);
+      fs.writeFileSync(tempPath, standaloneHtml, 'utf8');
+
+      printWin = new BrowserWindow({
+        show: true,
+        x: -9999,
+        y: -9999,
+        width: 350,
+        height: 800,
+        frame: false,
+        skipTaskbar: true,
+        focusable: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          backgroundThrottling: false
+        }
+      });
+
+      await printWin.loadFile(tempPath);
+      await new Promise(r => setTimeout(r, 200));
+
+      const printOpts = {
+        silent: Boolean(silent),
+        printBackground: true,
+        margins: { marginType: 'none' }
+      };
+      if (targetPrinter) {
+        printOpts.deviceName = targetPrinter;
+      }
+
+      console.log('🖨️ Dispatching thermal print job to:', targetPrinter || 'Default Printer', 'silent:', silent);
+
+      const doPrint = (opts) => {
+        return new Promise((res) => {
+          printWin.webContents.print(opts, (success, failureReason) => {
+            res({ success, failureReason });
+          });
+        });
+      };
+
+      let result = await doPrint(printOpts);
+
+      // Fallback: If printing to named printer failed, retry on system default printer
+      if (!result.success && targetPrinter) {
+        console.warn('⚠️ Named printer failed, retrying on system default printer...', result.failureReason);
+        result = await doPrint({
+          silent: Boolean(silent),
+          printBackground: true,
+          margins: { marginType: 'none' }
+        });
+      }
+
+      try { fs.unlinkSync(tempPath); } catch (_) {}
+
+      // Keep print window alive briefly so Windows spooler completes reading EMF data
+      setTimeout(() => {
+        try {
+          if (printWin && !printWin.isDestroyed()) printWin.destroy();
+        } catch (_) {}
+      }, 3000);
+
+      if (result.success) {
+        console.log('✅ Thermal receipt printed successfully to:', targetPrinter || 'Default Printer');
+        resolve({ success: true });
+      } else {
+        console.warn('⚠️ Thermal print failed:', result.failureReason);
+        resolve({ success: false, error: result.failureReason || 'چاپ نەکرا' });
+      }
+    } catch (err) {
+      if (tempPath) { try { fs.unlinkSync(tempPath); } catch (_) {} }
+      if (printWin && !printWin.isDestroyed()) { try { printWin.destroy(); } catch (_) {} }
+      console.error('Thermal print fatal error:', err);
+      resolve({ success: false, error: err.message });
+    }
+  });
+}
+
+// Handler for regular sales & reprint receipts
+ipcMain.handle('print-thermal-receipt', async (event, options = {}) => {
+  return await printHtmlReceipt(options);
 });
 
-// -------------------------------------------------------------
-// Backups Folder & Dialog IPC Handlers
-// -------------------------------------------------------------
+// Handler for hardware test receipt in Settings
+ipcMain.handle('print-test-receipt', async (event, { printerName, storeName, paperWidth, silent = true }) => {
+  console.log('🖨️ Handling test receipt request for printer:', printerName || 'Default');
+  const testHtml = `
+    <div style="text-align: center; font-size: 16px; font-weight: 800; margin-bottom: 2px;">${storeName || 'مارکێتی شارەکەم'}</div>
+    <div style="text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 4px;">تاقیکردنەوەی دروستی چاپکەر</div>
+    <div class="receipt-divider"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;"><span>بەروار:</span><span>${new Date().toLocaleDateString('en-GB')}</span></div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;"><span>کات:</span><span>${new Date().toLocaleTimeString('en-GB')}</span></div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;"><span>چاپکەر:</span><span>${printerName || 'چاپکەری سەرەکی'}</span></div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;"><span>قەبارە:</span><span>${paperWidth || '80mm'}</span></div>
+    <div class="receipt-divider"></div>
+    <div style="font-size: 12px; font-weight: bold; margin: 4px 0; text-align: center;">پشکنینی فۆنت و پیتە کوردییەکان:</div>
+    <div style="font-size: 14px; font-weight: bold; letter-spacing: 1px; margin: 3px 0; text-align: center;">پ چ ژ گ ڤ ۆ ێ ڵ ڕ</div>
+    <div style="font-size: 12px; font-weight: bold; text-align: center;">١٢٣٤٥٦٧٨٩٠ - 1234567890</div>
+    <div class="receipt-divider"></div>
+    <div style="font-size: 13px; font-weight: 800; margin-top: 4px; text-align: center;">چاپکەر ئامادەیە بۆ کارکردن! ✅</div>
+    <div style="font-size: 10px; color: #444; margin-top: 2px; text-align: center;">Market POS System</div>
+  `;
+  return await printHtmlReceipt({
+    htmlContent: testHtml,
+    deviceName: printerName,
+    paperWidth: paperWidth || '80mm',
+    silent: silent !== undefined ? silent : true
+  });
+});
+
 ipcMain.handle('open-backups-folder', async () => {
   try {
     const backupsDir = path.resolve(__dirname, 'backend', 'backups');
@@ -427,4 +602,5 @@ ipcMain.handle('save-invoice-pdf', async (event, { defaultFileName, htmlContent 
     }
   }
 });
+
 
