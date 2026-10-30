@@ -295,34 +295,26 @@ const Products = () => {
             )}
           </div>
 
-          {/* Category Select Dropdown (36px) */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+          {/* Add Product Button (Unified DRY Style matching Purchases) */}
+          <button
+            type="button"
+            onClick={openAddModal}
             style={{
               height: '36px',
-              padding: '0 10px',
-              borderRadius: '8px',
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-primary)',
+              padding: '0 16px',
+              borderRadius: '6px',
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 800,
               fontSize: '0.84rem',
-              fontWeight: 600,
-              outline: 'none',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
               boxSizing: 'border-box'
             }}
           >
-            <option value="ALL">هەموو جۆرەکان ({products.length})</option>
-            {categories.map(cat => {
-              const count = products.filter(p => String(p.category_id) === String(cat.id)).length;
-              return (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name} ({count})
-                </option>
-              );
-            })}
-          </select>
+            + کاڵای نوێ
+          </button>
         </div>
 
         {/* Left side: Status Filters (Pills) + "+ کاڵای نوێ" Button */}
