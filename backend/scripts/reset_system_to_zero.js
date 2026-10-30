@@ -62,8 +62,13 @@ async function factoryReset() {
     }
     console.log(`✓ Seeded ${initialCategories.length} clean standard categories`);
 
-    // Reset AUTO_INCREMENT on users if needed, but preserve existing user accounts
-    await connection.query('ALTER TABLE `users` AUTO_INCREMENT = 4');
+    // Clean test cashiers, keep only master admin
+    await connection.query("DELETE FROM `users` WHERE `username` != 'admin'");
+    await connection.query('ALTER TABLE `users` AUTO_INCREMENT = 2');
+
+    // Reset backup and sync timestamps
+    await connection.query("UPDATE `telegram_backup_settings` SET last_sent_at = NULL, last_status = NULL, last_error = NULL, last_filename = NULL, last_file_size = 0 WHERE id = 1");
+    await connection.query("UPDATE `sync_settings` SET last_successful_sync = NULL WHERE id = 1");
 
     await connection.commit();
     await connection.query('SET FOREIGN_KEY_CHECKS = 1');

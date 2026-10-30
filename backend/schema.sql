@@ -136,9 +136,11 @@ CREATE TABLE IF NOT EXISTS Needs (
     FOREIGN KEY (category_id) REFERENCES Needs_Categories(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Insert Mock Dummy Products for Testing (Only runs if DB is empty or ignoring duplicates)
-INSERT IGNORE INTO Categories (id, name) VALUES (1, 'خواردنەوەکان'), (2, 'شیرینی');
-INSERT IGNORE INTO Products (name, barcode, cost_price, selling_price, stock, category_id) VALUES 
-('ماء معدني كبير', '123456789012', 250, 500, 100, 1),
-('بسكويت الشوكولاتة', '098765432109', 500, 1000, 50, 2),
-('شاي عراقي ممتاز', '111122223333', 1500, 2500, 200, 1);
+-- Initial standard clean categories
+INSERT IGNORE INTO Categories (name) VALUES 
+('خواردنەوەکان'), 
+('شیرینی و پسکیت'),
+('خۆراکی گشتی'),
+('سەوزە و میوە'),
+('شۆردەر و پاککەرەوە'),
+('ئەلیکترۆنی و کەلوپەل');
