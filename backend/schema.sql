@@ -135,12 +135,3 @@ CREATE TABLE IF NOT EXISTS Needs (
     is_fulfilled BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (category_id) REFERENCES Needs_Categories(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
--- Initial standard clean categories
-INSERT IGNORE INTO Categories (name) VALUES 
-('خواردنەوەکان'), 
-('شیرینی و پسکیت'),
-('خۆراکی گشتی'),
-('سەوزە و میوە'),
-('شۆردەر و پاککەرەوە'),
-('ئەلیکترۆنی و کەلوپەل');

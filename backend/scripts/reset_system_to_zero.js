@@ -44,23 +44,9 @@ async function factoryReset() {
       console.log(`✓ Truncated & reset AUTO_INCREMENT: ${tbl}`);
     }
 
-    // Keep categories clean or reset categories
+    // Keep categories completely clean at ZERO
     await connection.query('TRUNCATE TABLE `categories`');
-    console.log('✓ Truncated categories');
-
-    // Insert clean initial standard categories
-    const initialCategories = [
-      'خواردنەوەکان',
-      'شیرینی و پسکیت',
-      'خۆراکی گشتی',
-      'سەوزە و میوە',
-      'شۆردەر و پاککەرەوە',
-      'ئەلیکترۆنی و کەلوپەل'
-    ];
-    for (const cat of initialCategories) {
-      await connection.query('INSERT INTO `categories` (name) VALUES (?)', [cat]);
-    }
-    console.log(`✓ Seeded ${initialCategories.length} clean standard categories`);
+    console.log('✓ Truncated categories to ZERO');
 
     // Clean test cashiers, keep only master admin
     await connection.query("DELETE FROM `users` WHERE `username` != 'admin'");
