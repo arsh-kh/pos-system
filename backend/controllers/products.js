@@ -172,9 +172,35 @@ exports.updateProduct = async (req, res) => {
             });
         }
 
-        // 4. Detect and log manual stock adjustments
+        // 4. Detect and log manual stock adjustments, ensuring FIFO batch synchronization
         const stockChanged = Number(oldP.stock) !== Number(stock || 0);
         if (stockChanged) {
+            const stockDiff = Number(stock || 0) - Number(oldP.stock || 0);
+            if (stockDiff > 0) {
+                await db.query(`
+                    INSERT INTO Product_Batches (
+                        product_id,
+                        batch_number,
+                        initial_quantity,
+                        remaining_quantity,
+                        cost_price,
+                        selling_price,
+                        units_per_box,
+                        expiry_date,
+                        status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+                `, [
+                    id,
+                    `ADJ-${id}-${Date.now().toString().slice(-6)}`,
+                    stockDiff,
+                    stockDiff,
+                    BigInt(Math.round(Number(cost_price || oldP.cost_price) || 0)).toString(),
+                    BigInt(Math.round(Number(selling_price || oldP.selling_price) || 0)).toString(),
+                    cleanUnitsPerBox,
+                    expiry_date || oldP.expiry_date || null
+                ]);
+            }
+
             await logAuditAction({
                 req,
                 action_type: 'STOCK_ADJUSTMENT',
