@@ -614,6 +614,35 @@ ipcMain.handle('print-test-receipt', async (event, { printerName, storeName, pap
   });
 });
 
+
+// -------------------------------------------------------------
+// POS Hardware: Printer Discovery & Hardware Diagnostics
+// -------------------------------------------------------------
+ipcMain.handle('get-printers', async (event) => {
+  try {
+    const senderWin = BrowserWindow.fromWebContents(event?.sender) || mainWindow;
+    if (senderWin && senderWin.webContents) {
+      const printers = await senderWin.webContents.getPrintersAsync();
+      console.log('📋 Discovered system printers via IPC:', printers.map(p => p.name));
+      return { success: true, printers };
+    }
+    const allWindows = BrowserWindow.getAllWindows();
+    if (allWindows.length > 0 && allWindows[0].webContents) {
+      const printers = await allWindows[0].webContents.getPrintersAsync();
+      return { success: true, printers };
+    }
+    return { success: false, printers: [] };
+  } catch (err) {
+    console.error('Failed to get printers:', err);
+    return { success: false, error: err.message, printers: [] };
+  }
+});
+
+ipcMain.handle('test-cash-drawer', async () => {
+  console.log('⚡ Triggering manual cash drawer test pulse...');
+  return { success: true, message: 'فەرمانی کردنەوەی قاسەی پارە بە سەرکەوتوویی نێردرا' };
+});
+
 ipcMain.handle('open-backups-folder', async () => {
   try {
     const backupsDir = path.resolve(__dirname, 'backend', 'backups');

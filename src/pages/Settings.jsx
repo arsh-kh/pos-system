@@ -13,13 +13,17 @@ import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 // Safe Electron IPC Detection
-let ipcRenderer = null;
-if (typeof window !== 'undefined' && typeof window.require === 'function') {
-  try {
-    const electron = window.require('electron');
-    ipcRenderer = electron?.ipcRenderer || null;
-  } catch (_) {}
-}
+const getIpc = () => {
+  if (typeof window !== 'undefined' && typeof window.require === 'function') {
+    try {
+      return window.require('electron')?.ipcRenderer || null;
+    } catch (_) {
+      return null;
+    }
+  }
+  return null;
+};
+let ipcRenderer = getIpc();
 
 const Settings = () => {
   const { isAdmin, currentUser, changePassword, lockToCashier, cashierPermissions, updatePermissions } = useAuth();
@@ -43,24 +47,40 @@ const Settings = () => {
   const [lastScannedItem, setLastScannedItem] = useState(null);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
-  // Fetch installed Windows printers on mount
-  useEffect(() => {
-    const fetchPrinters = async () => {
-      if (ipcRenderer) {
-        try {
-          const res = await ipcRenderer.invoke('get-printers');
-          if (res?.success && Array.isArray(res.printers)) {
-            setPrintersList(res.printers);
-            if (!selectedPrinter) {
+  const fetchPrinters = async () => {
+    const ipc = getIpc();
+    if (ipc) {
+      try {
+        const res = await ipc.invoke('get-printers');
+        if (res?.success && Array.isArray(res.printers)) {
+          setPrintersList(res.printers);
+          const savedPrinter = localStorage.getItem('pos_selected_printer');
+          if (!savedPrinter) {
+            const xp = res.printers.find(p => 
+              p.name.toLowerCase().includes('xp-') || 
+              p.name.toLowerCase().includes('pos') || 
+              p.name.toLowerCase().includes('thermal') ||
+              p.name.toLowerCase().includes('80c')
+            );
+            if (xp) {
+              setSelectedPrinter(xp.name);
+              localStorage.setItem('pos_selected_printer', xp.name);
+            } else {
               const def = res.printers.find(p => p.isDefault);
               if (def) setSelectedPrinter(def.name);
             }
           }
-        } catch (_) {}
+        }
+      } catch (err) {
+        console.error('Failed to get printers:', err);
       }
-    };
+    }
+  };
+
+  // Fetch installed Windows printers on mount
+  useEffect(() => {
     fetchPrinters();
-  }, [selectedPrinter]);
+  }, []);
 
   const handleSaveHardwareSettings = () => {
     localStorage.setItem('pos_selected_printer', selectedPrinter);
@@ -74,9 +94,10 @@ const Settings = () => {
     setIsTestPrinting(true);
     setHardwareNotice('');
     try {
-      if (ipcRenderer) {
+      const ipc = getIpc();
+      if (ipc) {
         const storeName = (localStorage.getItem('pos_store_name') && localStorage.getItem('pos_store_name') !== 'مارکێتی حاجی ئاکۆ') ? localStorage.getItem('pos_store_name') : 'مارکێتی شارەکەم';
-        const res = await ipcRenderer.invoke('print-test-receipt', {
+        const res = await ipc.invoke('print-test-receipt', {
           printerName: selectedPrinter,
           storeName,
           paperWidth,
@@ -1680,6 +1701,26 @@ const Settings = () => {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={fetchPrinters}
+                title="نوێکردنەوە و پشکنینی چاپکەرەکان"
+                style={{
+                  padding: '0 12px',
+                  borderRadius: '10px',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <RefreshCw size={16} />
+              </button>
               <button
                 type="button"
                 onClick={handleSaveHardwareSettings}
