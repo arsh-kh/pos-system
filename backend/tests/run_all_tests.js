@@ -25,7 +25,9 @@ const testFiles = [
     'test_full_lifecycle_e2e.js',
     'test_analytics_ranges.js',
     'test_multi_cashier_and_audit.js',
-    'test_date_formatter.js'
+    'test_date_formatter.js',
+    'test_specificity_engine.js',
+    'test_financial_audit_scenarios.js'
 ];
 
 async function runMasterSuite() {

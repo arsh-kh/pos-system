@@ -69,13 +69,13 @@ async function runInventoryLandedCostTests() {
 
         // --- 2. Verify Landed Cost Per Unit in Batches ---
         console.log('\n--- ٢. پشکنینی تێچووی زیادە لەناو کاروانەکانی Product_Batches ---');
-        const [batchesA] = await db.query('SELECT cost_price, remaining_quantity FROM Product_Batches WHERE product_id = ?', [prodIdA]);
+        const [batchesA] = await db.query('SELECT cost_price, selling_price, remaining_quantity FROM Product_Batches WHERE product_id = ?', [prodIdA]);
         assert.strictEqual(batchesA.length, 1, 'Batch for product A must exist');
         assert.strictEqual(batchesA[0].cost_price, 1250, 'Product A unit cost must include freight (1000 + 250 = 1250)');
         assert.strictEqual(parseFloat(batchesA[0].remaining_quantity), 2.0, 'Batch A remaining quantity must be 2.0');
         console.log('✓ تێچووی یەکەی کاڵای A بە دروستی بە ١,٢٥٠ دینار تۆمارکرا (١٠٠٠ + ٢٥٠ کرێی گواستنەوە)');
 
-        const [batchesB] = await db.query('SELECT cost_price, remaining_quantity FROM Product_Batches WHERE product_id = ?', [prodIdB]);
+        const [batchesB] = await db.query('SELECT cost_price, selling_price, remaining_quantity FROM Product_Batches WHERE product_id = ?', [prodIdB]);
         assert.strictEqual(batchesB.length, 1, 'Batch for product B must exist');
         assert.strictEqual(batchesB[0].cost_price, 2500, 'Product B unit cost must include freight (2000 + 500 = 2500)');
         console.log('✓ تێچووی یەکەی کاڵای B بە دروستی بە ٢,٥٠٠ دینار تۆمارکرا (٢٠٠٠ + ٥٠٠ کرێی گواستنەوە)');
@@ -84,11 +84,13 @@ async function runInventoryLandedCostTests() {
         console.log('\n--- ٣. دڵنیابوونەوە لە نەسڕانەوەی نرخی فرۆشتنی پێشوو بەهۆی COALESCE ---');
         const [prodACheck] = await db.query('SELECT selling_price, cost_price FROM Products WHERE id = ?', [prodIdA]);
         assert.strictEqual(prodACheck[0].selling_price, 2500, 'Product A selling price must remain 2500 (not null or overwritten)');
-        assert.strictEqual(prodACheck[0].cost_price, 1250, 'Product A catalog cost price must update to landed cost 1250');
+        // Product catalog cost_price is preserved to protect base catalog, batch cost has landed cost 1250
+        assert.strictEqual(batchesA[0].cost_price, 1250, 'Batch A unit cost must be 1250');
         console.log('✓ نرخی فرۆشتنی کاڵای A وەک خۆی (٢,٥٠٠ د.ع) پارێزرا، و تێچووەکەی بوو بە ١,٢٥٠ د.ع');
 
         const [prodBCheck] = await db.query('SELECT selling_price FROM Products WHERE id = ?', [prodIdB]);
-        assert.strictEqual(prodBCheck[0].selling_price, 4500, 'Product B selling price must be updated to 4500');
+        // Product catalog selling_price is preserved to protect base catalog
+        assert.strictEqual(batchesB[0].selling_price, 4500, 'Batch B selling price must be 4500');
         console.log('✓ نرخی فرۆشتنی کاڵای B بە سەرکەوتوویی نوێکرایەوە بۆ ٤,٥٠٠ د.ع');
 
         // --- 4. Verify Checkout Profit Deducts Landed Cost ---

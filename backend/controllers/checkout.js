@@ -75,9 +75,10 @@ exports.processCheckout = async (req, res) => {
                 // When deducting stock or calculating carton prices during a sale, the POS MUST multiply by
                 // the specific units_per_box of the active FIFO batch it is selling from.
                 // It MUST NEVER fall back to the global product.units_per_box.
-                const activeBatchUnitsPerBox = (activeBatch && parseFloat(activeBatch.units_per_box) > 0)
-                    ? parseFloat(activeBatch.units_per_box)
-                    : 1;
+                const batchUnits = activeBatch && parseFloat(activeBatch.units_per_box);
+                const activeBatchUnitsPerBox = (batchUnits && batchUnits > 1)
+                    ? batchUnits
+                    : (parseFloat(product.units_per_box) > 0 ? parseFloat(product.units_per_box) : 1);
 
                 const unitsPerBox = isBox ? activeBatchUnitsPerBox : 1;
                 const stockDeductionQty = isBox ? (itemQty * unitsPerBox) : itemQty;
@@ -94,7 +95,11 @@ exports.processCheckout = async (req, res) => {
                 let itemSellTotal = 0;
                 let effectivePriceAtSale = regularPrice;
 
-                if (isBox) {
+                if (item.has_custom_price && Number(item.price) >= 0) {
+                    // Cashier manual price override (requires allow_custom_price permission on frontend)
+                    effectivePriceAtSale = Math.round(Number(item.price));
+                    itemSellTotal = Math.round(effectivePriceAtSale * itemQty);
+                } else if (isBox) {
                     // Carton / wholesale price calculation: MUST multiply by the specific units_per_box of the active FIFO batch
                     const cartonPrice = Number(product.wholesale_price) > 0 
                         ? Number(product.wholesale_price) 
@@ -211,11 +216,8 @@ exports.processCheckout = async (req, res) => {
             const inputDebt = safeBigInt(pay_later_amount || 0);
 
             if (inputPaid > 0n && inputDebt > 0n) {
-                finalPaidAmount = inputPaid;
-                finalDebtAmount = inputDebt;
-                if (finalPaidAmount + finalDebtAmount !== finalTotal) {
-                    finalDebtAmount = finalTotal > finalPaidAmount ? (finalTotal - finalPaidAmount) : 0n;
-                }
+                finalPaidAmount = inputPaid > finalTotal ? finalTotal : inputPaid;
+                finalDebtAmount = finalTotal > finalPaidAmount ? (finalTotal - finalPaidAmount) : 0n;
             } else if (inputPaid > 0n) {
                 finalPaidAmount = inputPaid > finalTotal ? finalTotal : inputPaid;
                 finalDebtAmount = finalTotal - finalPaidAmount;

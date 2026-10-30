@@ -46,8 +46,8 @@ async function runTests() {
 
     // 3. Create carton/box product (units_per_box: 12, piece price: 2,000, box price: 20,000, stock: 120)
     const [p2Res] = await db.query(
-      "INSERT INTO Products (name, barcode, box_barcode, units_per_box, cost_price, selling_price, wholesale_price, stock) VALUES ('شەربەتی کارتۆن', 'BOX_PIECE_BC', ?, 12, 1000, 2000, 20000, 120)",
-      [barcodeBox]
+      "INSERT INTO Products (name, barcode, box_barcode, units_per_box, cost_price, selling_price, wholesale_price, stock) VALUES ('شەربەتی کارتۆن', ?, ?, 12, 1000, 2000, 20000, 120)",
+      [barcodeBox + '_p', barcodeBox]
     );
     testBoxProdId = p2Res.insertId;
     console.log(`✓ کاڵاکان دروستکران: دانە #${testPieceProdId}, کارتۆن #${testBoxProdId}`);

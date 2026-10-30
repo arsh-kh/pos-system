@@ -225,10 +225,26 @@ exports.processReturn = async (req, res) => {
         // Determine refund settlement: CASH vs DEBT
         let finalRefundMethod = (refund_method || '').toUpperCase();
         if (!['CASH', 'DEBT'].includes(finalRefundMethod)) {
-            if (sale.payment_method === 'DEBT') {
+            if (sale.payment_method === 'DEBT' || (sale.customer_id && Number(sale.debt_amount) > 0)) {
                 finalRefundMethod = 'DEBT';
             } else {
                 finalRefundMethod = 'CASH';
+            }
+        }
+
+        // Financial Debt Protection Guard:
+        // A customer cannot extract physical cash if the purchase was debt-funded and cash paid is exceeded
+        if (finalRefundMethod === 'CASH' && sale.customer_id && Number(sale.debt_amount) > 0) {
+            const [alreadyCashRows] = await connection.query(
+                "SELECT COALESCE(SUM(refunded_amount), 0) as already_refunded_cash FROM Returns WHERE sale_id = ? AND refund_method = 'CASH'",
+                [sale_id]
+            );
+            const alreadyRefundedCash = Number(alreadyCashRows[0]?.already_refunded_cash) || 0;
+            const maxCashRefundable = Math.max(0, Number(sale.paid_amount || 0) - alreadyRefundedCash);
+
+            if (maxCashRefundable <= 0 || refundedAmount > maxCashRefundable) {
+                // Entire cash component already refunded or return amount exceeds physical cash tendered -> Must deduct from debt
+                finalRefundMethod = 'DEBT';
             }
         }
 

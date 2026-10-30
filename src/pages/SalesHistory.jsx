@@ -109,8 +109,14 @@ const SalesHistory = () => {
         }
         @media print {
           @page {
-            size: auto;
+            size: 80mm auto;
             margin: 0;
+          }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 80mm !important;
+            background: #ffffff !important;
           }
           body * {
             visibility: hidden !important;
@@ -121,12 +127,12 @@ const SalesHistory = () => {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 71mm !important;
-            max-width: 71mm !important;
+            width: 100% !important;
+            max-width: 80mm !important;
             box-sizing: border-box !important;
             background: white !important;
             color: black !important;
-            padding: 4px 5px !important;
+            padding: 4px 6px !important;
             font-family: monospace, Tahoma, 'Noto Kufi Arabic', sans-serif !important;
             font-size: 12px !important;
             direction: rtl !important;

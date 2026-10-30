@@ -46,9 +46,10 @@ exports.getActivePromotions = async (req, res) => {
             ORDER BY p.id DESC
         `);
 
-        // Compute effective promo price for each item
+        // Compute effective promo price for each item (Newest promotion takes precedence)
         const activeMap = {};
         rows.forEach(promo => {
+            if (activeMap[promo.product_id]) return; // Newest id already recorded due to ORDER BY p.id DESC
             const orig = Number(promo.original_price);
             let promoPrice = orig;
             if (promo.discount_type === 'PERCENT') {

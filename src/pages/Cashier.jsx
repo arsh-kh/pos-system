@@ -540,7 +540,7 @@ const Cashier = () => {
     }
     const parsed = Math.max(0, parseInt(newPrice) || 0);
     if (parsed <= 0) return;
-    setCart(prev => prev.map(item => (item.cartKey === key || item.barcode === key) ? { ...item, price: parsed } : item));
+    setCart(prev => prev.map(item => (item.cartKey === key || item.barcode === key) ? { ...item, price: parsed, has_custom_price: true } : item));
   };
 
   const clearCart = () => {
@@ -1246,6 +1246,7 @@ const Cashier = () => {
           barcode: i.barcode,
           quantity: i.quantity,
           is_custom: i.is_custom || false,
+          has_custom_price: i.has_custom_price || false,
           price: i.price,
           name: i.name,
           unit_type: i.unit_type || 'PIECE',
@@ -1316,7 +1317,7 @@ const Cashier = () => {
         }
 
         // Auto kick cash drawer if cash was received
-        if (paymentMode === 'CASH' || (paymentMode === 'SPLIT' && (Number(paidAmount) || 0) > 0)) {
+        if (paymentMode === 'CASH' || (paymentMode === 'SPLIT' && (Number(effectiveCashPaid) || 0) > 0)) {
           if (window.require) {
             try {
               const { ipcRenderer } = window.require('electron');
@@ -1375,8 +1376,14 @@ const Cashier = () => {
         }
         @media print {
           @page {
-            size: auto;
+            size: 80mm auto;
             margin: 0;
+          }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 80mm !important;
+            background: #ffffff !important;
           }
           body * {
             visibility: hidden !important;
@@ -1387,12 +1394,12 @@ const Cashier = () => {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 71mm !important;
-            max-width: 71mm !important;
+            width: 100% !important;
+            max-width: 80mm !important;
             box-sizing: border-box !important;
             background: white !important;
             color: black !important;
-            padding: 4px 5px !important;
+            padding: 4px 6px !important;
             font-family: monospace, Tahoma, sans-serif !important;
             font-size: 12px !important;
             direction: rtl !important;
@@ -2671,14 +2678,15 @@ const Cashier = () => {
                 </button>
               </div>
 
-              {/* Quick Cashier Actions Row (دوو دوگمەی سەرەکی و خێرا) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '8px' }}>
+              {/* Quick Cashier Actions Row (دوگمەی چاپکردنەوە) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px', marginBottom: '8px' }}>
                 <button 
                   type="button" 
                   onClick={handleReprintLastReceipt}
                   title="چاپکردنەوەی دوایین پسووڵە (F8)"
                   style={{ 
                     height: '34px',
+                    width: '100%',
                     display: 'inline-flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
@@ -2687,7 +2695,7 @@ const Cashier = () => {
                     color: '#38bdf8', 
                     border: '1px solid rgba(56, 189, 248, 0.35)', 
                     borderRadius: '8px', 
-                    fontSize: '0.78rem', 
+                    fontSize: '0.82rem', 
                     cursor: 'pointer',
                     fontWeight: 700,
                     whiteSpace: 'nowrap',
@@ -2695,30 +2703,6 @@ const Cashier = () => {
                   }}
                 >
                   <span>چاپکردنەوە</span>
-                </button>
-
-                <button 
-                  type="button" 
-                  onClick={handleOpenCashDrawer}
-                  title="کردنەوەی دەغیلە (F10)"
-                  style={{ 
-                    height: '34px',
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    gap: '5px', 
-                    background: 'rgba(16, 185, 129, 0.12)', 
-                    color: '#10b981', 
-                    border: '1px solid rgba(16, 185, 129, 0.35)', 
-                    borderRadius: '8px', 
-                    fontSize: '0.78rem', 
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <span>دەغیلە</span>
                 </button>
               </div>
 
