@@ -47,11 +47,12 @@ const CashDrawer = () => {
     }
   };
 
-  const printZReport = () => {
+  const printZReport = async () => {
     if (window.require && selectedReportForPrint) {
       try {
         const { ipcRenderer } = window.require('electron');
-        ipcRenderer.send('print-z-report', selectedReportForPrint);
+        const res = await ipcRenderer.invoke('print-z-report', selectedReportForPrint);
+        if (res && res.success) return;
       } catch (_) {}
     }
     window.print();

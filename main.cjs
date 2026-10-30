@@ -194,115 +194,136 @@ ipcMain.on('open-cash-drawer', (event) => {
 });
 
 // -------------------------------------------------------------
-// POS Hardware: Thermal Receipt Printing (ESC/POS 80mm/58mm)
+// POS Hardware: Thermal Receipt & Report Formatter Helpers
 // -------------------------------------------------------------
-ipcMain.on('print-receipt', (event, receiptData) => {
-  console.log('🖨️ Formatted ESC/POS Receipt for invoice:', receiptData?.sale_id || receiptData?.id);
-  
-  let text = "";
-  text += ESC + "@";              // Initialize
-  text += ESC + "a" + "1";        // Center
-  text += "مارکێتی پێشکەوتوو\n";
-  text += "پسووڵەی فرۆشتن\n";
-  text += "================================\n";
-  text += ESC + "a" + "0";        // Left/Right
-  
+const formatInvoiceReceiptHtml = (receiptData) => {
   const invoiceNum = receiptData.sale_id || receiptData.id || Date.now().toString().slice(-6);
-  text += `ژمارەی پسووڵە: #${invoiceNum}\n`;
-  text += `بەروار و کات: ${receiptData.date || new Date().toLocaleString('en-GB')}\n`;
-  text += `کاشێر: ${receiptData.cashier || 'کاشێری سەرەکی'}\n`;
-  text += "--------------------------------\n";
+  const dateStr = receiptData.date || new Date().toLocaleString('en-GB');
+  const cashierStr = receiptData.cashier || 'کاشێری سەرەکی';
+  const totalIQD = Number(receiptData.total || receiptData.grandTotal || 0).toLocaleString();
 
+  let itemsHtml = '';
   if (Array.isArray(receiptData.items)) {
-    receiptData.items.forEach(item => {
+    receiptData.items.forEach((item, idx) => {
       const lineTotal = Number(item.total || item.total_price || (item.price * item.quantity)).toLocaleString();
-      text += `${item.name} (${item.quantity} ${item.unit || 'دانە'})\n`;
-      text += `     ${lineTotal} دینار\n`;
+      itemsHtml += `
+        <tr>
+          <td style="text-align: center; width: 20px;">${idx + 1}</td>
+          <td style="text-align: right;">${item.name || 'کاڵا'}</td>
+          <td style="text-align: center; width: 35px;">${item.quantity}</td>
+          <td style="text-align: left; width: 55px;">${Number(item.price || 0).toLocaleString()}</td>
+          <td style="text-align: left; width: 55px;">${lineTotal}</td>
+        </tr>
+      `;
     });
   }
 
-  text += "--------------------------------\n";
-  text += ESC + "a" + "1";        // Center
-  const totalIQD = Number(receiptData.total || receiptData.grandTotal || 0).toLocaleString();
-  text += `کۆی گشتی: ${totalIQD} دینار\n`;
-
+  let paymentMethodHtml = 'نەقد (کاش)';
   if (receiptData.isSplit || receiptData.payment_method === 'SPLIT') {
-    text += `نەقد (کاش): ${Number(receiptData.paidAmount || 0).toLocaleString()} دینار\n`;
-    text += `قەرز: ${Number(receiptData.debtAmount || 0).toLocaleString()} دینار\n`;
-    text += `کڕیار: ${receiptData.customerName || 'کڕیاری دیاریکراو'}\n`;
+    paymentMethodHtml = `نەقد: ${Number(receiptData.paidAmount || 0).toLocaleString()} | قەرز: ${Number(receiptData.debtAmount || 0).toLocaleString()} (${receiptData.customerName || 'کڕیار'})`;
   } else if (receiptData.isDebt || receiptData.payment_method === 'DEBT') {
-    text += `شێواز: قەرز (${receiptData.customerName || 'کڕیار'})\n`;
-  } else {
-    text += "شێواز: نەقد (کاش)\n";
+    paymentMethodHtml = `قەرز (${receiptData.customerName || 'کڕیار'})`;
   }
 
-  text += "سوپاس بۆ سەردانەکەتان!\n";
-  text += "\n\n\n";
-  text += CUT_PAPER;
+  return `
+    <div style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 2px;">مارکێتی شارەکەم</div>
+    <div style="text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 4px;">پسووڵەی فرۆشتن #${invoiceNum}</div>
+    <div class="receipt-divider"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-weight: bold;">
+      <span>بەروار: ${dateStr}</span>
+      <span>کاشێر: ${cashierStr}</span>
+    </div>
+    <div class="receipt-divider"></div>
+    <table>
+      <thead>
+        <tr style="background: #f0f0f0;">
+          <th style="width: 20px;">#</th>
+          <th>کاڵا</th>
+          <th style="width: 35px;">دانە</th>
+          <th style="width: 55px;">نرخ</th>
+          <th style="width: 55px;">کۆ</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+    <div class="receipt-divider"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; margin: 4px 0;">
+      <span>کۆی گشتی:</span>
+      <span>${totalIQD} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;">
+      <span>شێوازی پارەدان:</span>
+      <span>${paymentMethodHtml}</span>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="text-align: center; font-size: 11px; font-weight: bold; margin-top: 4px;">سوپاس بۆ سەردانەکەتان!</div>
+  `;
+};
 
-  // Auto trigger drawer kick pulse for cash purchases
-  if (!receiptData.isDebt && receiptData.payment_method !== 'DEBT') {
-    text += DRAWER_KICK;
-  }
-
-  event.reply('print-receipt-reply', { success: true, textLength: text.length });
-});
-
-// -------------------------------------------------------------
-// POS Hardware: Z-Report Thermal Printing (End of Shift / Day)
-// -------------------------------------------------------------
-ipcMain.on('print-z-report', (event, zData) => {
-  console.log('📊 Printing Z-Report via ESC/POS for shift:', zData?.shift_id || zData?.id);
-  let text = "";
-  text += ESC + "@";
-  text += ESC + "a" + "1";
-  text += "================================\n";
-  text += "ڕاپۆرتی داخستنی شیفت (Z-REPORT)\n";
-  text += "================================\n";
-  text += ESC + "a" + "0";
-  text += `ژمارەی شیفت: #${zData.shift_id || zData.id || 1}\n`;
-  text += `کاشێر: ${zData.cashier_name || 'کاشێری سەرەکی'}\n`;
-  text += `کردنەوە: ${zData.opened_at ? new Date(zData.opened_at).toLocaleString('en-GB') : '-'}\n`;
-  text += `داخستن: ${zData.closed_at ? new Date(zData.closed_at).toLocaleString('en-GB') : new Date().toLocaleString('en-GB')}\n`;
-  text += "--------------------------------\n";
-  text += `سەرمایەی سەرەتا (قاسە): ${Number(zData.opening_cash || 0).toLocaleString()} دینار\n`;
-  text += `فرۆشی نەقد (کاش): ${Number(zData.cash_sales || 0).toLocaleString()} دینار\n`;
-  text += `فرۆشی قەرز: ${Number(zData.debt_sales || 0).toLocaleString()} دینار\n`;
-  text += `کۆی گشتی فرۆش: ${Number(zData.total_sales || 0).toLocaleString()} دینار\n`;
-  text += `گەڕاوەی نەقد: -${Number(zData.cash_refunds || 0).toLocaleString()} دینار\n`;
-  text += `خەرجییەکان: -${Number(zData.expenses_paid || 0).toLocaleString()} دینار\n`;
-  text += "--------------------------------\n";
-  text += `پێشبینیکراو لە قاسە: ${Number(zData.expected_cash || 0).toLocaleString()} دینار\n`;
-  text += `ژمێردراوی دەستی: ${Number(zData.actual_cash || zData.expected_cash || 0).toLocaleString()} دینار\n`;
+const formatZReportHtml = (zData) => {
+  const shiftNum = zData.shift_id || zData.id || 1;
+  const cashierName = zData.cashier_name || 'کاشێری سەرەکی';
+  const openTime = zData.opened_at ? new Date(zData.opened_at).toLocaleString('en-GB') : '-';
+  const closeTime = zData.closed_at ? new Date(zData.closed_at).toLocaleString('en-GB') : new Date().toLocaleString('en-GB');
   const diff = Number(zData.difference || 0);
-  text += `جیاوازی قاسە: ${diff === 0 ? 'تەواوە (٠)' : `${diff > 0 ? '+' : ''}${diff.toLocaleString()} دینار`}\n`;
-  text += "================================\n";
-  text += "\n\n\n";
-  text += CUT_PAPER;
 
-  event.reply('print-z-report-reply', { success: true, textLength: text.length });
-});
-
-// -------------------------------------------------------------
-// POS Hardware: Printer Discovery & Hardware Diagnostics
-// -------------------------------------------------------------
-ipcMain.handle('get-printers', async () => {
-  try {
-    if (mainWindow && mainWindow.webContents) {
-      const printers = await mainWindow.webContents.getPrintersAsync();
-      return { success: true, printers };
-    }
-    return { success: false, printers: [] };
-  } catch (err) {
-    console.error('Failed to get printers:', err);
-    return { success: false, error: err.message, printers: [] };
-  }
-});
-
-ipcMain.handle('test-cash-drawer', async () => {
-  console.log('⚡ Triggering manual cash drawer test pulse...');
-  return { success: true, message: 'فەرمانی کردنەوەی قاسەی پارە بە سەرکەوتوویی نێردرا' };
-});
+  return `
+    <div style="text-align: center; font-size: 15px; font-weight: 800; margin-bottom: 2px;">مارکێتی شارەکەم</div>
+    <div style="text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 4px;">ڕاپۆرتی داخستنی شیفت (Z-REPORT) #${shiftNum}</div>
+    <div class="receipt-divider"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;">
+      <span>کاشێر:</span><span>${cashierName}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-weight: bold; margin: 2px 0;">
+      <span>کردنەوە:</span><span>${openTime}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-weight: bold; margin: 2px 0;">
+      <span>داخستن:</span><span>${closeTime}</span>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 2px 0;">
+      <span>سەرمایەی سەرەتا (قاسە):</span>
+      <span>${Number(zData.opening_cash || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 2px 0;">
+      <span>فرۆشی نەقد (کاش):</span>
+      <span>${Number(zData.cash_sales || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 2px 0;">
+      <span>فرۆشی قەرز:</span>
+      <span>${Number(zData.debt_sales || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;">
+      <span>کۆی گشتی فرۆش:</span>
+      <span>${Number(zData.total_sales || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 2px 0;">
+      <span>گەڕاوەی نەقد:</span>
+      <span>-${Number(zData.cash_refunds || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 2px 0;">
+      <span>خەرجییەکان:</span>
+      <span>-${Number(zData.expenses_paid || 0).toLocaleString()} دینار</span>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin: 2px 0;">
+      <span>پێشبینیکراو لە قاسە:</span>
+      <span>${Number(zData.expected_cash || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin: 2px 0;">
+      <span>ژمێردراوی دەستی:</span>
+      <span>${Number(zData.actual_cash || zData.expected_cash || 0).toLocaleString()} دینار</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 800; margin: 4px 0;">
+      <span>جیاوازی قاسە:</span>
+      <span>${diff === 0 ? 'تەواوە (٠)' : `${diff > 0 ? '+' : ''}${diff.toLocaleString()} دینار`}</span>
+    </div>
+    <div class="receipt-divider"></div>
+    <div style="text-align: center; font-size: 10px; color: #555; margin-top: 4px;">Market POS System</div>
+  `;
+};
 
 // -------------------------------------------------------------
 // POS Hardware: Unified Robust Thermal Printing Engine (XP-80C / ESC-POS / Windows Spooler)
@@ -317,16 +338,50 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       }
 
       const printers = await mainWindow.webContents.getPrintersAsync();
+      
+      const isThermalName = (name) => {
+        if (!name) return false;
+        const n = name.toLowerCase();
+        return n.includes('xp-') || n.includes('pos') || n.includes('80c') || n.includes('58c') || n.includes('thermal') || n.includes('receipt') || n.includes('printer');
+      };
+
+      const isVirtualName = (name) => {
+        if (!name) return false;
+        const n = name.toLowerCase();
+        return n.includes('pdf') || n.includes('onenote') || n.includes('xps') || n.includes('fax');
+      };
+
       let targetPrinter = deviceName;
-      if (!targetPrinter) {
-        const xpPrinter = printers.find(p => 
-          p.name.toLowerCase().includes('xp-80') || 
-          p.name.toLowerCase().includes('pos-80') || 
-          p.name.toLowerCase().includes('80c') ||
-          p.name.toLowerCase().includes('thermal')
-        );
-        targetPrinter = xpPrinter ? xpPrinter.name : (printers.find(p => p.isDefault)?.name || '');
+      let isThermal = false;
+
+      if (targetPrinter) {
+        const found = printers.find(p => p.name.toLowerCase() === targetPrinter.toLowerCase());
+        if (found) {
+          targetPrinter = found.name;
+          isThermal = isThermalName(targetPrinter);
+        } else {
+          targetPrinter = null;
+        }
       }
+
+      if (!targetPrinter) {
+        // Auto-detect any thermal printer installed on Windows
+        const autoThermal = printers.find(p => isThermalName(p.name));
+        if (autoThermal) {
+          targetPrinter = autoThermal.name;
+          isThermal = true;
+        } else {
+          // Fall back to system default printer
+          const defPrinter = printers.find(p => p.isDefault) || printers[0];
+          targetPrinter = defPrinter ? defPrinter.name : '';
+          isThermal = isThermalName(targetPrinter);
+        }
+      }
+
+      const isVirtual = isVirtualName(targetPrinter);
+      // Silent print is only active when requested, printer is thermal, and NOT a virtual PDF/OneNote printer!
+      // If user has no physical thermal printer or target is PDF, system print dialog opens automatically!
+      const shouldUseSilent = Boolean(silent) && isThermal && !isVirtual;
 
       const is58 = paperWidth === '58mm';
       const bodyWidth = is58 ? '48mm' : '72mm';
@@ -354,14 +409,15 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       background: #ffffff !important;
       color: #000000 !important;
       font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
-      font-size: 12px !important;
+      font-size: 11px !important;
       direction: rtl !important;
       text-align: right !important;
       overflow: visible !important;
       height: auto !important;
     }
     .thermal-receipt-wrapper {
-      width: ${wrapperWidth} !important;
+      width: 100% !important;
+      max-width: ${wrapperWidth} !important;
       margin: 0 auto !important;
       padding: 4px 2px 25mm 2px !important;
       box-sizing: border-box !important;
@@ -407,15 +463,12 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       tempPath = path.join(app.getPath('temp'), `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.html`);
       fs.writeFileSync(tempPath, standaloneHtml, 'utf8');
 
+      // Crucial Fix: Standard hidden window WITHOUT negative coordinates (-9999).
+      // Negative coordinates suspend Chromium GPU compositor rendering!
       printWin = new BrowserWindow({
-        show: true,
-        x: -9999,
-        y: -9999,
-        width: 350,
-        height: 800,
-        frame: false,
-        skipTaskbar: true,
-        focusable: false,
+        show: false,
+        width: 400,
+        height: 900,
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
@@ -424,18 +477,19 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       });
 
       await printWin.loadFile(tempPath);
-      await new Promise(r => setTimeout(r, 200));
 
-      const printOpts = {
-        silent: Boolean(silent),
-        printBackground: true,
-        margins: { marginType: 'none' }
-      };
-      if (targetPrinter) {
-        printOpts.deviceName = targetPrinter;
-      }
-
-      console.log('🖨️ Dispatching thermal print job to:', targetPrinter || 'Default Printer', 'silent:', silent);
+      // Wait for complete DOM rendering and layout paint
+      await printWin.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          if (document.readyState === 'complete') {
+            requestAnimationFrame(() => setTimeout(resolve, 60));
+          } else {
+            window.addEventListener('load', () => {
+              requestAnimationFrame(() => setTimeout(resolve, 60));
+            });
+          }
+        });
+      `);
 
       const doPrint = (opts) => {
         return new Promise((res) => {
@@ -445,13 +499,34 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
         });
       };
 
-      let result = await doPrint(printOpts);
+      const primaryOpts = {
+        silent: shouldUseSilent,
+        printBackground: true,
+        margins: { marginType: 'none' }
+      };
+      if (targetPrinter) {
+        primaryOpts.deviceName = targetPrinter;
+      }
 
-      // Fallback: If printing to named printer failed, retry on system default printer
-      if (!result.success && targetPrinter) {
-        console.warn('⚠️ Named printer failed, retrying on system default printer...', result.failureReason);
+      console.log('🖨️ Dispatching thermal print job to:', targetPrinter || 'Default Printer', 'silent:', shouldUseSilent);
+      let result = await doPrint(primaryOpts);
+
+      // Fallback 1: If silent printing failed (e.g. printer error, missing driver dialog), retry with system print dialog
+      if (!result.success && shouldUseSilent) {
+        console.warn('⚠️ Silent print failed, opening system print dialog as fallback...', result.failureReason);
         result = await doPrint({
-          silent: Boolean(silent),
+          silent: false,
+          printBackground: true,
+          deviceName: targetPrinter || undefined,
+          margins: { marginType: 'none' }
+        });
+      }
+
+      // Fallback 2: If targetPrinter device failed, retry on system default printer with dialog
+      if (!result.success && targetPrinter) {
+        console.warn('⚠️ Named printer failed, opening system print dialog on default printer...');
+        result = await doPrint({
+          silent: false,
           printBackground: true,
           margins: { marginType: 'none' }
         });
@@ -482,12 +557,37 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
   });
 }
 
-// Handler for regular sales & reprint receipts
+// -------------------------------------------------------------
+// POS Hardware: Thermal Receipt & Z-Report IPC Handlers
+// -------------------------------------------------------------
+ipcMain.on('print-receipt', async (event, receiptData) => {
+  console.log('🖨️ Received print-receipt event for invoice:', receiptData?.sale_id || receiptData?.id);
+  const html = formatInvoiceReceiptHtml(receiptData);
+  const result = await printHtmlReceipt({ htmlContent: html, paperWidth: '80mm', silent: true });
+  event.reply('print-receipt-reply', result);
+});
+
+ipcMain.handle('print-receipt', async (event, receiptData) => {
+  const html = formatInvoiceReceiptHtml(receiptData);
+  return await printHtmlReceipt({ htmlContent: html, paperWidth: '80mm', silent: true });
+});
+
+ipcMain.on('print-z-report', async (event, zData) => {
+  console.log('📊 Received print-z-report event for shift:', zData?.shift_id || zData?.id);
+  const html = formatZReportHtml(zData);
+  const result = await printHtmlReceipt({ htmlContent: html, paperWidth: '80mm', silent: true });
+  event.reply('print-z-report-reply', result);
+});
+
+ipcMain.handle('print-z-report', async (event, zData) => {
+  const html = formatZReportHtml(zData);
+  return await printHtmlReceipt({ htmlContent: html, paperWidth: '80mm', silent: true });
+});
+
 ipcMain.handle('print-thermal-receipt', async (event, options = {}) => {
   return await printHtmlReceipt(options);
 });
 
-// Handler for hardware test receipt in Settings
 ipcMain.handle('print-test-receipt', async (event, { printerName, storeName, paperWidth, silent = true }) => {
   console.log('🖨️ Handling test receipt request for printer:', printerName || 'Default');
   const testHtml = `
