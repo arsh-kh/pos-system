@@ -1,6 +1,8 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
+let pdfToPrinter = null;
+try { pdfToPrinter = require('pdf-to-printer'); } catch (err) { console.warn('pdf-to-printer load error:', err.message); }
 const http = require('http');
 const { spawn } = require('child_process');
 
@@ -331,6 +333,7 @@ const formatZReportHtml = (zData) => {
 async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', silent = true }) {
   let printWin = null;
   let tempPath = null;
+  let tempPdfPath = null;
   return new Promise(async (resolve) => {
     try {
       if (!mainWindow || !mainWindow.webContents) {
@@ -380,7 +383,6 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
 
       const isVirtual = isVirtualName(targetPrinter);
       // Silent print is only active when requested, printer is thermal, and NOT a virtual PDF/OneNote printer!
-      // If user has no physical thermal printer or target is PDF, system print dialog opens automatically!
       const shouldUseSilent = Boolean(silent) && isThermal && !isVirtual;
 
       const is58 = paperWidth === '58mm';
@@ -463,8 +465,6 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       tempPath = path.join(app.getPath('temp'), `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.html`);
       fs.writeFileSync(tempPath, standaloneHtml, 'utf8');
 
-      // Crucial Fix: Standard hidden window WITHOUT negative coordinates (-9999).
-      // Negative coordinates suspend Chromium GPU compositor rendering!
       printWin = new BrowserWindow({
         show: false,
         width: 400,
@@ -491,6 +491,52 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
         });
       `);
 
+      // -------------------------------------------------------------
+      // High-Reliability Native Printing Engine:
+      // If silent thermal print is requested, render vector PDF & spool via pdf-to-printer (SumatraPDF)
+      // This bypasses Chromium headless silent print driver dropouts on Windows 11!
+      // -------------------------------------------------------------
+      if (shouldUseSilent && pdfToPrinter) {
+        try {
+          const heightPx = await printWin.webContents.executeJavaScript(`
+            Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 260)
+          `);
+          const widthInches = is58 ? 1.89 : 2.83; // 48mm or 72mm in inches
+          const heightInches = Math.max(3.2, (heightPx / 96) + 0.3);
+
+          const pdfBuffer = await printWin.webContents.printToPDF({
+            printBackground: true,
+            pageSize: {
+              width: widthInches,
+              height: heightInches
+            },
+            margins: { marginType: 'none' }
+          });
+
+          tempPdfPath = path.join(app.getPath('temp'), `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.pdf`);
+          fs.writeFileSync(tempPdfPath, pdfBuffer);
+
+          console.log('🖨️ Dispatching 100% silent print via pdf-to-printer to:', targetPrinter || 'Default');
+          await pdfToPrinter.print(tempPdfPath, {
+            printer: targetPrinter || undefined,
+            silent: true,
+            scale: 'fit'
+          });
+
+          try { fs.unlinkSync(tempPdfPath); } catch (_) {}
+          try { fs.unlinkSync(tempPath); } catch (_) {}
+          if (printWin && !printWin.isDestroyed()) printWin.destroy();
+
+          console.log('✅ Silent thermal print completed successfully to:', targetPrinter);
+          return resolve({ success: true });
+        } catch (pdfErr) {
+          console.warn('⚠️ pdf-to-printer failed, falling back to standard print dialog...', pdfErr);
+        }
+      }
+
+      // -------------------------------------------------------------
+      // Standard / Fallback Print Pipeline:
+      // -------------------------------------------------------------
       const doPrint = (opts) => {
         return new Promise((res) => {
           printWin.webContents.print(opts, (success, failureReason) => {
@@ -500,7 +546,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       };
 
       const primaryOpts = {
-        silent: shouldUseSilent,
+        silent: false, // If we reached here, open system dialog for user
         printBackground: true,
         margins: { marginType: 'none' }
       };
@@ -508,33 +554,12 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
         primaryOpts.deviceName = targetPrinter;
       }
 
-      console.log('🖨️ Dispatching thermal print job to:', targetPrinter || 'Default Printer', 'silent:', shouldUseSilent);
+      console.log('🖨️ Opening print dialog for printer:', targetPrinter || 'Default Printer');
       let result = await doPrint(primaryOpts);
 
-      // Fallback 1: If silent printing failed (e.g. printer error, missing driver dialog), retry with system print dialog
-      if (!result.success && shouldUseSilent) {
-        console.warn('⚠️ Silent print failed, opening system print dialog as fallback...', result.failureReason);
-        result = await doPrint({
-          silent: false,
-          printBackground: true,
-          deviceName: targetPrinter || undefined,
-          margins: { marginType: 'none' }
-        });
-      }
+      try { if (tempPath) fs.unlinkSync(tempPath); } catch (_) {}
+      try { if (tempPdfPath) fs.unlinkSync(tempPdfPath); } catch (_) {}
 
-      // Fallback 2: If targetPrinter device failed, retry on system default printer with dialog
-      if (!result.success && targetPrinter) {
-        console.warn('⚠️ Named printer failed, opening system print dialog on default printer...');
-        result = await doPrint({
-          silent: false,
-          printBackground: true,
-          margins: { marginType: 'none' }
-        });
-      }
-
-      try { fs.unlinkSync(tempPath); } catch (_) {}
-
-      // Keep print window alive briefly so Windows spooler completes reading EMF data
       setTimeout(() => {
         try {
           if (printWin && !printWin.isDestroyed()) printWin.destroy();
@@ -542,14 +567,15 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       }, 3000);
 
       if (result.success) {
-        console.log('✅ Thermal receipt printed successfully to:', targetPrinter || 'Default Printer');
+        console.log('✅ Receipt printed successfully via dialog:', targetPrinter || 'Default Printer');
         resolve({ success: true });
       } else {
-        console.warn('⚠️ Thermal print failed:', result.failureReason);
+        console.warn('⚠️ Print dialog returned non-success:', result.failureReason);
         resolve({ success: false, error: result.failureReason || 'چاپ نەکرا' });
       }
     } catch (err) {
       if (tempPath) { try { fs.unlinkSync(tempPath); } catch (_) {} }
+      if (tempPdfPath) { try { fs.unlinkSync(tempPdfPath); } catch (_) {} }
       if (printWin && !printWin.isDestroyed()) { try { printWin.destroy(); } catch (_) {} }
       console.error('Thermal print fatal error:', err);
       resolve({ success: false, error: err.message });
