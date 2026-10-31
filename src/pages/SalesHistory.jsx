@@ -122,7 +122,7 @@ const SalesHistory = () => {
         @media print {
           @page {
             size: 80mm auto;
-            margin: 0;
+            margin: 0 !important;
           }
           html, body {
             margin: 0 !important;
@@ -137,21 +137,28 @@ const SalesHistory = () => {
             display: block !important;
             visibility: visible !important;
             position: static !important;
-            width: 64mm !important;
-            max-width: 64mm !important;
+            width: 100% !important;
+            max-width: 76mm !important;
             margin: 0 auto !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: white !important;
             color: black !important;
-            padding: 4px 2mm 30px 2mm !important;
+            padding: 0 2mm 30px 2mm !important;
             font-family: 'Segoe UI', Tahoma, 'Noto Kufi Arabic', sans-serif !important;
-            font-size: 11px !important;
+            font-size: 12px !important;
             direction: rtl !important;
             text-align: right !important;
           }
           #reprint-thermal-receipt * {
             visibility: visible !important;
+            box-sizing: border-box !important;
+          }
+          #reprint-thermal-receipt table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
             box-sizing: border-box !important;
           }
           #reprint-thermal-receipt table,
@@ -161,9 +168,11 @@ const SalesHistory = () => {
             font-weight: bold !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            box-sizing: border-box !important;
           }
           .receipt-divider {
-            border-bottom: 1px dashed #000 !important;
+            width: 100% !important;
+            border-bottom: 1px dashed #000000 !important;
             margin: 6px 0 !important;
           }
         }
@@ -345,7 +354,11 @@ const SalesHistory = () => {
               <div style={{ flex: 1.2, minWidth: '180px', padding: '1rem', background: selectedSale.payment_method === 'DEBT' ? 'rgba(239,68,68,0.08)' : (selectedSale.payment_method === 'SPLIT' ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)'), borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>شێوازی پارەدان</div>
                 <div style={{ fontSize: '0.95rem', fontWeight: 'bold', marginTop: '4px', color: selectedSale.payment_method === 'DEBT' ? '#ef4444' : (selectedSale.payment_method === 'SPLIT' ? '#d97706' : '#059669') }}>
-                  {selectedSale.payment_method === 'DEBT' ? 'قەرز (تەواو)' : (selectedSale.payment_method === 'SPLIT' ? `تێکەڵ (نەقد: ${Number(selectedSale.paid_amount || 0).toLocaleString()} | قەرز: ${Number(selectedSale.debt_amount || 0).toLocaleString()} د.ع)` : 'نەقد')}
+                  {selectedSale.payment_method === 'DEBT' 
+                    ? 'قەرز (تەواو)' 
+                    : (selectedSale.payment_method === 'SPLIT' 
+                        ? 'تێکەڵ (نەقد: ' + Number(selectedSale.paid_amount || 0).toLocaleString() + ' | قەرز: ' + Number(selectedSale.debt_amount || 0).toLocaleString() + ' د.ع)' 
+                        : 'نەقد')}
                 </div>
               </div>
             </div>
@@ -384,7 +397,7 @@ const SalesHistory = () => {
                                   gap: '4px'
                                 }}
                               >
-                                📦 {b.batch_number || `وەجبەی #${b.batch_id}`}: <b>{Number(b.quantity_deducted)} دانە</b> بە تێچوونی <b>{Number(b.unit_cost_price).toLocaleString()} د.ع</b>
+                                📦 {b.batch_number || ('وەجبەی #' + b.batch_id)}: <b>{Number(b.quantity_deducted)} دانە</b> بە تێچوونی <b>{Number(b.unit_cost_price).toLocaleString()} د.ع</b>
                               </span>
                             ))}
                           </div>
@@ -426,29 +439,29 @@ const SalesHistory = () => {
       {reprintReceipt && (
         <div id="reprint-thermal-receipt" style={{
           width: '100%',
-          maxWidth: '64mm',
+          maxWidth: '76mm',
           margin: '0 auto',
-          padding: '0 2px',
+          padding: '0 2mm',
           boxSizing: 'border-box',
           overflow: 'hidden',
           direction: 'rtl',
           textAlign: 'right'
         }}>
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '17px' }}>مارکێتی شارەکەم</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>مارکێتی شارەکەم</div>
 
           {/* Unique Barcode directly below store name */}
-          <div style={{ textAlign: 'center', margin: '4px 0 6px 0' }}>
-            <BarcodeSVG value={`shrm/2026/${String(reprintReceipt.id).padStart(4, '0')}`} maxWidth="56mm" barHeight={48} />
+          <div style={{ textAlign: 'center', margin: '4px 0 6px 0', width: '100%' }}>
+            <BarcodeSVG value={'shrm/2026/' + String(reprintReceipt.id).padStart(4, '0')} maxWidth="72mm" barHeight={52} />
           </div>
 
-          <div className="receipt-divider"></div>
+          <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#000000', fontWeight: 'bold', padding: '0 2px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#000000', fontWeight: 'bold', padding: '0 2px', width: '100%' }}>
             <span>بەروار و کات:</span>
             <span>{formatDateTime(reprintReceipt.created_at, { twelveHour: true })}</span>
           </div>
 
-          <div className="receipt-divider"></div>
+          <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
 
           {/* 5-Column Grid Table matching Cashier screen (#، کاڵا، دانە، نرخ، کۆ) with vertical borders */}
           <table style={{ 
@@ -458,7 +471,7 @@ const SalesHistory = () => {
             borderCollapse: 'collapse', 
             border: '1px solid #000000', 
             direction: 'rtl',
-            fontSize: '10px',
+            fontSize: '11px',
             margin: '5px 0',
             boxSizing: 'border-box',
             overflow: 'hidden',
@@ -466,11 +479,11 @@ const SalesHistory = () => {
           }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #000000', background: '#f5f5f5', color: '#000000' }}>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '18px', color: '#000000', fontWeight: 'bold' }}>#</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '24px', color: '#000000', fontWeight: 'bold' }}>#</th>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold' }}>کاڵا</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '35px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '42px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '44px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '46px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '54px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '58px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
               </tr>
             </thead>
             <tbody>
@@ -479,52 +492,48 @@ const SalesHistory = () => {
                 const cleanQty = Number.isInteger(qtyVal) ? qtyVal : parseFloat(qtyVal.toFixed(3));
                 const isGramOrWeight = it.unit === 'گم' || it.unit === 'کگم' || it.unit === 'گرام' || it.unit === 'کیلۆ' || it.unit_type === 'WEIGHT' || String(it.unit || '').includes('گم') || String(it.unit || '').includes('کێش');
                 const isBox = it.unit_type === 'BOX' || it.unit === 'کارتۆن';
-                const displayQty = isGramOrWeight ? `${cleanQty} گم` : (isBox ? `${cleanQty} کارتۆن` : cleanQty);
+                const displayQty = isGramOrWeight ? (cleanQty + ' گم') : (isBox ? (cleanQty + ' کارتۆن') : cleanQty);
                 const itemPrice = Number(it.price_at_sale || it.price || 0);
                 const itemTotal = itemPrice * Number(it.quantity || 1);
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #000000', color: '#000000' }}>
-                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold' }}>{idx + 1}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold' }}>{idx + 1}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold', overflow: 'hidden', wordBreak: 'break-word' }}>{it.product_name || it.name}</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{displayQty}</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{itemPrice.toLocaleString()}</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{itemTotal.toLocaleString()}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{displayQty}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{itemPrice.toLocaleString()}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{itemTotal.toLocaleString()}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
 
-          <div className="receipt-divider"></div>
+          <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
 
           {Number(reprintReceipt.discount || 0) > 0 && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '0 2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '0 2px', width: '100%' }}>
                 <span>کۆی سەرەتایی:</span>
                 <span>{(Number(reprintReceipt.total_amount) + Number(reprintReceipt.discount)).toLocaleString()} دینار</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '0 2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '0 2px', width: '100%' }}>
                 <span>داشکاندن:</span>
                 <span>-{Number(reprintReceipt.discount).toLocaleString()} دینار</span>
               </div>
-              <div className="receipt-divider"></div>
+              <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
             </>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', padding: '0 2px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold', padding: '0 2px', width: '100%' }}>
             <span>کۆی گشتی:</span>
             <span>{Number(reprintReceipt.total_amount).toLocaleString()} دینار</span>
           </div>
 
-          {/* Payment method omitted per user requirement */}
-
-          <div className="receipt-divider"></div>
-          <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '6px' }}>بەخێربێن بۆ مارکێتی شارەکەم</div>
+          <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
+          <div style={{ textAlign: 'center', fontSize: '11.5px', marginTop: '6px', width: '100%' }}>بەخێربێن بۆ مارکێتی شارەکەم</div>
         </div>
       )}
-
     </div>
   );
 };
-
 export default SalesHistory;
