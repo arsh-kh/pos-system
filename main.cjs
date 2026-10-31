@@ -377,8 +377,8 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       const shouldUseSilent = Boolean(silent) && isThermal && !isVirtual;
 
       const is58 = paperWidth === '58mm';
-      const bodyWidth = is58 ? '48mm' : '72mm';
-      const wrapperWidth = is58 ? '46mm' : '64mm';
+      const bodyWidth = is58 ? '48mm' : '71mm';
+      const wrapperWidth = is58 ? '46mm' : '71mm';
 
       const standaloneHtml = `<!DOCTYPE html>
 <html dir="rtl" lang="ckb">
@@ -410,11 +410,10 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
     }
     .thermal-receipt-wrapper {
       width: 100% !important;
-      width: 64mm !important;
-      max-width: 64mm !important;
-      margin-right: 5mm !important;
-      margin-left: auto !important;
-      padding: 2px 4mm 25mm 2mm !important;
+      width: 100% !important;
+      max-width: ${wrapperWidth} !important;
+      margin: 0 auto !important;
+      padding: 2px 2mm 25mm 2mm !important;
       box-sizing: border-box !important;
       overflow: hidden !important;
       color: #000000 !important;
@@ -499,7 +498,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
           const heightPx = await printWin.webContents.executeJavaScript(`
             Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 260)
           `);
-          const widthInches = is58 ? 1.89 : 2.835; // 48mm or 76mm in inches
+          const widthInches = is58 ? 1.89 : 2.795; // 48mm or 76mm in inches
           const heightInches = Math.max(3.2, (heightPx / 96) + 0.3);
 
           const pdfBuffer = await printWin.webContents.printToPDF({
