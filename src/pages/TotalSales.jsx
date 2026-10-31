@@ -826,6 +826,7 @@ const TotalSales = () => {
                   </label>
                   <input 
                     type="date"
+                    lang="en-GB"
                     required
                     value={manualForm.date}
                     onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}

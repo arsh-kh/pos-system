@@ -625,6 +625,7 @@ const Promotions = () => {
                   <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>بەرواری دەستپێک *</label>
                   <input 
                     type="date" 
+                    lang="en-GB"
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                     required
@@ -635,6 +636,7 @@ const Promotions = () => {
                   <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>بەرواری کۆتایی *</label>
                   <input 
                     type="date" 
+                    lang="en-GB"
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     required

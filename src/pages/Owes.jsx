@@ -214,7 +214,7 @@ const Owes = () => {
       amountPaid: paidAmount !== null ? paidAmount : 0,
       remainingDebt: Number(customer.total_debt || 0),
       isStatement: paidAmount === null,
-      date: new Date().toLocaleString('en-US', { hour12: true })
+      date: formatDateTime(new Date(), { twelveHour: true })
     });
     setTimeout(() => {
       window.print();

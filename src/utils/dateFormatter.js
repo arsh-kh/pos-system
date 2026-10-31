@@ -27,6 +27,13 @@ export function formatDate(input) {
       return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
     }
 
+    // Check if already matching DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmyMatch) {
+      const [, d, m, y] = dmyMatch;
+      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+
     const d = new Date(input);
     if (isNaN(d.getTime())) return str;
     const day = String(d.getDate()).padStart(2, '0');
@@ -127,10 +134,20 @@ export function formatRelativeDate(input) {
   }
 }
 
+export function getLocalDateString(d = new Date()) {
+  const dateObj = d instanceof Date ? d : new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default {
   formatDate,
   formatDateTime,
   formatTime,
   formatCurrency,
-  formatRelativeDate
+  formatRelativeDate,
+  getLocalDateString
 };

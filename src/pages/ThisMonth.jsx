@@ -219,6 +219,7 @@ const ThisMonth = () => {
             <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)' }}>لە بەروار:</span>
             <input
               type="date"
+              lang="en-GB"
               value={customStartDate}
               onChange={(e) => setCustomStartDate(e.target.value)}
               style={{
@@ -239,6 +240,7 @@ const ThisMonth = () => {
             <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)' }}>تا بەروار:</span>
             <input
               type="date"
+              lang="en-GB"
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
               style={{

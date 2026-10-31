@@ -240,6 +240,7 @@ const AuditLogs = () => {
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>لە:</span>
           <input
             type="date"
+            lang="en-GB"
             value={startDate}
             onChange={(e) => handleCustomDateChange(e.target.value, undefined)}
             style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
@@ -247,6 +248,7 @@ const AuditLogs = () => {
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>تا:</span>
           <input
             type="date"
+            lang="en-GB"
             value={endDate}
             onChange={(e) => handleCustomDateChange(undefined, e.target.value)}
             style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem' }}

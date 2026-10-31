@@ -8,6 +8,8 @@ const { spawn } = require('child_process');
 
 // Enterprise POS: Completely suppress all print dialogs and print directly to thermal printer
 app.commandLine.appendSwitch('kiosk-printing');
+// Enforce DD/MM/YYYY date inputs and calendar format system-wide
+app.commandLine.appendSwitch('lang', 'en-GB');
 
 // Enforce single-instance lock to prevent port collisions and database locks
 const gotTheLock = app.requestSingleInstanceLock();

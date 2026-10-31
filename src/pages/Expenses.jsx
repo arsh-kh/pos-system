@@ -351,6 +351,7 @@ const Expenses = () => {
                   <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>بەروار</label>
                   <input 
                     type="date" 
+                    lang="en-GB"
                     value={formData.expense_date} 
                     onChange={e => setFormData({ ...formData, expense_date: e.target.value })} 
                     style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} 

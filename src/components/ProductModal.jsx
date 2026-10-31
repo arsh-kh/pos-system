@@ -789,6 +789,7 @@ const ProductModal = ({
                 </label>
                 <input 
                   type="date" 
+                  lang="en-GB"
                   className="clean-date-input"
                   value={formData.expiry_date} 
                   onClick={(e) => { try { e.target.showPicker?.(); } catch(_) {} }}

@@ -800,6 +800,7 @@ const Purchases = () => {
         <div style={{ width: '140px' }}>
           <input 
             type="date" 
+            lang="en-GB"
             value={invoiceDate} 
             onChange={(e) => setInvoiceDate(e.target.value)}
             style={{

@@ -5,6 +5,7 @@ import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { useAuth } from '../context/AuthContext';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
+import { formatDate } from '../utils/dateFormatter';
 import BarcodeSVG from '../components/BarcodeSVG';
 import ProductModal from '../components/ProductModal';
 import './Dashboard.css';
@@ -514,7 +515,7 @@ const Products = () => {
                           fontWeight: 600, 
                           color: isExpired ? '#ef4444' : isNearExpiry ? '#f59e0b' : 'var(--text-secondary)' 
                         }}>
-                          {String(p.expiry_date).split('T')[0]}
+                          {formatDate(p.expiry_date)}
                         </span>
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>-</span>
@@ -959,7 +960,7 @@ const Products = () => {
                                 {batch.supplier_name || 'کڕینی ناوخۆیی'}
                               </td>
                               <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#64748b' }}>
-                                {new Date(batch.created_at).toLocaleDateString('en-GB')}
+                                {formatDate(batch.created_at)}
                               </td>
                               <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>
                                 {canViewCost ? `${Number(batch.cost_price).toLocaleString()} د.ع` : '••••••'}
