@@ -1531,10 +1531,11 @@ const Cashier = () => {
             display: block !important;
             visibility: visible !important;
             position: static !important;
-            width: 66mm !important;
-            max-width: 66mm !important;
-            margin: 0 auto !important;
-            padding: 2px 4mm 25mm 3mm !important;
+            width: 64mm !important;
+            max-width: 64mm !important;
+            margin-right: 5mm !important;
+            margin-left: auto !important;
+            padding: 2px 4mm 25mm 2mm !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #ffffff !important;
@@ -3044,10 +3045,11 @@ const Cashier = () => {
             {/* Hidden Thermal Receipt Container (Targeted by @media print) */}
       {printedReceipt && (
         <div id="cashier-thermal-receipt" style={{
-          width: '66mm',
-          maxWidth: '66mm',
-          margin: '0 auto',
-          padding: '0 4mm 0 3mm',
+          width: '64mm',
+          maxWidth: '64mm',
+          marginRight: '5mm',
+          marginLeft: 'auto',
+          padding: '0 4mm 0 2mm',
           boxSizing: 'border-box',
           overflow: 'hidden',
           direction: 'rtl',
@@ -3057,7 +3059,7 @@ const Cashier = () => {
 
           {/* Unique Barcode directly below store name */}
           <div style={{ textAlign: 'center', margin: '4px 0 6px 0', width: '100%' }}>
-            <BarcodeSVG value={'shrm/2026/' + String(printedReceipt.saleId).padStart(4, '0')} maxWidth="58mm" barHeight={52} />
+            <BarcodeSVG value={'shrm/2026/' + String(printedReceipt.saleId).padStart(4, '0')} maxWidth="56mm" barHeight={52} />
           </div>
 
           <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
@@ -3085,11 +3087,11 @@ const Cashier = () => {
           }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #000000', background: '#f5f5f5', color: '#000000' }}>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '20px', color: '#000000', fontWeight: 'bold' }}>#</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '18px', color: '#000000', fontWeight: 'bold' }}>#</th>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold' }}>کاڵا</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '38px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '46px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '48px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '36px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '44px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '46px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
               </tr>
             </thead>
             <tbody>
