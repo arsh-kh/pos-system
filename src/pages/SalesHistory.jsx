@@ -137,8 +137,8 @@ const SalesHistory = () => {
             display: block !important;
             visibility: visible !important;
             position: static !important;
-            width: 100% !important;
-            max-width: 76mm !important;
+            width: 72mm !important;
+            max-width: 72mm !important;
             margin: 0 auto !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
@@ -438,8 +438,8 @@ const SalesHistory = () => {
       {/* Hidden Thermal Reprint Receipt Container (Targeted by @media print) */}
       {reprintReceipt && (
         <div id="reprint-thermal-receipt" style={{
-          width: '100%',
-          maxWidth: '76mm',
+          width: '72mm',
+          maxWidth: '72mm',
           margin: '0 auto',
           padding: '0 2mm',
           boxSizing: 'border-box',
@@ -451,7 +451,7 @@ const SalesHistory = () => {
 
           {/* Unique Barcode directly below store name */}
           <div style={{ textAlign: 'center', margin: '4px 0 6px 0', width: '100%' }}>
-            <BarcodeSVG value={'shrm/2026/' + String(reprintReceipt.id).padStart(4, '0')} maxWidth="72mm" barHeight={52} />
+            <BarcodeSVG value={'shrm/2026/' + String(reprintReceipt.id).padStart(4, '0')} maxWidth="68mm" barHeight={52} />
           </div>
 
           <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
@@ -479,11 +479,11 @@ const SalesHistory = () => {
           }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #000000', background: '#f5f5f5', color: '#000000' }}>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '24px', color: '#000000', fontWeight: 'bold' }}>#</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '22px', color: '#000000', fontWeight: 'bold' }}>#</th>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold' }}>کاڵا</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '46px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '54px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '58px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '42px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '50px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '54px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
               </tr>
             </thead>
             <tbody>
