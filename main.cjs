@@ -220,13 +220,6 @@ const formatInvoiceReceiptHtml = (receiptData) => {
     });
   }
 
-  let paymentMethodHtml = 'نەقد (کاش)';
-  if (receiptData.isSplit || receiptData.payment_method === 'SPLIT') {
-    paymentMethodHtml = `نەقد: ${Number(receiptData.paidAmount || 0).toLocaleString()} | قەرز: ${Number(receiptData.debtAmount || 0).toLocaleString()} (${receiptData.customerName || 'کڕیار'})`;
-  } else if (receiptData.isDebt || receiptData.payment_method === 'DEBT') {
-    paymentMethodHtml = `قەرز (${receiptData.customerName || 'کڕیار'})`;
-  }
-
   return `
     <div style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 2px;">مارکێتی شارەکەم</div>
     <div style="text-align: center; font-size: 12px; font-weight: bold; margin-bottom: 4px;">پسووڵەی فرۆشتن #${invoiceNum}</div>
@@ -254,10 +247,6 @@ const formatInvoiceReceiptHtml = (receiptData) => {
     <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; margin: 4px 0;">
       <span>کۆی گشتی:</span>
       <span>${totalIQD} دینار</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 2px 0;">
-      <span>شێوازی پارەدان:</span>
-      <span>${paymentMethodHtml}</span>
     </div>
     <div class="receipt-divider"></div>
     <div style="text-align: center; font-size: 11px; font-weight: bold; margin-top: 4px;">سوپاس بۆ سەردانەکەتان!</div>
@@ -387,7 +376,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
 
       const is58 = paperWidth === '58mm';
       const bodyWidth = is58 ? '48mm' : '72mm';
-      const wrapperWidth = is58 ? '46mm' : '70mm';
+      const wrapperWidth = is58 ? '44mm' : '64mm';
 
       const standaloneHtml = `<!DOCTYPE html>
 <html dir="rtl" lang="ckb">
@@ -399,7 +388,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       margin: 0;
     }
     * {
-      box-sizing: border-box;
+      box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -414,15 +403,16 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       font-size: 11px !important;
       direction: rtl !important;
       text-align: right !important;
-      overflow: visible !important;
+      overflow: hidden !important;
       height: auto !important;
     }
     .thermal-receipt-wrapper {
       width: 100% !important;
       max-width: ${wrapperWidth} !important;
       margin: 0 auto !important;
-      padding: 4px 2px 25mm 2px !important;
+      padding: 4px 2mm 25mm 2mm !important;
       box-sizing: border-box !important;
+      overflow: hidden !important;
       color: #000000 !important;
       background: #ffffff !important;
     }
@@ -433,6 +423,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
     }
     table {
       width: 100% !important;
+      max-width: 100% !important;
       table-layout: fixed !important;
       border-collapse: collapse !important;
       border: 1px solid #000000 !important;
@@ -440,12 +431,15 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       margin: 5px 0 !important;
       color: #000000 !important;
       page-break-inside: avoid !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
     }
     th, td {
       border: 1px solid #000000 !important;
       color: #000000 !important;
       font-weight: bold !important;
       padding: 3px 2px !important;
+      box-sizing: border-box !important;
     }
     svg {
       display: block !important;
@@ -520,7 +514,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
           await pdfToPrinter.print(tempPdfPath, {
             printer: targetPrinter || undefined,
             silent: true,
-            scale: 'fit'
+            scale: 'noscale'
           });
 
           try { fs.unlinkSync(tempPdfPath); } catch (_) {}

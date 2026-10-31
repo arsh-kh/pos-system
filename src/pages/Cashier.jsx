@@ -1531,15 +1531,16 @@ const Cashier = () => {
             display: block !important;
             visibility: visible !important;
             position: static !important;
-            width: 72mm !important;
-            max-width: 72mm !important;
+            width: 64mm !important;
+            max-width: 64mm !important;
             margin: 0 auto !important;
-            padding: 6px 4px 60px 4px !important;
+            padding: 4px 2mm 30px 2mm !important;
             box-sizing: border-box !important;
+            overflow: hidden !important;
             background: #ffffff !important;
             color: #000000 !important;
             font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
-            font-size: 12px !important;
+            font-size: 11px !important;
             direction: rtl !important;
             text-align: right !important;
             page-break-after: avoid !important;
@@ -3041,17 +3042,26 @@ const Cashier = () => {
       </div>
       {/* Hidden Thermal Receipt Container (Targeted by @media print) */}
       {printedReceipt && (
-        <div id="cashier-thermal-receipt">
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>مارکێتی شارەکەم</div>
+        <div id="cashier-thermal-receipt" style={{
+          width: '100%',
+          maxWidth: '64mm',
+          margin: '0 auto',
+          padding: '0 2px',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          direction: 'rtl',
+          textAlign: 'right'
+        }}>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '17px' }}>مارکێتی شارەکەم</div>
 
           {/* Unique Barcode directly below store name */}
           <div style={{ textAlign: 'center', margin: '4px 0 6px 0' }}>
-            <BarcodeSVG value={`shrm/2026/${String(printedReceipt.saleId).padStart(4, '0')}`} maxWidth="62mm" barHeight={52} />
+            <BarcodeSVG value={`shrm/2026/${String(printedReceipt.saleId).padStart(4, '0')}`} maxWidth="56mm" barHeight={48} />
           </div>
 
           <div className="receipt-divider"></div>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#000000', fontWeight: 'bold' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#000000', fontWeight: 'bold', padding: '0 2px' }}>
             <span>بەروار و کات:</span>
             <span>{printedReceipt.date}</span>
           </div>
@@ -3061,22 +3071,24 @@ const Cashier = () => {
           {/* 5-Column Grid Table matching Cashier screen (#، کاڵا، دانە، نرخ، کۆ) with vertical borders */}
           <table style={{ 
             width: '100%', 
+            maxWidth: '100%',
             tableLayout: 'fixed',
             borderCollapse: 'collapse', 
             border: '1px solid #000000', 
             direction: 'rtl',
-            fontSize: '10.5px',
+            fontSize: '10px',
             margin: '5px 0',
             boxSizing: 'border-box',
+            overflow: 'hidden',
             color: '#000000'
           }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #000000', background: '#f5f5f5', color: '#000000' }}>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '20px', color: '#000000', fontWeight: 'bold' }}>#</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 3px', textAlign: 'right', color: '#000000', fontWeight: 'bold' }}>کاڵا</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '38px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '44px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '48px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '18px', color: '#000000', fontWeight: 'bold' }}>#</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold' }}>کاڵا</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '35px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '42px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', width: '44px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
               </tr>
             </thead>
             <tbody>
@@ -3089,7 +3101,7 @@ const Cashier = () => {
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #000000', color: '#000000' }}>
                     <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold' }}>{idx + 1}</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 3px', textAlign: 'right', color: '#000000', fontWeight: 'bold', overflow: 'hidden', wordBreak: 'break-word' }}>{it.name}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold', overflow: 'hidden', wordBreak: 'break-word' }}>{it.name}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{displayQty}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{Number(it.price).toLocaleString()}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 1px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{Number(it.total).toLocaleString()}</td>
@@ -3102,7 +3114,7 @@ const Cashier = () => {
           <div className="receipt-divider"></div>
 
           {printedReceipt.promotionalSavings > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#d97706', fontWeight: 'bold' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#d97706', fontWeight: 'bold', padding: '0 2px' }}>
               <span>پاشەکەوتی ئۆفەرەکان:</span>
               <span>-{printedReceipt.promotionalSavings.toLocaleString()} دینار</span>
             </div>
@@ -3110,11 +3122,11 @@ const Cashier = () => {
 
           {printedReceipt.discount > 0 && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '0 2px' }}>
                 <span>کۆی سەرەتایی:</span>
                 <span>{printedReceipt.subtotal.toLocaleString()} دینار</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#333' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#333', padding: '0 2px' }}>
                 <span>داشکاندنی وەسڵ:</span>
                 <span>-{printedReceipt.discount.toLocaleString()} دینار</span>
               </div>
@@ -3122,40 +3134,20 @@ const Cashier = () => {
             </>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold', padding: '0 2px' }}>
             <span>کۆی گشتی:</span>
             <span>{printedReceipt.total.toLocaleString()} دینار</span>
           </div>
 
-          {printedReceipt.isSplit ? (
-            <div style={{ margin: '4px 0', padding: '4px 0', borderTop: '1px dashed #000' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
-                <span>شێوازی پارەدان:</span>
-                <span>فرە-جۆر (تێکەڵ)</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span>دراو بە نەقد:</span>
-                <span>{Number(printedReceipt.paidAmount || 0).toLocaleString()} دینار</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
-                <span>ماوە بە قەرز:</span>
-                <span>{Number(printedReceipt.debtAmount || 0).toLocaleString()} دینار</span>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '2px' }}>
-              <span>شێوازی پارەدان:</span>
-              <span>{printedReceipt.isDebt ? 'قەرز' : 'نەقد'}</span>
-            </div>
-          )}
+          {/* Payment method omitted per user requirement */}
 
           {printedReceipt.tenderedAmount > 0 && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '3px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '3px', padding: '0 2px' }}>
                 <span>پارەی وەرگیراو:</span>
                 <span>{printedReceipt.tenderedAmount.toLocaleString()} دینار</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '2px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '2px', fontWeight: 'bold', padding: '0 2px' }}>
                 <span>باقی (گەڕاوە):</span>
                 <span>{(printedReceipt.changeDue || 0).toLocaleString()} دینار</span>
               </div>
