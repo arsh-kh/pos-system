@@ -19,6 +19,14 @@ if (typeof window !== 'undefined' && typeof window.require === 'function') {
   } catch (_) {}
 }
 
+const formatCleanQty = (val) => {
+  if (val === '' || val === null || val === undefined) return '';
+  const num = parseFloat(val);
+  if (isNaN(num)) return String(val);
+  if (Number.isInteger(num)) return String(num);
+  return String(parseFloat(num.toFixed(3)));
+};
+
 const Purchases = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,6 +65,7 @@ const Purchases = () => {
   const [scanBarcode, setScanBarcode] = useState('');
   const scanInputRef = useRef(null);
   const [productSearch, setProductSearch] = useState('');
+  const [highlightedRowIndex, setHighlightedRowIndex] = useState(null);
 
   // Quick Add Product Modal State
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -137,12 +146,11 @@ const Purchases = () => {
               const boxCostPrice = it.box_cost_price ? Number(it.box_cost_price) : Math.round(costPrice * unitsPerBox);
 
               const rawBoxQty = it.box_quantity !== undefined && it.box_quantity !== null && it.box_quantity !== ''
-                ? parseFloat(it.box_quantity)
-                : (unitsPerBox > 0 ? parseFloat((Number(it.quantity) / unitsPerBox).toFixed(3)) : 1);
-              const cleanBoxQty = isNaN(rawBoxQty) ? '1' : String(rawBoxQty);
+                ? it.box_quantity
+                : (unitsPerBox > 0 ? (Number(it.quantity) / unitsPerBox) : 1);
+              const cleanBoxQty = formatCleanQty(rawBoxQty);
 
-              const rawQty = parseFloat(it.quantity) || 0;
-              const cleanQty = isNaN(rawQty) ? '0' : String(rawQty);
+              const cleanQty = formatCleanQty(it.quantity || 0);
 
               return {
                 product_id: it.product_id,
@@ -232,19 +240,14 @@ const Purchases = () => {
       setItems(prevItems => {
         const itemIdx = prevItems.findIndex(i => i.product_id === existing.id);
         if (itemIdx >= 0) {
-          const updated = [...prevItems];
-          const it = { ...updated[itemIdx] };
-          if (it.unit_type === 'BOX') {
-            const newBoxQty = (parseFloat(it.box_quantity) || 0) + 1;
-            it.box_quantity = String(newBoxQty);
-            it.quantity = String(Math.round(newBoxQty * unitsPerBox));
-          } else {
-            const newQty = (parseFloat(it.quantity) || 0) + 1;
-            it.quantity = String(newQty);
-            it.box_quantity = unitsPerBox > 0 ? String(parseFloat((newQty / unitsPerBox).toFixed(2)) || 0) : String(newQty);
-          }
-          updated[itemIdx] = it;
-          return updated;
+          setHighlightedRowIndex(itemIdx);
+          setTimeout(() => setHighlightedRowIndex(null), 3000);
+          toast.warning(`کاڵای «${existing.name}» پێشتر لە لیستەکەدا هەیە. دەتوانیت بڕەکەی لە خشتەکەدا دەستکاری بکەیت.`);
+          setTimeout(() => {
+            const el = document.getElementById(`purchase-row-${itemIdx}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 100);
+          return prevItems;
         } else {
           const pieceCost = Number(existing.cost_price) || 0;
           const boxCost = existing.box_cost_price 
@@ -313,20 +316,14 @@ const Purchases = () => {
     setItems(prev => {
       const existingIdx = prev.findIndex(i => i.product_id === newProd.id);
       if (existingIdx >= 0) {
-        const updated = [...prev];
-        const it = { ...updated[existingIdx] };
-        if (it.unit_type === 'BOX') {
-          const newBoxQty = (parseFloat(it.box_quantity) || 0) + 1;
-          it.box_quantity = String(newBoxQty);
-          it.quantity = String(Math.round(newBoxQty * unitsPerBox));
-        } else {
-          const added = parseFloat(initialQty) || 1;
-          const newQty = (parseFloat(it.quantity) || 0) + added;
-          it.quantity = String(newQty);
-          it.box_quantity = unitsPerBox > 0 ? String(parseFloat((newQty / unitsPerBox).toFixed(2)) || 0) : String(newQty);
-        }
-        updated[existingIdx] = it;
-        return updated;
+        setHighlightedRowIndex(existingIdx);
+        setTimeout(() => setHighlightedRowIndex(null), 3000);
+        toast.warning(`کاڵای «${newProd.name}» پێشتر لە پسووڵەکەدا هەیە.`);
+        setTimeout(() => {
+          const el = document.getElementById(`purchase-row-${existingIdx}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+        return prev;
       }
       const effectivePieceCost = (initialUnitType === 'BOX' && unitsPerBox > 0)
         ? Math.round(boxCost / unitsPerBox)
@@ -1285,9 +1282,15 @@ const Purchases = () => {
                 return (
                   <tr 
                     key={index} 
-                    style={{ height: '42px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    id={`purchase-row-${index}`}
+                    style={{ 
+                      height: '42px', 
+                      borderBottom: '1px solid #e2e8f0', 
+                      transition: 'background 0.3s ease',
+                      background: highlightedRowIndex === index ? '#fef3c7' : 'transparent'
+                    }}
+                    onMouseEnter={(e) => { if (highlightedRowIndex !== index) e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseLeave={(e) => { if (highlightedRowIndex !== index) e.currentTarget.style.background = 'transparent'; }}
                   >
                     {/* Index */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center', color: '#64748b', fontWeight: 700, fontSize: '0.80rem' }}>
@@ -1365,6 +1368,12 @@ const Purchases = () => {
                         min="0.001" 
                         value={isBox ? item.box_quantity : item.quantity} 
                         onChange={(e) => updateItem(index, isBox ? 'box_quantity' : 'quantity', e.target.value)} 
+                        onBlur={(e) => {
+                          const formatted = formatCleanQty(e.target.value);
+                          if (formatted !== e.target.value) {
+                            updateItem(index, isBox ? 'box_quantity' : 'quantity', formatted);
+                          }
+                        }}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
                           width: '75px',
@@ -1388,8 +1397,14 @@ const Purchases = () => {
                         step="any"
                         min={item.is_weighted ? '0.1' : '1'} 
                         disabled={!isBox}
-                        value={isBox ? (item.units_per_box ?? '') : (item.is_weighted ? (item.last_box_multiplier || item.units_per_box || '1') : '1')} 
+                        value={isBox ? (formatCleanQty(item.units_per_box) ?? '') : (item.is_weighted ? (formatCleanQty(item.last_box_multiplier || item.units_per_box) || '1') : '1')} 
                         onChange={(e) => updateItem(index, 'units_per_box', e.target.value)} 
+                        onBlur={(e) => {
+                          const formatted = formatCleanQty(e.target.value);
+                          if (formatted !== e.target.value) {
+                            updateItem(index, 'units_per_box', formatted);
+                          }
+                        }}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
                           width: '75px',
@@ -1707,7 +1722,7 @@ const Purchases = () => {
               {printedInvoice.items.map((item, idx) => (
                 <tr key={idx} style={{ borderBottom: '1px dotted #ccc' }}>
                   <td style={{ padding: '4px 0' }}>{item.name}</td>
-                  <td style={{ padding: '4px 0', textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ padding: '4px 0', textAlign: 'center' }}>{formatCleanQty(item.quantity)}</td>
                   <td style={{ padding: '4px 0', textAlign: 'left' }}>{item.total.toLocaleString()}</td>
                 </tr>
               ))}

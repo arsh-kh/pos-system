@@ -24,27 +24,7 @@ async function migrate() {
             console.log('✓ Added `line_total` column to `Purchase_Invoice_Items`');
         }
 
-        // 2. Fix specific known invoices with rounding mismatches
-        // INV-030975 (4992 -> 5000)
-        await db.query("UPDATE Purchase_Invoices SET total_amount = 5000 WHERE invoice_number = 'INV-030975'");
-        await db.query("UPDATE Purchase_Invoice_Items SET unit_type = 'BOX', box_quantity = 1, box_cost_price = 5000, line_total = 5000, units_per_box = 24 WHERE invoice_id = 1");
-
-        // INV-535859 (7008 -> 7000)
-        await db.query("UPDATE Purchase_Invoices SET total_amount = 7000 WHERE invoice_number = 'INV-535859'");
-        await db.query("UPDATE Purchase_Invoice_Items SET unit_type = 'BOX', box_quantity = 1, box_cost_price = 7000, line_total = 7000, units_per_box = 24 WHERE invoice_id = 2");
-
-        // INV-444074 (9504 -> 9500)
-        await db.query("UPDATE Purchase_Invoices SET total_amount = 9500 WHERE invoice_number = 'INV-444074'");
-        await db.query("UPDATE Purchase_Invoice_Items SET unit_type = 'BOX', box_quantity = 1, box_cost_price = 9500, line_total = 9500, units_per_box = 24 WHERE invoice_id = 3");
-
-        // INV-864777 (25980 -> 26000)
-        await db.query("UPDATE Purchase_Invoices SET total_amount = 26000 WHERE invoice_number = 'INV-864777'");
-        await db.query("UPDATE Purchase_Invoice_Items SET line_total = 6000, box_quantity = 1, box_cost_price = 6000, unit_type = 'BOX' WHERE id = 22");
-        await db.query("UPDATE Purchase_Invoice_Items SET line_total = 10000, box_quantity = 1, box_cost_price = 10000, unit_type = 'BOX' WHERE id = 23");
-        await db.query("UPDATE Purchase_Invoice_Items SET line_total = 5000, box_quantity = 1, box_cost_price = 5000, unit_type = 'BOX' WHERE id = 24");
-        await db.query("UPDATE Purchase_Invoice_Items SET line_total = 5000, box_quantity = 1, box_cost_price = 5000, unit_type = 'BOX' WHERE id = 25");
-
-        // 3. For any remaining invoice items without line_total, backfill line_total
+        // 2. For any remaining invoice items without line_total, backfill line_total
         await db.query(`
             UPDATE Purchase_Invoice_Items 
             SET line_total = ROUND(cost_price * quantity) 

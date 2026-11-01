@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
@@ -65,6 +65,28 @@ const ProductModal = ({
   const [categoryList, setCategoryList] = useState(Array.isArray(categories) ? categories : []);
   const categoryContainerRef = useRef(null);
 
+  const getAuthConfig = () => {
+    const token = localStorage.getItem('token');
+    return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  };
+
+  const fetchFreshCategories = useCallback(async () => {
+    try {
+      let res = null;
+      try {
+        const config = getAuthConfig();
+        res = await axios.get('http://localhost:3001/api/categories', config);
+      } catch (_) {
+        res = await axios.get('http://localhost:3001/api/categories');
+      }
+      if (res?.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
+        setCategoryList(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load fresh categories in ProductModal:', err);
+    }
+  }, []);
+
   // Sync categoryList with categories prop whenever provided
   useEffect(() => {
     if (Array.isArray(categories) && categories.length > 0) {
@@ -74,23 +96,10 @@ const ProductModal = ({
 
   // Always fetch fresh categories from backend API when modal opens
   useEffect(() => {
-    if (!isOpen) return;
-    const fetchFreshCategories = async () => {
-      try {
-        const config = getAuthConfig();
-        const res = await axios.get('http://localhost:3001/api/categories', config);
-        if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
-          setCategoryList(res.data.data);
-          if (onCategoriesUpdate) {
-            res.data.data.forEach(cat => onCategoriesUpdate(cat));
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load fresh categories in ProductModal:', err);
-      }
-    };
-    fetchFreshCategories();
-  }, [isOpen]);
+    if (isOpen) {
+      fetchFreshCategories();
+    }
+  }, [isOpen, fetchFreshCategories]);
 
   // Close category dropdown on click outside
   useEffect(() => {
@@ -206,11 +215,6 @@ const ProductModal = ({
       return { ...prev, barcode: cleaned };
     });
   });
-
-  const getAuthConfig = () => {
-    const token = localStorage.getItem('token');
-    return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-  };
 
   const filteredCategories = useMemo(() => {
     if (!categoryInput.trim()) return categoryList;
@@ -489,7 +493,10 @@ const ProductModal = ({
                     const match = categoryList.find(c => c.name.trim().toLowerCase() === val.trim().toLowerCase());
                     setFormData(prev => ({ ...prev, category_id: match ? match.id : '' }));
                   }} 
-                  onFocus={() => setIsCategoryOpen(true)}
+                  onFocus={() => {
+                    setIsCategoryOpen(true);
+                    if (categoryList.length === 0) fetchFreshCategories();
+                  }}
                   style={{ 
                     width: '100%', 
                     height: '38px',
@@ -505,7 +512,13 @@ const ProductModal = ({
                 />
                 <button
                   type="button"
-                  onClick={() => setIsCategoryOpen(prev => !prev)}
+                  onClick={() => {
+                    setIsCategoryOpen(prev => {
+                      const next = !prev;
+                      if (next && categoryList.length === 0) fetchFreshCategories();
+                      return next;
+                    });
+                  }}
                   style={{
                     position: 'absolute',
                     left: '6px',
