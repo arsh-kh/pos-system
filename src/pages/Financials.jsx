@@ -15,6 +15,7 @@ import {
   CreditCard,
   Eye,
   Edit2,
+  Trash2,
   RotateCcw,
   AlertTriangle
 } from 'lucide-react';
@@ -40,6 +41,13 @@ const Financials = () => {
   // Modals
   const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
   const [newSupplier, setNewSupplier] = useState({ name: '', phone: '' });
+
+  // Edit & Delete Supplier States
+  const [isEditSupplierOpen, setIsEditSupplierOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState(null);
+  const [isUpdatingSupplier, setIsUpdatingSupplier] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState(null);
+  const [isDeletingSupplier, setIsDeletingSupplier] = useState(false);
 
   // Purchase Return Modal
   const [isAddReturnOpen, setIsAddReturnOpen] = useState(false);
@@ -98,6 +106,66 @@ const Financials = () => {
       fetchData();
     } catch {
       alert('هەڵەیەک ڕوویدا لە کاتی زیادکردنی کۆمپانیا');
+    }
+  };
+
+  const openEditSupplier = (supplier, e) => {
+    if (e) e.stopPropagation();
+    setEditingSupplier({
+      id: supplier.id,
+      name: supplier.name || '',
+      phone: supplier.phone || ''
+    });
+    setIsEditSupplierOpen(true);
+  };
+
+  const handleUpdateSupplier = async (e) => {
+    e.preventDefault();
+    if (!editingSupplier || !editingSupplier.name.trim()) return;
+    setIsUpdatingSupplier(true);
+    try {
+      const res = await axios.put(`http://localhost:3001/api/suppliers/${editingSupplier.id}`, {
+        name: editingSupplier.name.trim(),
+        phone: (editingSupplier.phone || '').trim()
+      });
+      if (res.data?.status === 'SUCCESS') {
+        toast.success(res.data.message || 'زانیارییەکان نوێکرانەوە');
+        setIsEditSupplierOpen(false);
+        setEditingSupplier(null);
+        fetchData();
+        if (selectedProfile && selectedProfile.id === editingSupplier.id) {
+          openProfile(editingSupplier.id);
+        }
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی نوێکردنەوە');
+    } finally {
+      setIsUpdatingSupplier(false);
+    }
+  };
+
+  const openDeleteSupplier = (supplier, e) => {
+    if (e) e.stopPropagation();
+    setSupplierToDelete(supplier);
+  };
+
+  const handleConfirmDeleteSupplier = async () => {
+    if (!supplierToDelete) return;
+    setIsDeletingSupplier(true);
+    try {
+      const res = await axios.delete(`http://localhost:3001/api/suppliers/${supplierToDelete.id}`);
+      if (res.data?.status === 'SUCCESS') {
+        toast.success(res.data.message || 'کۆمپانیا بە سەرکەوتوویی سڕایەوە');
+        if (selectedProfile && selectedProfile.id === supplierToDelete.id) {
+          setSelectedProfile(null);
+        }
+        setSupplierToDelete(null);
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'هەڵەیەک ڕوویدا لە کاتی سڕینەوە');
+    } finally {
+      setIsDeletingSupplier(false);
     }
   };
 
@@ -506,11 +574,12 @@ const Financials = () => {
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', background: '#ffffff', direction: 'rtl' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
-              <col style={{ width: '28%' }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '18%' }} />
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '17%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '12%' }} />
             </colgroup>
             <thead>
               <tr style={{ height: '38px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569', fontWeight: 700 }}>
@@ -519,13 +588,14 @@ const Financials = () => {
                 <th style={{ padding: '0 10px', textAlign: 'center' }}>ژمارەی پسووڵە</th>
                 <th style={{ padding: '0 10px', textAlign: 'center' }}>کۆی دراو</th>
                 <th style={{ padding: '0 14px', textAlign: 'center' }}>کۆی ماوە (قەرز)</th>
+                <th style={{ padding: '0 8px', textAlign: 'center' }}>کردار</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>باردەکرێت...</td></tr>
+                <tr><td colSpan="6" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>باردەکرێت...</td></tr>
               ) : filteredSuppliers.length === 0 ? (
-                <tr><td colSpan="5" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>هیچ کۆمپانیایەک نەدۆزرایەوە</td></tr>
+                <tr><td colSpan="6" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>هیچ کۆمپانیایەک نەدۆزرایەوە</td></tr>
               ) : (
                 filteredSuppliers.map(s => {
                   const remaining = Number(s.total_remaining) || 0;
@@ -556,6 +626,56 @@ const Financials = () => {
                       </td>
                       <td style={{ padding: '0 14px', textAlign: 'center', color: remaining > 0 ? '#ef4444' : '#64748b', fontWeight: remaining > 0 ? 700 : 500, fontSize: '0.86rem' }}>
                         {remaining.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '0 6px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => openEditSupplier(s, e)}
+                            title="دەستکاریکردنی زانیاری کۆمپانیا"
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: '#2563eb',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#2563eb'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => openDeleteSupplier(s, e)}
+                            title="سڕینەوەی کۆمپانیا"
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#ef4444'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -895,6 +1015,261 @@ const Financials = () => {
         </div>
       )}
 
+      {/* Edit Supplier Modal */}
+      {isEditSupplierOpen && editingSupplier && (
+        <div className="pos-modal-overlay" onClick={() => setIsEditSupplierOpen(false)}>
+          <div 
+            className="pos-modal-card" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '480px',
+              width: '92%',
+              padding: '20px',
+              borderRadius: '16px',
+              background: '#ffffff',
+              direction: 'rtl',
+              border: '1px solid #cbd5e1',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#1e293b', fontWeight: 800 }}>
+                دەستکاریکردنی زانیاری کۆمپانیا
+              </h2>
+              <button 
+                type="button" 
+                onClick={() => setIsEditSupplierOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                  lineHeight: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateSupplier} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                  ناوی کۆمپانیا / دابینکەر <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={editingSupplier.name} 
+                  onChange={e => setEditingSupplier({ ...editingSupplier, name: e.target.value })} 
+                  style={{ 
+                    width: '100%', 
+                    height: '38px', 
+                    padding: '0 10px', 
+                    borderRadius: '8px', 
+                    background: '#ffffff', 
+                    border: '1px solid #cbd5e1', 
+                    color: '#1e293b', 
+                    boxSizing: 'border-box', 
+                    fontSize: '0.88rem' 
+                  }} 
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                  ژمارەی مۆبایل / پەیوەندی
+                </label>
+                <input 
+                  type="text" 
+                  value={editingSupplier.phone} 
+                  onChange={e => setEditingSupplier({ ...editingSupplier, phone: e.target.value })} 
+                  style={{ 
+                    width: '100%', 
+                    height: '38px', 
+                    padding: '0 10px', 
+                    borderRadius: '8px', 
+                    background: '#ffffff', 
+                    border: '1px solid #cbd5e1', 
+                    color: '#1e293b', 
+                    boxSizing: 'border-box', 
+                    fontSize: '0.88rem', 
+                    fontFamily: 'monospace' 
+                  }} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button 
+                  type="submit" 
+                  disabled={isUpdatingSupplier}
+                  style={{ 
+                    flex: 1, 
+                    height: '42px', 
+                    borderRadius: '8px', 
+                    background: '#2563eb', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    fontSize: '0.95rem', 
+                    fontWeight: 800, 
+                    cursor: isUpdatingSupplier ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
+                    transition: 'all 0.15s ease' 
+                  }}
+                >
+                  {isUpdatingSupplier ? 'نوێ دەکرێتەوە...' : 'پاشەکەوتکردنی گۆڕانکاری'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditSupplierOpen(false)}
+                  style={{ 
+                    padding: '0 18px', 
+                    height: '42px', 
+                    borderRadius: '8px', 
+                    background: '#f1f5f9', 
+                    color: '#475569', 
+                    border: '1px solid #cbd5e1', 
+                    fontSize: '0.90rem', 
+                    fontWeight: 700, 
+                    cursor: 'pointer' 
+                  }}
+                >
+                  داخستن
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Supplier Confirmation Modal */}
+      {supplierToDelete && (
+        <div className="pos-modal-overlay" onClick={() => setSupplierToDelete(null)}>
+          <div 
+            className="pos-modal-card" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '440px',
+              width: '92%',
+              padding: '24px 20px',
+              borderRadius: '16px',
+              background: '#ffffff',
+              direction: 'rtl',
+              border: '1px solid #cbd5e1',
+              boxSizing: 'border-box',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: '#fee2e2',
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 12px auto'
+            }}>
+              <AlertTriangle size={24} />
+            </div>
+
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.10rem', fontWeight: 800, color: '#1e293b' }}>
+              سڕینەوەی کۆمپانیا
+            </h3>
+
+            {Number(supplierToDelete.total_remaining) > 0 ? (
+              <div>
+                <p style={{ color: '#ef4444', fontSize: '0.88rem', fontWeight: 700, lineHeight: 1.5, margin: '8px 0 16px 0' }}>
+                  ناتوانرێت کۆمپانیای «{supplierToDelete.name}» بسڕدرێتەوە چونکە بڕی {Number(supplierToDelete.total_remaining).toLocaleString()} د.ع قەرزی ماوە.
+                </p>
+                <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 18px 0' }}>
+                  تکایە سەرەتا لە بەشی پڕۆفایلی کۆمپانیاکەدا قەرزەکە پاکتاو بکە.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSupplierToDelete(null)}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    borderRadius: '8px',
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  داخستن
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p style={{ color: '#334155', fontSize: '0.90rem', margin: '8px 0 14px 0', lineHeight: 1.5 }}>
+                  دڵنیایت لە سڕینەوەی کۆمپانیای <strong>«{supplierToDelete.name}»</strong>؟
+                </p>
+
+                {Number(supplierToDelete.total_invoices) > 0 && (
+                  <div style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    color: '#64748b',
+                    fontSize: '0.80rem',
+                    textAlign: 'right',
+                    marginBottom: '16px',
+                    lineHeight: 1.5
+                  }}>
+                    ئەم کۆمپانیایە {supplierToDelete.total_invoices} پسووڵەی کڕینی پێشووی هەیە. بە سڕینەوەی کۆمپانیاکە، تەواوی پسووڵەکان، مەوجودی عەمبار و مێژووی فرۆشتن بە پارێزراوی دەمێننەوە و دەبنە (کڕینی ناوخۆیی / بێ کۆمپانیا).
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    disabled={isDeletingSupplier}
+                    onClick={handleConfirmDeleteSupplier}
+                    style={{
+                      flex: 1,
+                      height: '42px',
+                      borderRadius: '8px',
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.90rem',
+                      cursor: isDeletingSupplier ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 12px rgba(239,68,68,0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isDeletingSupplier ? 'دەسڕدرێتەوە...' : 'بەڵێ، بسڕەوە'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSupplierToDelete(null)}
+                    style={{
+                      flex: 1,
+                      height: '42px',
+                      borderRadius: '8px',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      fontWeight: 700,
+                      fontSize: '0.90rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    پاشگەزبوونەوە
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Add Purchase Return Modal */}
       {isAddReturnOpen && (
         <div className="pos-modal-overlay" onClick={() => setIsAddReturnOpen(false)}>
@@ -1125,6 +1500,54 @@ const Financials = () => {
               <span style={{ fontFamily: 'monospace', fontSize: '14px', color: '#64748b' }}>
                 {selectedProfile.phone || 'دیارینەکراوە'}
               </span>
+              <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => openEditSupplier(selectedProfile, e)}
+                  title="دەستکاریکردنی ناوی کۆمپانیا و مۆبایل"
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#2563eb',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#2563eb'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                >
+                  <Edit2 size={12} /> دەستکاریکردن
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => openDeleteSupplier(selectedProfile, e)}
+                  title="سڕینەوەی کۆمپانیا"
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#ef4444',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#ef4444'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                >
+                  <Trash2 size={12} /> سڕینەوە
+                </button>
+              </div>
             </div>
 
             {/* Center: Inline text pills for the financials */}
