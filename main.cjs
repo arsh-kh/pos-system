@@ -63,6 +63,7 @@ async function ensureBackendProcess() {
     console.log('🚀 Spawning embedded backend service:', serverScript);
 
     // 1. Prefer Electron native utilityProcess (safe, embedded, avoids OS spawn ENOENT)
+    let spawnedSuccessfully = false;
     if (utilityProcess && typeof utilityProcess.fork === 'function') {
       try {
         backendProcess = utilityProcess.fork(serverScript, [], {
@@ -82,31 +83,46 @@ async function ensureBackendProcess() {
         backendProcess.on('exit', (code) => {
           console.log(`Backend process exited with code ${code}`);
         });
-        return;
+        spawnedSuccessfully = true;
       } catch (forkErr) {
         console.warn('⚠️ utilityProcess.fork failed, falling back to spawn:', forkErr.message);
       }
     }
 
     // 2. Fallback to child_process spawn with proper error trapping
-    try {
-      backendProcess = spawn(process.execPath, [serverScript], {
-        cwd: backendCwd,
-        env: {
-          ...process.env,
-          ELECTRON_RUN_AS_NODE: '1'
-        },
-        stdio: 'ignore'
-      });
+    if (!spawnedSuccessfully) {
+      try {
+        backendProcess = spawn(process.execPath, [serverScript], {
+          cwd: backendCwd,
+          env: {
+            ...process.env,
+            ELECTRON_RUN_AS_NODE: '1'
+          },
+          stdio: 'ignore'
+        });
 
-      backendProcess.on('error', (err) => {
-        console.warn('⚠️ Spawn fallback error (trapped):', err.message);
-      });
+        backendProcess.on('error', (err) => {
+          console.warn('⚠️ Spawn fallback error (trapped):', err.message);
+        });
 
-      backendProcess.unref();
-      console.log('✓ Embedded backend service started via spawn (PID: ' + backendProcess.pid + ')');
-    } catch (spawnErr) {
-      console.warn('⚠️ Could not spawn backend process:', spawnErr.message);
+        backendProcess.unref();
+        console.log('✓ Embedded backend service started via spawn (PID: ' + backendProcess.pid + ')');
+        spawnedSuccessfully = true;
+      } catch (spawnErr) {
+        console.warn('⚠️ Could not spawn backend process:', spawnErr.message);
+      }
+    }
+
+    // Wait until the backend server is active and listening before loading frontend
+    if (spawnedSuccessfully) {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        await new Promise(r => setTimeout(r, 200));
+        const active = await checkBackendRunning();
+        if (active) {
+          console.log('✓ Backend API server is confirmed active and listening on port 3001');
+          return;
+        }
+      }
     }
   } else {
     console.warn('⚠️ Backend server.js not found in candidate paths. Assuming external backend.');

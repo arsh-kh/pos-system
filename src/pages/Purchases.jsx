@@ -80,18 +80,26 @@ const Purchases = () => {
   };
 
   const fetchData = async () => {
+    const config = getAuthConfig();
     try {
-      const config = getAuthConfig();
-      const [supRes, prodRes, catRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/suppliers'),
-        axios.get('http://localhost:3001/api/products', config),
-        axios.get('http://localhost:3001/api/categories', config)
-      ]);
-      if (supRes.data.status === 'SUCCESS') setSuppliers(supRes.data.data);
-      if (prodRes.data.status === 'SUCCESS') setProducts(prodRes.data.data);
-      if (catRes.data.status === 'SUCCESS') setCategories(catRes.data.data);
+      const supRes = await axios.get('http://localhost:3001/api/suppliers');
+      if (supRes.data?.status === 'SUCCESS') setSuppliers(supRes.data.data);
     } catch (err) {
-      console.error('Failed to fetch initial data:', err);
+      console.error('Failed to fetch suppliers:', err);
+    }
+
+    try {
+      const prodRes = await axios.get('http://localhost:3001/api/products', config);
+      if (prodRes.data?.status === 'SUCCESS') setProducts(prodRes.data.data);
+    } catch (err) {
+      console.error('Failed to fetch products:', err);
+    }
+
+    try {
+      const catRes = await axios.get('http://localhost:3001/api/categories', config);
+      if (catRes.data?.status === 'SUCCESS') setCategories(catRes.data.data);
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
     }
   };
 
@@ -333,6 +341,7 @@ const Purchases = () => {
           stock_before: 0,
           is_draft: Boolean(newProd.is_draft),
           draft_payload: newProd.is_draft ? newProd : null,
+          category_id: newProd.category_id || null,
           is_weighted: isWeighted,
           unit: isWeighted ? 'کگم' : (newProd.unit || 'دانە')
         }
@@ -686,20 +695,22 @@ const Purchases = () => {
       for (const item of items) {
         const isDraft = item.is_draft || String(item.product_id).startsWith('draft_');
         if (isDraft && !draftMap.has(item.product_id)) {
-          const draftPayload = item.draft_payload || {
-            name: item.name,
-            barcode: item.barcode,
-            cost_price: Number(item.cost_price) || 0,
-            selling_price: Number(item.selling_price) || 0,
+          const basePayload = item.draft_payload ? { ...item.draft_payload } : {};
+          const draftPayload = {
+            name: basePayload.name || item.name,
+            barcode: basePayload.barcode || item.barcode,
+            cost_price: Number(basePayload.cost_price || item.cost_price) || 0,
+            selling_price: Number(basePayload.selling_price || item.selling_price) || 0,
             stock: 0,
-            wholesale_price: 0,
-            expiry_date: null,
-            low_stock_threshold: 5,
-            box_barcode: item.box_barcode || null,
-            units_per_box: item.units_per_box || 1,
-            is_weighted: item.is_weighted ? 1 : 0,
-            unit: item.is_weighted ? 'کگم' : (item.unit || 'دانە'),
-            category_id: item.category_id || null
+            wholesale_price: Number(basePayload.wholesale_price) || 0,
+            expiry_date: basePayload.expiry_date || null,
+            low_stock_threshold: basePayload.low_stock_threshold !== undefined ? basePayload.low_stock_threshold : 5,
+            box_barcode: basePayload.box_barcode || item.box_barcode || null,
+            units_per_box: basePayload.units_per_box || item.units_per_box || 1,
+            is_weighted: (basePayload.is_weighted || item.is_weighted) ? 1 : 0,
+            unit: (basePayload.is_weighted || item.is_weighted) ? 'کگم' : (basePayload.unit || item.unit || 'دانە'),
+            category_id: basePayload.category_id || item.category_id || null,
+            box_cost_price: basePayload.box_cost_price || item.box_cost_price || null
           };
           const createRes = await axios.post('http://localhost:3001/api/products', draftPayload, config);
           const realId = createRes.data?.id || createRes.data?.data?.id;

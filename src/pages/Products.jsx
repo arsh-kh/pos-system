@@ -88,16 +88,19 @@ const Products = () => {
   };
 
   const fetchData = async () => {
+    const config = getAuthConfig();
     try {
-      const config = getAuthConfig();
-      const [prodRes, catRes] = await Promise.all([
-        axios.get('http://localhost:3001/api/products', config),
-        axios.get('http://localhost:3001/api/categories', config)
-      ]);
-      if (prodRes.data.status === 'SUCCESS') setProducts(prodRes.data.data);
-      if (catRes.data.status === 'SUCCESS') setCategories(catRes.data.data);
+      const prodRes = await axios.get('http://localhost:3001/api/products', config);
+      if (prodRes.data?.status === 'SUCCESS') setProducts(prodRes.data.data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch products:', err);
+    }
+
+    try {
+      const catRes = await axios.get('http://localhost:3001/api/categories', config);
+      if (catRes.data?.status === 'SUCCESS') setCategories(catRes.data.data);
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
     } finally {
       setLoading(false);
     }

@@ -62,7 +62,35 @@ const ProductModal = ({
   const [categoryInput, setCategoryInput] = useState('');
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categoryList, setCategoryList] = useState(Array.isArray(categories) ? categories : []);
   const categoryContainerRef = useRef(null);
+
+  // Sync categoryList with categories prop whenever provided
+  useEffect(() => {
+    if (Array.isArray(categories) && categories.length > 0) {
+      setCategoryList(categories);
+    }
+  }, [categories]);
+
+  // Always fetch fresh categories from backend API when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchFreshCategories = async () => {
+      try {
+        const config = getAuthConfig();
+        const res = await axios.get('http://localhost:3001/api/categories', config);
+        if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
+          setCategoryList(res.data.data);
+          if (onCategoriesUpdate) {
+            res.data.data.forEach(cat => onCategoriesUpdate(cat));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load fresh categories in ProductModal:', err);
+      }
+    };
+    fetchFreshCategories();
+  }, [isOpen]);
 
   // Close category dropdown on click outside
   useEffect(() => {
@@ -185,9 +213,9 @@ const ProductModal = ({
   };
 
   const filteredCategories = useMemo(() => {
-    if (!categoryInput.trim()) return categories;
-    return categories.filter(c => kurdishSearchMatch(c.name, categoryInput));
-  }, [categories, categoryInput]);
+    if (!categoryInput.trim()) return categoryList;
+    return categoryList.filter(c => kurdishSearchMatch(c.name, categoryInput));
+  }, [categoryList, categoryInput]);
 
   const generateBarcode = () => {
     const randomBarcode = Math.floor(100000000000 + Math.random() * 900000000000).toString();
@@ -256,7 +284,7 @@ const ProductModal = ({
       let finalCategoryId = formData.category_id || null;
       const trimmedCat = categoryInput.trim();
       if (trimmedCat) {
-        const found = categories.find(c => c.name.trim().toLowerCase() === trimmedCat.toLowerCase());
+        const found = categoryList.find(c => c.name.trim().toLowerCase() === trimmedCat.toLowerCase());
         if (found) {
           finalCategoryId = found.id;
         } else {
@@ -264,6 +292,7 @@ const ProductModal = ({
             const catRes = await axios.post('http://localhost:3001/api/categories', { name: trimmedCat }, config);
             if (catRes.data?.data?.id) {
               finalCategoryId = catRes.data.data.id;
+              setCategoryList(prev => [...prev.filter(x => x.id !== catRes.data.data.id), catRes.data.data]);
               if (onCategoriesUpdate) {
                 onCategoriesUpdate(catRes.data.data);
               }
@@ -457,7 +486,7 @@ const ProductModal = ({
                     const val = e.target.value;
                     setCategoryInput(val);
                     setIsCategoryOpen(true);
-                    const match = categories.find(c => c.name.trim().toLowerCase() === val.trim().toLowerCase());
+                    const match = categoryList.find(c => c.name.trim().toLowerCase() === val.trim().toLowerCase());
                     setFormData(prev => ({ ...prev, category_id: match ? match.id : '' }));
                   }} 
                   onFocus={() => setIsCategoryOpen(true)}
@@ -551,7 +580,7 @@ const ProductModal = ({
                     );
                   })}
 
-                  {categoryInput.trim() && !categories.some(c => c.name.trim().toLowerCase() === categoryInput.trim().toLowerCase()) && (
+                  {categoryInput.trim() && !categoryList.some(c => c.name.trim().toLowerCase() === categoryInput.trim().toLowerCase()) && (
                     <div 
                       onClick={async () => {
                         const newName = categoryInput.trim();
@@ -560,6 +589,7 @@ const ProductModal = ({
                           const res = await axios.post('http://localhost:3001/api/categories', { name: newName }, config);
                           if (res.data?.data) {
                             const createdCat = res.data.data;
+                            setCategoryList(prev => [...prev.filter(x => x.id !== createdCat.id), createdCat]);
                             if (onCategoriesUpdate) {
                               onCategoriesUpdate(createdCat);
                             }
