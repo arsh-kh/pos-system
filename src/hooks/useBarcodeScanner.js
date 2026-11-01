@@ -27,9 +27,10 @@ const useBarcodeScanner = (onScan) => {
             }
 
             const currentTime = Date.now();
+            const timeSinceLastKey = lastKeyTime.current ? (currentTime - lastKeyTime.current) : 999;
             
             // If more than 100ms elapsed since last key, start a new buffer
-            if (lastKeyTime.current && (currentTime - lastKeyTime.current > 100)) {
+            if (timeSinceLastKey > 100) {
                 buffer.current = '';
             }
 
@@ -48,7 +49,21 @@ const useBarcodeScanner = (onScan) => {
             } else {
                 const char = getCharFromBarcodeKeyEvent(e);
                 if (char) {
+                    // Check if this is a hardware scanner burst (< 45ms between characters)
+                    const isScannerBurst = timeSinceLastKey < 45 && buffer.current.length >= 1;
+
                     buffer.current += char;
+
+                    // If a hardware scanner burst is detected while focused on a regular non-barcode input,
+                    // prevent default on this key so the scanner does NOT type numbers into text fields (like product name)!
+                    const isBarcodeField = e.target && (
+                        e.target.name === 'barcode' || 
+                        e.target.name === 'box_barcode' || 
+                        (typeof e.target.getAttribute === 'function' && e.target.getAttribute('data-barcode') === 'true')
+                    );
+                    if (isScannerBurst && e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && !isBarcodeField) {
+                        e.preventDefault();
+                    }
 
                     // Auto-flush timer: Hardware scanners emit characters in rapid bursts (<35ms per character).
                     // If no new character arrives within 85ms and we have >= 3 chars, automatically trigger scan!

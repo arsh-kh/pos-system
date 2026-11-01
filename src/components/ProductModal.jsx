@@ -75,11 +75,25 @@ const ProductModal = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Track previous open state and edit target to prevent wiping inputs on subsequent scans/prop updates
+  const wasOpenRef = useRef(false);
+  const prevEditProductRef = useRef(null);
+
   // Sync Form Data on Modal Open or Prop Change
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      prevEditProductRef.current = null;
+      return;
+    }
+
+    const justOpened = !wasOpenRef.current;
+    const editProductChanged = editProduct !== prevEditProductRef.current;
+    wasOpenRef.current = true;
+    prevEditProductRef.current = editProduct;
 
     if (editProduct) {
+      if (justOpened || editProductChanged) {
       const isW = Boolean(editProduct.is_weighted || editProduct.unit === 'کگم');
       const existingCat = categories.find(c => String(c.id) === String(editProduct.category_id));
       setCategoryInput(existingCat ? existingCat.name : (editProduct.category_name || ''));
@@ -109,35 +123,60 @@ const ProductModal = ({
         box_cost_price: inferredBoxCost,
         is_weighted: isW,
         unit: isW ? 'کگم' : (editProduct.unit || 'دانە')
-      });
+        });
+      }
     } else {
       // Add / Quick-Add Mode
-      setCategoryInput('');
-      setIsCategoryOpen(false);
-      setFormData({
-        name: '',
-        barcode: presetBarcode ? String(presetBarcode).trim() : '',
-        cost_price: '',
-        selling_price: '',
-        stock: '',
-        category_id: '',
-        wholesale_price: '',
-        expiry_date: '',
-        low_stock_threshold: '5',
-        box_barcode: '',
-        units_per_box: '1',
-        box_cost_price: '',
-        is_weighted: false,
-        unit: 'دانە'
-      });
+      if (justOpened) {
+        // Modal just opened: initialize clean blank form with initial presetBarcode
+        setCategoryInput('');
+        setIsCategoryOpen(false);
+        setFormData({
+          name: '',
+          barcode: presetBarcode ? String(presetBarcode).trim() : '',
+          cost_price: '',
+          selling_price: '',
+          stock: '',
+          category_id: '',
+          wholesale_price: '',
+          expiry_date: '',
+          low_stock_threshold: '5',
+          box_barcode: '',
+          units_per_box: '1',
+          box_cost_price: '',
+          is_weighted: false,
+          unit: 'دانە'
+        });
+      } else if (presetBarcode) {
+        // Modal was ALREADY open: NEVER wipe existing inputs! Only update barcode if provided
+        const cleanPreset = String(presetBarcode).trim();
+        setFormData(prev => {
+          if (prev.barcode === cleanPreset) return prev;
+          return { ...prev, barcode: cleanPreset };
+        });
+      }
     }
-  }, [isOpen, editProduct, presetBarcode, isPurchaseMode]);
+  }, [isOpen, editProduct, presetBarcode, isPurchaseMode, categories]);
 
   // Hardware Scanner integration
   useBarcodeScanner((scannedBarcode) => {
     if (!isOpen) return;
     const cleaned = normalizeBarcode(scannedBarcode);
-    setFormData(prev => ({ ...prev, barcode: cleaned }));
+    const activeEl = document.activeElement;
+    const isBox = activeEl && (
+      activeEl.name === 'box_barcode' || 
+      (typeof activeEl.getAttribute === 'function' && (
+        activeEl.getAttribute('data-field') === 'box_barcode' ||
+        activeEl.getAttribute('data-barcode-type') === 'box'
+      ))
+    );
+
+    setFormData(prev => {
+      if (isBox) {
+        return { ...prev, box_barcode: cleaned };
+      }
+      return { ...prev, barcode: cleaned };
+    });
   });
 
   const getAuthConfig = () => {
@@ -247,11 +286,11 @@ const ProductModal = ({
         box_cost_price: formData.box_cost_price ? Number(formData.box_cost_price) : null,
         selling_price: formData.selling_price ? Number(formData.selling_price) : 0,
         stock: resolvedStock,
-        wholesale_price: (!formData.is_weighted && formData.wholesale_price) ? Number(formData.wholesale_price) : 0,
+        wholesale_price: formData.wholesale_price ? Number(formData.wholesale_price) : 0,
         expiry_date: (!formData.is_weighted && formData.expiry_date) ? formData.expiry_date : null,
         low_stock_threshold: formData.low_stock_threshold !== undefined && formData.low_stock_threshold !== '' ? parseFloat(formData.low_stock_threshold) : 5,
-        box_barcode: (!formData.is_weighted && formData.box_barcode && formData.box_barcode.trim() !== '') ? formData.box_barcode.trim() : null,
-        units_per_box: (!formData.is_weighted && formData.units_per_box) ? Math.max(1, parseFloat(formData.units_per_box)) : 1,
+        box_barcode: (formData.box_barcode && formData.box_barcode.trim() !== '') ? formData.box_barcode.trim() : null,
+        units_per_box: formData.units_per_box ? Math.max(1, parseFloat(formData.units_per_box)) : 1,
         is_weighted: formData.is_weighted ? 1 : 0,
         unit: formData.is_weighted ? 'کگم' : 'دانە',
         category_id: finalCategoryId
@@ -560,6 +599,8 @@ const ProductModal = ({
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input 
                   type="text" 
+                  name="barcode" 
+                  data-barcode="true" 
                   required 
                   placeholder="بارکۆد..."
                   value={formData.barcode} 
@@ -603,111 +644,111 @@ const ProductModal = ({
             </div>
           </div>
 
-          {/* Row 2: Wholesale / Carton (4-Column Grid: 1fr 1fr 1fr 1.35fr, gap 12px — ONLY visible when "بە دانە" is selected) */}
-          {!formData.is_weighted && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.35fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#1e40af', whiteSpace: 'nowrap' }}>
-                  نرخی کڕینی کارتۆن
-                </label>
-                <input 
-                  type="number" 
-                  step="any"
-                  min="0"
-                  placeholder="0"
-                  value={formData.box_cost_price} 
-                  onChange={e => handleBoxCostChange(e.target.value)} 
-                  style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#f8fafc', border: '1.5px solid #93c5fd', color: '#1e3a8a', fontWeight: 700, boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
-                />
-              </div>
+          {/* Row 2: Wholesale / Carton / Sack (4-Column Grid: 1fr 1fr 1fr 1.35fr, gap 12px) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.35fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#1e40af', whiteSpace: 'nowrap' }}>
+                {formData.is_weighted ? 'نرخی کڕینی گونیە' : 'نرخی کڕینی کارتۆن'}
+              </label>
+              <input 
+                type="number" 
+                step="any"
+                min="0"
+                placeholder="0"
+                value={formData.box_cost_price} 
+                onChange={e => handleBoxCostChange(e.target.value)} 
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#f8fafc', border: '1.5px solid #93c5fd', color: '#1e3a8a', fontWeight: 700, boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+              />
+            </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
-                  نرخی فرۆشتنی کارتۆن
-                </label>
-                <input 
-                  type="number" 
-                  step="any"
-                  min="0"
-                  placeholder="0"
-                  value={formData.wholesale_price} 
-                  onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
-                  style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
-                />
-              </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                {formData.is_weighted ? 'نرخی فرۆشتنی گونیە' : 'نرخی فرۆشتنی کارتۆن'}
+              </label>
+              <input 
+                type="number" 
+                step="any"
+                min="0"
+                placeholder="0"
+                value={formData.wholesale_price} 
+                onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+              />
+            </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
-                  دانە لە کارتۆندا
-                </label>
-                <input 
-                  type="number" 
-                  min="1"
-                  step="any"
-                  placeholder="24"
-                  value={formData.units_per_box} 
-                  onChange={e => handleUnitsPerBoxChange(e.target.value)} 
-                  style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
-                />
-              </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                {formData.is_weighted ? 'کێش لە گونیەدا (کگم)' : 'دانە لە کارتۆندا'}
+              </label>
+              <input 
+                type="number" 
+                min={formData.is_weighted ? '0.1' : '1'}
+                step="any"
+                placeholder={formData.is_weighted ? '25' : '24'}
+                value={formData.units_per_box} 
+                onChange={e => handleUnitsPerBoxChange(e.target.value)} 
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+              />
+            </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
-                  بارکۆدی کارتۆن
-                </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input 
-                    type="text" 
-                    placeholder="بارکۆدی کارتۆن..."
-                    value={formData.box_barcode} 
-                    onChange={e => setFormData({ ...formData, box_barcode: normalizeBarcode(e.target.value) })} 
-                    style={{ 
-                      width: '100%', 
-                      height: '38px', 
-                      padding: '0 16px 0 85px', 
-                      borderRadius: '8px', 
-                      background: '#ffffff', 
-                      border: '1px solid #cbd5e1', 
-                      color: '#1e293b', 
-                      fontFamily: 'monospace', 
-                      fontSize: '0.84rem', 
-                      boxSizing: 'border-box',
-                      textAlign: 'right'
-                    }} 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={generateBoxBarcode} 
-                    style={{
-                      position: 'absolute',
-                      left: '4px',
-                      top: '4px',
-                      bottom: '4px',
-                      padding: '0 8px',
-                      background: '#eff6ff',
-                      color: '#2563eb',
-                      border: '1px solid #bfdbfe',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    دروستکردن
-                  </button>
-                </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.80rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                {formData.is_weighted ? 'بارکۆدی گونیە' : 'بارکۆدی کارتۆن'}
+              </label>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  name="box_barcode" 
+                  data-barcode="true" 
+                  placeholder={formData.is_weighted ? 'بارکۆدی گونیە...' : 'بارکۆدی کارتۆن...'}
+                  value={formData.box_barcode} 
+                  onChange={e => setFormData({ ...formData, box_barcode: normalizeBarcode(e.target.value) })} 
+                  style={{ 
+                    width: '100%', 
+                    height: '38px', 
+                    padding: '0 16px 0 85px', 
+                    borderRadius: '8px', 
+                    background: '#ffffff', 
+                    border: '1px solid #cbd5e1', 
+                    color: '#1e293b', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.84rem', 
+                    boxSizing: 'border-box', 
+                    textAlign: 'right'
+                  }} 
+                />
+                <button 
+                  type="button" 
+                  onClick={generateBoxBarcode} 
+                  style={{
+                    position: 'absolute',
+                    left: '4px',
+                    top: '4px',
+                    bottom: '4px',
+                    padding: '0 8px',
+                    background: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  دروستکردن
+                </button>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Row 3: Pricing & Inventory */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: formData.is_weighted ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)', 
             gap: '12px',
-            borderTop: !formData.is_weighted ? '1px solid #f1f5f9' : 'none',
-            paddingTop: !formData.is_weighted ? '12px' : '0'
+            borderTop: '1px solid #f1f5f9',
+            paddingTop: '12px'
           }}>
             <div>
               <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>

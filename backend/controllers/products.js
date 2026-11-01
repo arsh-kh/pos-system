@@ -18,7 +18,7 @@ exports.getAllProducts = async (req, res) => {
                        WHERE pb.product_id = p.id AND pb.status = 'ACTIVE' AND pb.remaining_quantity > 0 
                        ORDER BY pb.created_at ASC, pb.id ASC 
                        LIMIT 1
-                   ), 1) AS active_units_per_box,
+                   ), p.units_per_box, 1) AS active_units_per_box,
                    (
                        SELECT pb.selling_price 
                        FROM Product_Batches pb 

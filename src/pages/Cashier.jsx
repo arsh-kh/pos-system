@@ -513,11 +513,12 @@ const Cashier = () => {
           idx === existingIdx ? { ...item, quantity: Math.max(0.001, newQty) } : item
         );
       } else {
+        const isWeightedProd = Boolean(product.is_weighted || product.unit === 'کگم');
         const newItem = {
           id: product.id,
           cartKey: cartKey,
           baseName: product.name,
-          name: isBox ? `${product.name} (کارتۆن - ${unitsPerBox} دانە)` : product.name,
+          name: isBox ? (isWeightedProd ? `${product.name} (گونیە - ${unitsPerBox} کگم)` : `${product.name} (کارتۆن - ${unitsPerBox} دانە)`) : product.name,
           barcode: product.barcode,
           box_barcode: product.box_barcode,
           price: effectivePrice,
@@ -527,7 +528,8 @@ const Cashier = () => {
           unit_type: unitType,
           stock: product.stock || 0,
           quantity: Math.max(0.001, Number(addQty)),
-          unit: isBox ? 'کارتۆن' : (product.unit || 'دانە')
+          unit: isBox ? (isWeightedProd ? 'گونیە' : 'کارتۆن') : (product.unit || 'دانە'),
+          is_weighted: isWeightedProd
         };
         return [...prevCart, newItem];
       }
@@ -544,15 +546,19 @@ const Cashier = () => {
         const unitsPerBox = Number(item.units_per_box) || 1;
         const singlePrice = Number(item.single_price) || Number(item.price);
         const boxPrice = Number(item.wholesale_price) > 0 ? Number(item.wholesale_price) : Math.round(singlePrice * unitsPerBox);
-        const baseName = item.baseName || item.name.replace(/\s*\(کارتۆن.*?\)/, '');
+        const baseName = item.baseName || item.name.replace(/\s*\((کارتۆن|گونیە).*?\)/, '');
+        const isW = Boolean(item.is_weighted || item.unit === 'کگم' || item.unit === 'گونیە');
 
         return {
           ...item,
           cartKey: `${item.id}_${targetUnitType}`,
           unit_type: targetUnitType,
           price: isToBox ? boxPrice : singlePrice,
-          name: isToBox ? `${baseName} (کارتۆن - ${unitsPerBox} دانە)` : baseName,
-          unit: isToBox ? 'کارتۆن' : 'دانە'
+          name: isToBox 
+            ? (isW ? `${baseName} (گونیە - ${unitsPerBox} کگم)` : `${baseName} (کارتۆن - ${unitsPerBox} دانە)`) 
+            : baseName,
+          unit: isToBox ? (isW ? 'گونیە' : 'کارتۆن') : (isW ? 'کگم' : 'دانە'),
+          is_weighted: isW
         };
       });
     });
@@ -1533,8 +1539,8 @@ const Cashier = () => {
             position: static !important;
             width: 100% !important;
             max-width: 72mm !important;
-            margin: 0 auto !important;
-            padding: 2px 4mm 30px 4mm !important;
+            margin: 0 auto 0 1.5mm !important;
+            padding: 2px 6.5mm 30px 2.5mm !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #ffffff !important;
@@ -2097,7 +2103,7 @@ const Cashier = () => {
                 {cart.map((item, index) => {
                   const pricing = getItemPricing(item);
                     const lineTotal = pricing.lineTotal;
-                    const isKg = item.unit === 'کگم' || item.is_weighted;
+                    const isKg = item.unit === 'کگم' || item.unit === 'گونیە' || Boolean(item.is_weighted);
                     const itemKey = item.cartKey || item.barcode;
                     const isSelected = selectedCartKey === itemKey;
                     return (
@@ -2151,6 +2157,44 @@ const Cashier = () => {
                           }}>
                             {item.name}
                           </div>
+                          {(Number(item.units_per_box) > 1) && (
+                            <div style={{ display: 'inline-flex', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '1px', marginTop: '2px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setItemUnitType(itemKey, 'PIECE')}
+                                style={{
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: item.unit_type !== 'BOX' ? '#2563eb' : 'transparent',
+                                  color: item.unit_type !== 'BOX' ? '#ffffff' : 'var(--text-secondary)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                {isKg ? 'کگم' : 'دانە'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setItemUnitType(itemKey, 'BOX')}
+                                style={{
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: item.unit_type === 'BOX' ? '#2563eb' : 'transparent',
+                                  color: item.unit_type === 'BOX' ? '#ffffff' : 'var(--text-secondary)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                {isKg ? 'گونیە' : 'کارتۆن'}
+                              </button>
+                            </div>
+                          )}
                           {(item.is_custom || (pricing.hasPromo && item.unit_type !== 'BOX')) && (
                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
                               {item.is_custom && (
@@ -2172,7 +2216,7 @@ const Cashier = () => {
                           <button 
                             type="button"
                             onClick={() => {
-                              const step = isKg ? 0.25 : 1;
+                              const step = (isKg && item.unit_type !== 'BOX') ? 0.25 : 1;
                               const targetQty = Math.round((Number(item.quantity) - step) * 1000) / 1000;
                               updateQuantity(itemKey, Math.max(0, targetQty));
                             }}
@@ -2196,7 +2240,7 @@ const Cashier = () => {
                           
                           <input 
                             type="number" 
-                            step={isKg ? '0.05' : '1'}
+                            step={(isKg && item.unit_type !== 'BOX') ? '0.05' : '1'}
                             min="0"
                             value={item.quantity}
                             onFocus={(e) => e.target.select()}
@@ -2219,7 +2263,7 @@ const Cashier = () => {
                           <button 
                             type="button"
                             onClick={() => {
-                              const step = isKg ? 0.25 : 1;
+                              const step = (isKg && item.unit_type !== 'BOX') ? 0.25 : 1;
                               const targetQty = Math.round((Number(item.quantity) + step) * 1000) / 1000;
                               updateQuantity(itemKey, targetQty);
                             }}
@@ -3046,8 +3090,8 @@ const Cashier = () => {
         <div id="cashier-thermal-receipt" style={{
           width: '100%',
           maxWidth: '72mm',
-          margin: '0 auto',
-          padding: '0 4mm',
+          margin: '0 auto 0 1.5mm',
+          padding: '0 6.5mm 0 2.5mm',
           boxSizing: 'border-box',
           overflow: 'hidden',
           direction: 'rtl',
@@ -3097,8 +3141,9 @@ const Cashier = () => {
                 const qtyVal = Number(it.quantity) || 0;
                 const cleanQty = Number.isInteger(qtyVal) ? qtyVal : parseFloat(qtyVal.toFixed(3));
                 const isGramOrWeight = it.unit === 'گم' || it.unit === 'کگم' || it.unit === 'گرام' || it.unit === 'کیلۆ' || it.unit_type === 'WEIGHT' || String(it.unit || '').includes('گم') || String(it.unit || '').includes('کێش');
-                const isBox = it.unit_type === 'BOX' || it.unit === 'کارتۆن';
-                const displayQty = isGramOrWeight ? (cleanQty + ' گم') : (isBox ? (cleanQty + ' کارتۆن') : cleanQty);
+                const isBox = it.unit_type === 'BOX' || it.unit === 'کارتۆن' || it.unit === 'گونیە';
+                const boxUnitName = (it.is_weighted || it.unit === 'گونیە') ? 'گونیە' : 'کارتۆن';
+                const displayQty = (isGramOrWeight && !isBox) ? (cleanQty + ' کگم') : (isBox ? (cleanQty + ' ' + boxUnitName) : cleanQty);
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #000000', color: '#000000' }}>
                     <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold' }}>{idx + 1}</td>

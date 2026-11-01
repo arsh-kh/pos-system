@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
@@ -19,6 +20,14 @@ if (typeof window !== 'undefined' && typeof window.require === 'function') {
 }
 
 const Purchases = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const editInvoiceId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('edit');
+  }, [location.search]);
+
+  const [isEditMode, setIsEditMode] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -90,8 +99,82 @@ const Purchases = () => {
     fetchData();
   }, []);
 
-  // Auto-sync draft to localStorage
+  // Edit Mode: Fetch invoice details when edit parameter is present
   useEffect(() => {
+    if (!editInvoiceId) {
+      setIsEditMode(false);
+      return;
+    }
+
+    const fetchInvoiceForEdit = async () => {
+      try {
+        const config = getAuthConfig();
+        const res = await axios.get(`http://localhost:3001/api/purchase-invoices/${editInvoiceId}`, config);
+        if (res.data?.status === 'SUCCESS' && res.data.data) {
+          const inv = res.data.data;
+          setIsEditMode(true);
+          setSupplierId(String(inv.supplier_id || ''));
+          setInvoiceNumber(inv.invoice_number || `INV-${inv.id}`);
+          const rawDate = inv.created_at || '';
+          setInvoiceDate(rawDate.includes('T') ? rawDate.split('T')[0] : (rawDate.split(' ')[0] || new Date().toISOString().split('T')[0]));
+          setPaymentMethod(inv.payment_method || 'CASH');
+          setPaidAmount(String(inv.paid_amount || ''));
+          setAdditionalCost(String(inv.additional_cost || '0'));
+
+          if (Array.isArray(inv.items)) {
+            const loadedItems = inv.items.map(it => {
+              const unitsPerBox = Math.max(1, parseFloat(it.units_per_box) || 1);
+              const isBox = it.unit_type === 'BOX';
+              const costPrice = Number(it.cost_price) || 0;
+              const boxCostPrice = it.box_cost_price ? Number(it.box_cost_price) : Math.round(costPrice * unitsPerBox);
+
+              return {
+                product_id: it.product_id,
+                name: it.product_name,
+                barcode: it.barcode,
+                box_barcode: it.box_barcode || '',
+                units_per_box: unitsPerBox,
+                unit_type: it.unit_type || 'PIECE',
+                box_quantity: it.box_quantity ? String(it.box_quantity) : String(parseFloat((Number(it.quantity) / unitsPerBox).toFixed(2)) || 1),
+                box_cost_price: String(boxCostPrice),
+                quantity: String(it.quantity),
+                cost_price: String(costPrice),
+                selling_price: it.selling_price || 0,
+                stock_before: it.current_stock || 0,
+                is_weighted: Boolean(it.is_weighted),
+                unit: it.unit || 'دانە',
+                original_quantity: it.quantity,
+                original_item_id: it.id
+              };
+            });
+            setItems(loadedItems);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching invoice for edit:', err);
+        toast.error('هەڵەیەک ڕوویدا لە بارکردنی پسووڵەکە');
+      }
+    };
+
+    fetchInvoiceForEdit();
+  }, [editInvoiceId]);
+
+  const handleCancelEdit = () => {
+    localStorage.removeItem('pos_purchase_draft');
+    setSupplierId('');
+    setInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+    setItems([]);
+    setPaymentMethod('CASH');
+    setPaidAmount('');
+    setAdditionalCost('');
+    setIsEditMode(false);
+    navigate('/financials');
+  };
+
+
+  // Auto-sync draft to localStorage (Disabled during Edit Mode)
+  useEffect(() => {
+    if (isEditMode) return;
     if (items.length > 0 || supplierId) {
       try {
         localStorage.setItem('pos_purchase_draft', JSON.stringify({
@@ -126,8 +209,8 @@ const Purchases = () => {
 
     if (existing) {
       const isWeighted = Boolean(existing.is_weighted || existing.unit === 'کگم');
-      const unitsPerBox = (!isWeighted && existing.units_per_box) ? Math.max(1, parseFloat(existing.units_per_box) || 1) : 1;
-      const isScannedBox = Boolean(!isWeighted && existing.box_barcode && normalizeBarcode(existing.box_barcode) === cleanCode);
+      const unitsPerBox = existing.units_per_box ? Math.max(1, parseFloat(existing.units_per_box) || 1) : 1;
+      const isScannedBox = Boolean(existing.box_barcode && normalizeBarcode(existing.box_barcode) === cleanCode);
       const initialUnitType = isScannedBox ? 'BOX' : (unitsPerBox > 1 ? 'BOX' : 'PIECE');
 
       setItems(prevItems => {
@@ -185,11 +268,13 @@ const Purchases = () => {
   };
 
   useBarcodeScanner((scannedCode) => {
+    if (isQuickAddOpen) return;
     handleProcessBarcode(scannedCode);
   });
 
   const handleBarcodeSubmit = (e) => {
     e.preventDefault();
+    if (isQuickAddOpen) return;
     if (scanBarcode) {
       handleProcessBarcode(scanBarcode);
     }
@@ -197,10 +282,10 @@ const Purchases = () => {
 
   const handleQuickAddSuccess = (newProd) => {
     const isWeighted = Boolean(newProd.is_weighted || newProd.unit === 'کگم');
-    const unitsPerBox = (!isWeighted && newProd.units_per_box) ? Math.max(1, parseFloat(newProd.units_per_box) || 1) : 1;
+    const unitsPerBox = newProd.units_per_box ? Math.max(1, parseFloat(newProd.units_per_box) || 1) : 1;
     const boxCost = Math.max(0, Number(newProd.box_cost_price) || (Number(newProd.cost_price) * unitsPerBox) || 0);
     const pieceCost = Math.max(0, Number(newProd.cost_price) || 0);
-    const initialUnitType = (!isWeighted && unitsPerBox > 1) ? 'BOX' : 'PIECE';
+    const initialUnitType = (unitsPerBox > 1) ? 'BOX' : 'PIECE';
 
     let initialQty = '1';
     if (newProd.initial_qty !== null && newProd.initial_qty !== undefined && !isNaN(Number(newProd.initial_qty)) && Number(newProd.initial_qty) > 0) {
@@ -662,7 +747,12 @@ const Purchases = () => {
         })
       };
 
-      await axios.post('http://localhost:3001/api/purchase-invoices', payload, config);
+      if (isEditMode) {
+        await axios.put(`http://localhost:3001/api/purchase-invoices/${editInvoiceId}`, payload, config);
+        toast.success('پسووڵەکە بە سەرکەوتوویی نوێکرایەوە');
+      } else {
+        await axios.post('http://localhost:3001/api/purchase-invoices', payload, config);
+      }
 
       const savedSupplier = suppliers.find(s => String(s.id) === String(supplierId));
       const invoiceReceiptData = {
@@ -708,6 +798,12 @@ const Purchases = () => {
       setAdditionalCost('');
       setProductSearch('');
 
+      if (isEditMode && !exportPdf) {
+        setIsEditMode(false);
+        navigate('/financials');
+        return;
+      }
+
       const prodRes = await axios.get('http://localhost:3001/api/products', config);
       if (prodRes.data.status === 'SUCCESS') setProducts(prodRes.data.data);
 
@@ -733,6 +829,39 @@ const Purchases = () => {
       direction: 'rtl'
     }}>
       
+      {isEditMode && (
+        <div style={{
+          background: '#f0fdf4',
+          border: '1px solid #86efac',
+          borderRadius: '8px',
+          padding: '6px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0
+        }}>
+          <div style={{ color: '#166534', fontSize: '0.86rem', fontWeight: 700 }}>
+            <span>دەستکاریکردنی پسووڵەی #{invoiceNumber}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancelEdit}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '3px 12px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#475569',
+              cursor: 'pointer'
+            }}
+          >
+            پاشگەزبوونەوە
+          </button>
+        </div>
+      )}
+
       {/* Top Section: Clean Toolbar */}
       <div style={{
         background: '#ffffff',
@@ -1114,7 +1243,7 @@ const Purchases = () => {
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>هەبوو</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>شێوازی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بڕ</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>دانە لە کارتۆنێکدا</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>دانە / کێش لە بەستەدا</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی فرۆشتن (تاک)</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center' }}>کۆی کڕین</th>
@@ -1161,56 +1290,52 @@ const Purchases = () => {
                       {Number(item.stock_before || 0).toLocaleString()} {item.is_weighted ? 'کگم' : 'دانە'}
                     </td>
 
-                    {/* Unit Selector: Carton or Piece or KG */}
+                    {/* Unit Selector: Carton/Sack or Piece/KG */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
-                      {item.is_weighted ? (
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2563eb' }}>کگم</span>
-                      ) : (
-                        <div style={{
-                          display: 'inline-flex',
-                          background: '#f1f5f9',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          padding: '2px',
-                          height: '28px',
-                          boxSizing: 'border-box'
-                        }}>
-                          <button
-                            type="button"
-                            onClick={() => updateItem(index, 'unit_type', 'BOX')}
-                            style={{
-                              padding: '0 8px',
-                              borderRadius: '4px',
-                              border: 'none',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              background: isBox ? '#2563eb' : 'transparent',
-                              color: isBox ? '#ffffff' : '#64748b',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            کارتۆن
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateItem(index, 'unit_type', 'PIECE')}
-                            style={{
-                              padding: '0 8px',
-                              borderRadius: '4px',
-                              border: 'none',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              background: !isBox ? '#2563eb' : 'transparent',
-                              color: !isBox ? '#ffffff' : '#64748b',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            دانە
-                          </button>
-                        </div>
-                      )}
+                      <div style={{
+                        display: 'inline-flex',
+                        background: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        padding: '2px',
+                        height: '28px',
+                        boxSizing: 'border-box'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, 'unit_type', 'BOX')}
+                          style={{
+                            padding: '0 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            background: isBox ? '#2563eb' : 'transparent',
+                            color: isBox ? '#ffffff' : '#64748b',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {item.is_weighted ? 'گونیە' : 'کارتۆن'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, 'unit_type', 'PIECE')}
+                          style={{
+                            padding: '0 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            background: !isBox ? '#2563eb' : 'transparent',
+                            color: !isBox ? '#ffffff' : '#64748b',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {item.is_weighted ? 'کگم' : 'دانە'}
+                        </button>
+                      </div>
                     </td>
 
                     {/* Quantity Input - Clean Single Centered Input */}
@@ -1237,34 +1362,30 @@ const Purchases = () => {
                       />
                     </td>
 
-                    {/* Units per Box Input ("دانە لە کارتۆنێکدا") */}
+                    {/* Units per Box/Sack Input ("دانە لە کارتۆندا" / "کێش لە گونیەدا") */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
-                      {item.is_weighted ? (
-                        <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
-                      ) : (
-                        <input 
-                          type="number" 
-                          step="any"
-                          min="1" 
-                          disabled={!isBox}
-                          value={isBox ? (item.units_per_box ?? '') : '1'} 
-                          onChange={(e) => updateItem(index, 'units_per_box', e.target.value)} 
-                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
-                          style={{
-                            width: '75px',
-                            height: '28px',
-                            borderRadius: '4px',
-                            background: !isBox ? '#f1f5f9' : '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            color: !isBox ? '#94a3b8' : '#1e293b',
-                            textAlign: 'center',
-                            fontWeight: 700,
-                            fontSize: '0.86rem',
-                            outline: 'none',
-                            cursor: !isBox ? 'not-allowed' : 'text'
-                          }} 
-                        />
-                      )}
+                      <input 
+                        type="number" 
+                        step="any"
+                        min={item.is_weighted ? '0.1' : '1'} 
+                        disabled={!isBox}
+                        value={isBox ? (item.units_per_box ?? '') : (item.is_weighted ? (item.last_box_multiplier || item.units_per_box || '1') : '1')} 
+                        onChange={(e) => updateItem(index, 'units_per_box', e.target.value)} 
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+                        style={{
+                          width: '75px',
+                          height: '28px',
+                          borderRadius: '4px',
+                          background: !isBox ? '#f1f5f9' : '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: !isBox ? '#94a3b8' : '#1e293b',
+                          textAlign: 'center',
+                          fontWeight: 700,
+                          fontSize: '0.86rem',
+                          outline: 'none',
+                          cursor: !isBox ? 'not-allowed' : 'text'
+                        }} 
+                      />
                     </td>
 
                     {/* Cost Price Input - Clean Single Centered Input */}
@@ -1438,7 +1559,7 @@ const Purchases = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            تۆمارکردن
+            {isEditMode ? "نوێکردنەوە و پاشەکەوت" : "تۆمارکردن"}
           </button>
 
           <button 
@@ -1459,7 +1580,7 @@ const Purchases = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            تۆمارکردن و PDF
+            {isEditMode ? "نوێکردنەوە و PDF" : "تۆمارکردن و PDF"}
           </button>
         </div>
       </div>
@@ -1467,7 +1588,10 @@ const Purchases = () => {
       {/* Quick Add Product Modal (Unified DRY Layout matching Products & Warehouse) */}
       <ProductModal
         isOpen={isQuickAddOpen}
-        onClose={() => setIsQuickAddOpen(false)}
+        onClose={() => {
+          setIsQuickAddOpen(false);
+          setQuickAddBarcode('');
+        }}
         onSuccess={handleQuickAddSuccess}
         mode="purchase"
         presetBarcode={quickAddBarcode}

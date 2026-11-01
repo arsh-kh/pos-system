@@ -219,6 +219,282 @@ exports.createPurchaseInvoice = async (req, res) => {
     }
 };
 
+
+exports.updatePurchaseInvoice = async (req, res) => {
+    const { id } = req.params;
+    const { supplier_id, paid_amount, remaining_amount, items, invoice_number, payment_method, invoice_date, additional_cost } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە لانیکەم یەک کاڵا دیاری بکە' });
+    }
+
+    if (!supplier_id) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە سەرەتا کۆمپانیا دیاری بکە' });
+    }
+
+    const additionalCostBigInt = safeBigInt(additional_cost || 0);
+    if (additionalCostBigInt < 0n) {
+        return res.status(400).json({ status: 'ERROR', message: 'تێچووی زیادە ناتوانێت کەمتر بێت لە سفر' });
+    }
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Fetch current invoice with FOR UPDATE
+        const [oldInvoices] = await connection.query('SELECT * FROM Purchase_Invoices WHERE id = ? FOR UPDATE', [id]);
+        if (oldInvoices.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ status: 'ERROR', message: 'پسووڵەکە نەدۆزرایەوە' });
+        }
+        const oldInv = oldInvoices[0];
+
+        // 2. Fetch current items of this invoice
+        const [oldItems] = await connection.query('SELECT * FROM Purchase_Invoice_Items WHERE invoice_id = ?', [id]);
+
+        // 3. Fetch batches created by this invoice
+        const [oldBatches] = await connection.query('SELECT * FROM Product_Batches WHERE purchase_invoice_id = ?', [id]);
+
+        // 4. Calculate items subtotal and new grand total safely
+        let items_subtotal = 0n;
+        for (const item of items) {
+            const rawCostNum = Math.max(0, Number(item.cost_price) || 0);
+            const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
+            const lineTotal = (item.line_total !== undefined && item.line_total !== null && Number(item.line_total) >= 0)
+                ? safeBigInt(Math.round(Number(item.line_total)))
+                : safeBigInt(Math.round(rawCostNum * itemQtyNum));
+            items_subtotal += lineTotal;
+        }
+
+        let total_amount = items_subtotal + additionalCostBigInt;
+        if (req.body.total_amount !== undefined && req.body.total_amount !== null && Number(req.body.total_amount) > 0) {
+            total_amount = safeBigInt(Math.round(Number(req.body.total_amount)));
+        }
+
+        const newPaidBigInt = safeBigInt(paid_amount);
+        const newRemainingBigInt = safeBigInt(remaining_amount);
+
+        // 5. Update Supplier Ledger (Reverse old invoice values, apply new invoice values)
+        if (oldInv.supplier_id) {
+            await connection.query(
+                'UPDATE Suppliers SET total_paid = total_paid - ?, total_remaining = total_remaining - ? WHERE id = ?',
+                [safeBigInt(oldInv.paid_amount).toString(), safeBigInt(oldInv.remaining_amount).toString(), oldInv.supplier_id]
+            );
+        }
+        if (supplier_id) {
+            await connection.query(
+                'UPDATE Suppliers SET total_paid = total_paid + ?, total_remaining = total_remaining + ? WHERE id = ?',
+                [newPaidBigInt.toString(), newRemainingBigInt.toString(), supplier_id]
+            );
+        }
+
+        // 6. Proportional Landed Cost Allocation per Item
+        let remainingAdditional = additionalCostBigInt;
+        const oldItemMap = new Map();
+        oldItems.forEach(oi => oldItemMap.set(Number(oi.product_id), oi));
+
+        const oldBatchMap = new Map();
+        oldBatches.forEach(ob => oldBatchMap.set(Number(ob.product_id), ob));
+
+        const processedProductIds = new Set();
+        const dateVal = invoice_date ? new Date(invoice_date) : new Date(oldInv.created_at);
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const pId = Number(item.product_id);
+            processedProductIds.add(pId);
+
+            const rawCostNum = Math.max(0, Number(item.cost_price) || 0);
+            const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
+            const itemSubtotal = (item.line_total !== undefined && item.line_total !== null && Number(item.line_total) >= 0)
+                ? safeBigInt(Math.round(Number(item.line_total)))
+                : safeBigInt(Math.round(rawCostNum * itemQtyNum));
+
+            let allocatedCostForItem = 0n;
+            if (additionalCostBigInt > 0n && items_subtotal > 0n) {
+                if (i === items.length - 1) {
+                    allocatedCostForItem = remainingAdditional;
+                } else {
+                    allocatedCostForItem = (additionalCostBigInt * itemSubtotal) / items_subtotal;
+                    remainingAdditional -= allocatedCostForItem;
+                }
+            }
+
+            const additionalPerUnit = itemQtyNum > 0 ? Math.round(Number(allocatedCostForItem) / itemQtyNum) : 0;
+            const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
+            const itemUnitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+            const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
+                ? safeBigInt(item.selling_price ?? item.sell_price).toString()
+                : null;
+
+            if (oldItemMap.has(pId)) {
+                // Existing item: Update item and only adjust inventory by DELTA
+                const existingItem = oldItemMap.get(pId);
+                const oldQty = parseFloat(existingItem.quantity) || 0;
+                const qtyDelta = itemQtyNum - oldQty;
+
+                await connection.query(`
+                    UPDATE Purchase_Invoice_Items 
+                    SET quantity = ?, cost_price = ?, landed_cost_price = ?, selling_price = ?, units_per_box = ?, unit_type = ?, box_quantity = ?, box_cost_price = ?, line_total = ?
+                    WHERE id = ?
+                `, [
+                    itemQtyNum,
+                    safeBigInt(rawCostNum).toString(),
+                    landedUnitCost.toString(),
+                    sellingPriceVal,
+                    itemUnitsPerBox,
+                    item.unit_type || 'PIECE',
+                    item.box_quantity ? item.box_quantity : null,
+                    item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
+                    itemSubtotal.toString(),
+                    existingItem.id
+                ]);
+
+                // Update product stock with delta only (if delta == 0, stock is completely unchanged!)
+                if (qtyDelta !== 0) {
+                    await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [qtyDelta, pId]);
+                }
+
+                // Update Batch
+                if (oldBatchMap.has(pId)) {
+                    const batch = oldBatchMap.get(pId);
+                    await connection.query(`
+                        UPDATE Product_Batches 
+                        SET initial_quantity = initial_quantity + ?,
+                            remaining_quantity = remaining_quantity + ?,
+                            cost_price = ?,
+                            selling_price = ?,
+                            units_per_box = ?
+                        WHERE id = ?
+                    `, [
+                        qtyDelta,
+                        qtyDelta,
+                        landedUnitCost.toString(),
+                        sellingPriceVal,
+                        itemUnitsPerBox,
+                        batch.id
+                    ]);
+                }
+            } else {
+                // NEW ITEM added to invoice: Insert item, create batch, add full quantity to stock
+                await connection.query(`
+                    INSERT INTO Purchase_Invoice_Items (
+                        invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    id,
+                    pId,
+                    itemQtyNum,
+                    safeBigInt(rawCostNum).toString(),
+                    landedUnitCost.toString(),
+                    sellingPriceVal,
+                    itemUnitsPerBox,
+                    item.unit_type || 'PIECE',
+                    item.box_quantity ? item.box_quantity : null,
+                    item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
+                    itemSubtotal.toString()
+                ]);
+
+                const batchNum = item.batch_number || `BATCH-${id}-${pId}`;
+                await connection.query(`
+                    INSERT INTO Product_Batches (
+                        product_id, purchase_invoice_id, batch_number, initial_quantity, remaining_quantity, cost_price, selling_price, units_per_box, expiry_date, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+                `, [
+                    pId,
+                    id,
+                    batchNum,
+                    itemQtyNum,
+                    itemQtyNum,
+                    landedUnitCost.toString(),
+                    sellingPriceVal,
+                    itemUnitsPerBox,
+                    item.expiry_date || null,
+                    dateVal
+                ]);
+
+                await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [itemQtyNum, pId]);
+            }
+        }
+
+        // Handle removed items
+        for (const [oldPId, oldItem] of oldItemMap.entries()) {
+            if (!processedProductIds.has(oldPId)) {
+                const oldQty = parseFloat(oldItem.quantity) || 0;
+                await connection.query('UPDATE Products SET stock = stock - ? WHERE id = ?', [oldQty, oldPId]);
+                if (oldBatchMap.has(oldPId)) {
+                    const b = oldBatchMap.get(oldPId);
+                    await connection.query('DELETE FROM Product_Batches WHERE id = ?', [b.id]);
+                }
+                await connection.query('DELETE FROM Purchase_Invoice_Items WHERE id = ?', [oldItem.id]);
+            }
+        }
+
+        // 7. Update Invoice Record
+        await connection.query(`
+            UPDATE Purchase_Invoices 
+            SET supplier_id = ?, total_amount = ?, paid_amount = ?, remaining_amount = ?, invoice_number = ?, payment_method = ?, additional_cost = ?, created_at = ?
+            WHERE id = ?
+        `, [
+            supplier_id,
+            total_amount.toString(),
+            newPaidBigInt.toString(),
+            newRemainingBigInt.toString(),
+            invoice_number || oldInv.invoice_number,
+            payment_method || oldInv.payment_method,
+            additionalCostBigInt.toString(),
+            dateVal,
+            id
+        ]);
+
+        await connection.commit();
+
+        // Audit Logging
+        try {
+            await logAuditAction({
+                req,
+                action_type: 'PURCHASE_INVOICE_UPDATED',
+                entity_name: 'Purchase_Invoices',
+                entity_id: id,
+                details: `دەستکاریکردنی پسووڵەی کڕین #${invoice_number || id}، کۆی نوێ: ${Number(total_amount).toLocaleString()} د.ع`
+            });
+        } catch (_) {}
+
+        // Cloud & Offline Sync Event
+        try {
+            await queueSyncEvent({
+                entity_type: 'PURCHASE_INVOICE',
+                entity_id: id,
+                action_type: 'UPDATE',
+                payload: {
+                    invoice_id: id,
+                    supplier_id,
+                    total_amount: total_amount.toString(),
+                    paid_amount: newPaidBigInt.toString(),
+                    remaining_amount: newRemainingBigInt.toString(),
+                    additional_cost: additionalCostBigInt.toString(),
+                    items_count: items.length
+                }
+            });
+        } catch (_) {}
+
+        res.json({
+            status: 'SUCCESS',
+            message: 'پسووڵەی کڕین بە سەرکەوتوویی نوێکرایەوە',
+            invoice_id: id,
+            total_amount: total_amount.toString(),
+            additional_cost: additionalCostBigInt.toString()
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Update Purchase Invoice Error:', error);
+        res.status(500).json({ status: 'ERROR', message: 'Failed to update purchase invoice: ' + error.message });
+    } finally {
+        connection.release();
+    }
+};
+
 exports.getAllPurchaseInvoices = async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -255,7 +531,7 @@ exports.getPurchaseInvoiceDetails = async (req, res) => {
         }
 
         const [items] = await db.query(`
-            SELECT pii.*, p.name as product_name, p.barcode, p.stock as current_stock
+            SELECT pii.*, p.name as product_name, p.barcode, p.box_barcode, p.is_weighted, p.unit, p.stock as current_stock
             FROM Purchase_Invoice_Items pii
             JOIN Products p ON pii.product_id = p.id
             WHERE pii.invoice_id = ?

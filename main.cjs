@@ -410,10 +410,9 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
     }
     .thermal-receipt-wrapper {
       width: 100% !important;
-      width: 100% !important;
       max-width: ${wrapperWidth} !important;
-      margin: 0 auto !important;
-      padding: 2px 4mm 25mm 4mm !important;
+      margin: 0 auto 0 1.5mm !important;
+      padding: 2px 6.5mm 25mm 2.5mm !important;
       box-sizing: border-box !important;
       overflow: hidden !important;
       color: #000000 !important;

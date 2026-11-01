@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { 
@@ -13,6 +14,7 @@ import {
   CheckCircle2,
   CreditCard,
   Eye,
+  Edit2,
   RotateCcw,
   AlertTriangle
 } from 'lucide-react';
@@ -25,6 +27,7 @@ import './Dashboard.css';
 
 const Financials = () => {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [allInvoices, setAllInvoices] = useState([]);
   const [purchaseReturns, setPurchaseReturns] = useState([]);
@@ -411,43 +414,6 @@ const Financials = () => {
 
         {/* Far Left Actions: "+ پسووڵەی کڕین", "گەڕاندنەوە بۆ کۆمپانیا", "+ کۆمپانیای نوێ" */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <a
-            href="#/purchases"
-            style={{ 
-              height: '38px', 
-              padding: '0 14px', 
-              borderRadius: '8px', 
-              background: '#0284c7', 
-              color: '#ffffff', 
-              textDecoration: 'none',
-              fontWeight: 700, 
-              fontSize: '0.82rem', 
-              display: 'inline-flex',
-              alignItems: 'center',
-              cursor: 'pointer' 
-            }}
-          >
-            + پسووڵەی کڕین
-          </a>
-
-          <button 
-            type="button"
-            onClick={() => setIsAddReturnOpen(true)} 
-            style={{ 
-              height: '38px', 
-              padding: '0 14px', 
-              borderRadius: '8px', 
-              background: '#ffffff', 
-              color: '#ef4444', 
-              border: '1px solid #fecaca', 
-              fontWeight: 700, 
-              fontSize: '0.82rem', 
-              cursor: 'pointer' 
-            }}
-          >
-            گەڕاندنەوە بۆ کۆمپانیا
-          </button>
-
           <button 
             type="button"
             onClick={() => setIsAddSupplierOpen(true)} 
@@ -540,12 +506,11 @@ const Financials = () => {
         <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', background: '#ffffff', direction: 'rtl' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
-              <col style={{ width: '25%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} />
+              <col style={{ width: '28%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '18%' }} />
             </colgroup>
             <thead>
               <tr style={{ height: '38px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569', fontWeight: 700 }}>
@@ -553,64 +518,44 @@ const Financials = () => {
                 <th style={{ padding: '0 10px', textAlign: 'center' }}>مۆبایل</th>
                 <th style={{ padding: '0 10px', textAlign: 'center' }}>ژمارەی پسووڵە</th>
                 <th style={{ padding: '0 10px', textAlign: 'center' }}>کۆی دراو</th>
-                <th style={{ padding: '0 10px', textAlign: 'center' }}>کۆی ماوە (قەرز)</th>
-                <th style={{ padding: '0 14px', textAlign: 'left' }}>کردارەکان</th>
+                <th style={{ padding: '0 14px', textAlign: 'center' }}>کۆی ماوە (قەرز)</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="6" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>باردەکرێت...</td></tr>
+                <tr><td colSpan="5" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>باردەکرێت...</td></tr>
               ) : filteredSuppliers.length === 0 ? (
-                <tr><td colSpan="6" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>هیچ کۆمپانیایەک نەدۆزرایەوە</td></tr>
+                <tr><td colSpan="5" style={{ height: '38px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>هیچ کۆمپانیایەک نەدۆزرایەوە</td></tr>
               ) : (
                 filteredSuppliers.map(s => {
                   const remaining = Number(s.total_remaining) || 0;
                   return (
                     <tr 
                       key={s.id} 
-                      style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }} 
+                      onClick={() => openProfile(s.id)}
+                      style={{ height: '40px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease', cursor: 'pointer' }} 
                       onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} 
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      title="کلیک بکە بۆ بینینی پڕۆفایل و پسووڵەکان"
                     >
                       <td style={{ padding: '0 14px', textAlign: 'right', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {s.name}
                       </td>
                       <td style={{ padding: '0 10px', textAlign: 'center', color: '#475569', fontFamily: 'monospace', fontSize: '0.84rem' }}>
                         {s.phone ? (
-                          <a href={`tel:${s.phone}`} style={{ color: '#475569', textDecoration: 'none' }}>
+                          <span onClick={e => e.stopPropagation()} style={{ color: '#475569' }}>
                             {s.phone}
-                          </a>
+                          </span>
                         ) : '-'}
                       </td>
-                      <td style={{ padding: '0 10px', textAlign: 'center', color: '#0284c7', fontSize: '0.84rem' }}>
+                      <td style={{ padding: '0 10px', textAlign: 'center', color: '#0284c7', fontWeight: 700, fontSize: '0.84rem' }}>
                         {s.total_invoices || 0}
                       </td>
                       <td style={{ padding: '0 10px', textAlign: 'center', color: '#10b981', fontWeight: 600, fontSize: '0.86rem' }}>
                         {Number(s.total_paid || 0).toLocaleString()}
                       </td>
-                      <td style={{ padding: '0 10px', textAlign: 'center', color: remaining > 0 ? '#ef4444' : '#64748b', fontWeight: remaining > 0 ? 700 : 500, fontSize: '0.86rem' }}>
+                      <td style={{ padding: '0 14px', textAlign: 'center', color: remaining > 0 ? '#ef4444' : '#64748b', fontWeight: remaining > 0 ? 700 : 500, fontSize: '0.86rem' }}>
                         {remaining.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '0 14px', textAlign: 'left' }}>
-                        <button 
-                          type="button"
-                          onClick={() => openProfile(s.id)} 
-                          style={{ 
-                            background: '#ffffff', 
-                            color: '#0284c7', 
-                            border: '1px solid #cbd5e1', 
-                            padding: '3px 12px', 
-                            borderRadius: '6px', 
-                            cursor: 'pointer', 
-                            fontSize: '0.78rem', 
-                            fontWeight: 700,
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#f0f9ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                        >
-                          پڕۆفایل
-                        </button>
                       </td>
                     </tr>
                   );
@@ -648,7 +593,9 @@ const Financials = () => {
                   return (
                     <tr 
                       key={inv.id} 
-                      style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }} 
+                      onClick={() => navigate(`/purchases?edit=${inv.id}`)}
+                      title="کلیک بکە بۆ دەستکاریکردنی ئەم پسووڵەیە و زیادکردنی کاڵا"
+                      style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease', cursor: 'pointer' }} 
                       onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} 
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
@@ -686,7 +633,7 @@ const Financials = () => {
                         <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
                           <button 
                             type="button"
-                            onClick={() => handleExportInvoicePdfById(inv.id)} 
+                            onClick={(e) => { e.stopPropagation(); handleExportInvoicePdfById(inv.id); }} 
                             title="دەرکردنی فایلی PDF"
                             style={{ 
                               background: '#f8fafc', 
@@ -707,7 +654,7 @@ const Financials = () => {
                           </button>
                           <button 
                             type="button"
-                            onClick={() => openInvoiceDetails(inv.id)} 
+                            onClick={(e) => { e.stopPropagation(); openInvoiceDetails(inv.id); }} 
                             style={{ 
                               background: '#ffffff', 
                               color: '#0284c7', 
@@ -1393,7 +1340,9 @@ const Financials = () => {
                       return (
                         <tr 
                           key={inv.id} 
-                          style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }}
+                          onClick={() => navigate(`/purchases?edit=${inv.id}`)}
+                          title="کلیک بکە بۆ دەستکاریکردنی ئەم پسووڵەیە و زیادکردنی کاڵا"
+                          style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease', cursor: 'pointer' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
@@ -1425,16 +1374,16 @@ const Financials = () => {
                             </span>
                           </td>
                           <td style={{ border: '1px solid #e2e8f0', padding: '6px 8px', textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
                               <button
                                 type="button"
-                                onClick={() => handleExportInvoicePdfById(inv.id)}
+                                onClick={(e) => { e.stopPropagation(); handleExportInvoicePdfById(inv.id); }}
                                 title="دەرکردنی فایلی PDF"
                                 style={{
                                   background: '#f8fafc',
                                   color: '#0f172a',
                                   border: '1px solid #cbd5e1',
-                                  padding: '2px 8px',
+                                  padding: '3px 10px',
                                   borderRadius: '6px',
                                   cursor: 'pointer',
                                   fontSize: '0.78rem',
@@ -1449,12 +1398,12 @@ const Financials = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => openInvoiceDetails(inv.id)}
+                                onClick={(e) => { e.stopPropagation(); openInvoiceDetails(inv.id); }}
                                 style={{
                                   background: '#ffffff',
                                   color: '#0284c7',
                                   border: '1px solid #cbd5e1',
-                                  padding: '2px 8px',
+                                  padding: '3px 10px',
                                   borderRadius: '6px',
                                   cursor: 'pointer',
                                   fontSize: '0.78rem',
@@ -1476,166 +1425,274 @@ const Financials = () => {
               </table>
             </div>
 
-            {/* Profile Chart (Below table, only if data exists) */}
-            {profileChartData.length > 0 && (
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', background: '#ffffff', marginTop: '4px' }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.86rem', color: '#475569', fontWeight: 700 }}>هێڵکاری پارەدان و قەرزەکانی ئەم کۆمپانیایە بەپێی کات</h4>
-                <div style={{ width: '100%', height: 220 }}>
-                  <ResponsiveContainer>
-                    <AreaChart data={profileChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#94a3b8" fontSize={11} />
-                      <Tooltip 
-                        contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px' }}
-                        formatter={(val) => [`${Number(val).toLocaleString()}`]}
-                      />
-                      <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="rgba(59, 130, 246, 0.1)" name="کۆی کڕین" />
-                      <Area type="monotone" dataKey="paid" stroke="#10b981" fill="rgba(16, 185, 129, 0.1)" name="پارەی دراو" />
-                      <Area type="monotone" dataKey="remaining" stroke="#ef4444" fill="rgba(239, 68, 68, 0.1)" name="قەرز" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
+
 
           </div>
         </div>
       )}
 
-      {/* Invoice Details Modal */}
+      {/* Invoice Details Modal (Styled strictly matching Purchases.jsx data grid) */}
       {selectedInvoice && (
-        <div className="pos-modal-overlay" onClick={() => setSelectedInvoice(null)}>
-          <div className="pos-modal-card pos-modal-xl" onClick={e => e.stopPropagation()}>
-            
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <div>
-                <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '1.2rem', fontWeight: 800 }}>
-                  <FileText color="#38bdf8" /> وردەکاری پسووڵەی کڕین #{selectedInvoice.id}
-                </h2>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>
-                  کۆمپانیا: <strong style={{ color: 'var(--text-primary)' }}>{selectedInvoice.supplier_name}</strong> • {formatDateTime(selectedInvoice.created_at, { twelveHour: true })}
-                </div>
+        <div className="pos-modal-overlay" onClick={() => setSelectedInvoice(null)} style={{ background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)' }}>
+          <div 
+            style={{ 
+              maxWidth: '1000px', 
+              width: '95%', 
+              maxHeight: '92vh', 
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              direction: 'rtl'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header Toolbar matching Purchases.jsx */}
+            <div style={{
+              background: '#ffffff',
+              borderBottom: '1px solid #e2e8f0',
+              padding: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
+                  پسووڵەی کڕین #{selectedInvoice.invoice_number || selectedInvoice.id}
+                </span>
+                <span style={{ color: '#64748b', fontSize: '0.84rem' }}>
+                  کۆمپانیا: <strong style={{ color: '#0284c7' }}>{selectedInvoice.supplier_name}</strong>
+                </span>
+                <span style={{ color: '#94a3b8', fontSize: '0.80rem' }}>
+                  • {formatDate(selectedInvoice.created_at)}
+                </span>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  background: selectedInvoice.payment_method === 'DEBT' ? '#fef2f2' : selectedInvoice.payment_method === 'PARTIAL' ? '#fffbeb' : '#f0fdf4',
+                  color: selectedInvoice.payment_method === 'DEBT' ? '#ef4444' : selectedInvoice.payment_method === 'PARTIAL' ? '#b45309' : '#16a34a'
+                }}>
+                  {selectedInvoice.payment_method === 'DEBT' ? 'قەرز' : selectedInvoice.payment_method === 'PARTIAL' ? 'تێکەڵ' : 'نەقد'}
+                </span>
               </div>
-              <button onClick={() => setSelectedInvoice(null)} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '9999px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18}/>
+              <button 
+                type="button"
+                onClick={() => setSelectedInvoice(null)} 
+                style={{ 
+                  background: '#f8fafc', 
+                  border: '1px solid #cbd5e1', 
+                  color: '#64748b', 
+                  cursor: 'pointer', 
+                  width: '30px', 
+                  height: '30px', 
+                  borderRadius: '6px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center' 
+                }}
+              >
+                <X size={16}/>
               </button>
             </div>
 
-            {/* Financial Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', padding: '1rem', borderRadius: '12px', textAlign: 'center' }}>
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>کۆی تێچووی پسووڵە</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {Number(selectedInvoice.total_amount).toLocaleString()} دینار
-                </div>
+            {/* Financial Summary Toolbar (Exact Purchases.jsx Style) */}
+            <div style={{
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              padding: '8px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '24px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', gap: '6px', color: '#1e293b' }}>
+                <span style={{ color: '#64748b' }}>کۆی پسووڵە:</span>
+                <span style={{ fontSize: '0.92rem' }}>{Number(selectedInvoice.total_amount).toLocaleString()} دینار</span>
               </div>
 
               {Number(selectedInvoice.additional_cost) > 0 && (
-                <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
-                  <div style={{ color: '#fbbf24', fontSize: '0.85rem' }}>تێچووی زیادە (بار و حەماڵی)</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fbbf24', marginTop: '4px' }}>
-                    +{Number(selectedInvoice.additional_cost).toLocaleString()} دینار
-                  </div>
+                <div style={{ display: 'flex', gap: '6px', color: '#d97706' }}>
+                  <span style={{ color: '#b45309' }}>تێچووی زیادە:</span>
+                  <span>+{Number(selectedInvoice.additional_cost).toLocaleString()} دینار</span>
                 </div>
               )}
 
-              <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                <div style={{ color: '#10b981', fontSize: '0.85rem' }}>پارەی دراو</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
-                  {Number(selectedInvoice.paid_amount).toLocaleString()} دینار
-                </div>
+              <div style={{ display: 'flex', gap: '6px', color: '#10b981' }}>
+                <span style={{ color: '#047857' }}>پارەی دراو:</span>
+                <span>{Number(selectedInvoice.paid_amount).toLocaleString()} دینار</span>
               </div>
 
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                <div style={{ color: '#ef4444', fontSize: '0.85rem' }}>پارەی ماوە (قەرز)</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#ef4444', marginTop: '4px' }}>
-                  {Number(selectedInvoice.remaining_amount).toLocaleString()} دینار
-                </div>
+              <div style={{ display: 'flex', gap: '6px', color: Number(selectedInvoice.remaining_amount) > 0 ? '#ef4444' : '#64748b' }}>
+                <span style={{ color: '#64748b' }}>پارەی ماوە (قەرز):</span>
+                <span>{Number(selectedInvoice.remaining_amount).toLocaleString()} دینار</span>
+              </div>
+
+              <div style={{ marginRight: 'auto', color: '#64748b', fontSize: '0.82rem' }}>
+                ژمارەی کاڵاکان: <strong style={{ color: '#1e293b' }}>{selectedInvoice.items?.length || 0}</strong>
               </div>
             </div>
 
-            {/* Items Table */}
-            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)' }}>لیستی کاڵاکانی ناو ئەم پسووڵەیە:</h4>
-            <div style={{ padding: '1px', borderRadius: '12px', overflowX: 'auto', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                <thead style={{ background: 'var(--bg-secondary)' }}>
-                  <tr>
-                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>ناوی کاڵا</th>
-                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>بارکۆد</th>
-                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>بڕ (دانە)</th>
-                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>نرخی کڕین (خام)</th>
-                    {Number(selectedInvoice.additional_cost) > 0 && (
-                      <th style={{ padding: '12px 16px', color: '#fbbf24', fontSize: '0.9rem' }}>تێچووی گەیشتن (Landed)</th>
-                    )}
-                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>نرخی فرۆشتن</th>
-                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>کۆی تێچوو</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!selectedInvoice.items || selectedInvoice.items.length === 0 ? (
-                    <tr><td colSpan={Number(selectedInvoice.additional_cost) > 0 ? "7" : "6"} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>هیچ کاڵایەک نەدۆزرایەوە</td></tr>
-                  ) : (
-                    selectedInvoice.items.map((it, idx) => {
-                      const unitsPerBox = Math.max(1, Number(it.units_per_box) || 1);
-                      const isBox = it.unit_type === 'BOX' || (unitsPerBox > 1 && (Number(it.box_quantity) > 0 || (Number(it.quantity) % unitsPerBox === 0 && Number(it.quantity) >= unitsPerBox)));
-                      const bQty = Number(it.box_quantity) > 0 ? Number(it.box_quantity) : Math.max(1, Math.round(Number(it.quantity) / unitsPerBox));
-                      const qtyDesc = isBox ? `${bQty} کارتۆن` : `${it.quantity} دانە`;
-                      const unitCost = isBox 
-                        ? (Number(it.box_cost_price) || (it.line_total ? Math.round(Number(it.line_total) / bQty) : Math.round(Number(it.cost_price) * unitsPerBox)))
-                        : Number(it.cost_price);
-                      const landedCost = isBox
-                        ? (unitCost + (Number(it.landed_cost_price) > Number(it.cost_price) ? Math.round((Number(it.landed_cost_price) - Number(it.cost_price)) * unitsPerBox) : 0))
-                        : Number(it.landed_cost_price || it.cost_price);
-                      const lineTotal = Number(it.line_total) || (isBox ? (unitCost * bQty) : (Number(it.cost_price) * Number(it.quantity)));
+            {/* Items Table Container (Exact Bordered Data Grid matching Purchases.jsx) */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 18px' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <tr style={{ height: '38px', color: '#475569', fontSize: '0.82rem', fontWeight: 700 }}>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center', width: '4%' }}>#</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 12px', textAlign: 'right' }}>ناوی کاڵا</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center' }}>بارکۆد</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center' }}>بڕ</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center' }}>نرخی کڕین</th>
+                      {Number(selectedInvoice.additional_cost) > 0 && (
+                        <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center', color: '#b45309' }}>تێچووی گەیشتن (Landed)</th>
+                      )}
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center' }}>نرخی فرۆشتن</th>
+                      <th style={{ border: '1px solid #e2e8f0', padding: '0 12px', textAlign: 'center' }}>کۆی کڕین</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!selectedInvoice.items || selectedInvoice.items.length === 0 ? (
+                      <tr>
+                        <td colSpan={Number(selectedInvoice.additional_cost) > 0 ? "8" : "7"} style={{ border: '1px solid #e2e8f0', padding: '40px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
+                          هیچ کاڵایەک نەدۆزرایەوە
+                        </td>
+                      </tr>
+                    ) : (
+                      selectedInvoice.items.map((it, idx) => {
+                        const unitsPerBox = Math.max(1, Number(it.units_per_box) || 1);
+                        const isBox = it.unit_type === 'BOX' || (unitsPerBox > 1 && (Number(it.box_quantity) > 0 || (Number(it.quantity) % unitsPerBox === 0 && Number(it.quantity) >= unitsPerBox)));
+                        const bQty = Number(it.box_quantity) > 0 ? Number(it.box_quantity) : Math.max(1, Math.round(Number(it.quantity) / unitsPerBox));
+                        const qtyDesc = isBox ? `${bQty} کارتۆن` : `${it.quantity} دانە`;
+                        const unitCost = isBox 
+                          ? (Number(it.box_cost_price) || (it.line_total ? Math.round(Number(it.line_total) / bQty) : Math.round(Number(it.cost_price) * unitsPerBox)))
+                          : Number(it.cost_price);
+                        const landedCost = isBox
+                          ? (unitCost + (Number(it.landed_cost_price) > Number(it.cost_price) ? Math.round((Number(it.landed_cost_price) - Number(it.cost_price)) * unitsPerBox) : 0))
+                          : Number(it.landed_cost_price || it.cost_price);
+                        const lineTotal = Number(it.line_total) || (isBox ? (unitCost * bQty) : (Number(it.cost_price) * Number(it.quantity)));
 
-                      return (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{it.product_name}</td>
-                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: 600 }}>{it.barcode}</td>
-                          <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{qtyDesc}</td>
-                          <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{unitCost.toLocaleString()} دینار</td>
-                          {Number(selectedInvoice.additional_cost) > 0 && (
-                            <td style={{ padding: '12px 16px', color: '#fbbf24', fontWeight: 'bold' }}>
-                              {landedCost.toLocaleString()} دینار
+                        return (
+                          <tr 
+                            key={idx} 
+                            style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center', color: '#64748b', fontSize: '0.80rem' }}>
+                              {idx + 1}
                             </td>
-                          )}
-                          <td style={{ padding: '12px 16px', color: '#10b981' }}>{Number(it.selling_price).toLocaleString()} دینار</td>
-                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{lineTotal.toLocaleString()} دینار</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 12px', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>
+                              {it.product_name}
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center', fontFamily: 'monospace', color: '#64748b', fontSize: '0.82rem' }}>
+                              {it.barcode}
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center', color: '#0284c7', fontWeight: 700, fontSize: '0.84rem' }}>
+                              {qtyDesc}
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center', color: '#475569', fontSize: '0.84rem' }}>
+                              {unitCost.toLocaleString()}
+                            </td>
+                            {Number(selectedInvoice.additional_cost) > 0 && (
+                              <td style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center', color: '#b45309', fontWeight: 700, fontSize: '0.84rem' }}>
+                                {landedCost.toLocaleString()}
+                              </td>
+                            )}
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'center', color: '#10b981', fontWeight: 600, fontSize: '0.84rem' }}>
+                              {Number(it.selling_price).toLocaleString()}
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '0 12px', textAlign: 'center', fontWeight: 700, color: '#1e293b', fontSize: '0.86rem' }}>
+                              {lineTotal.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Modal Bottom Action Bar */}
+            <div style={{
+              background: '#ffffff',
+              borderTop: '1px solid #e2e8f0',
+              padding: '10px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  type="button"
+                  onClick={() => handleExportInvoicePdfFromObject(selectedInvoice)}
+                  style={{
+                    height: '36px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  <FileText size={14} />
+                  <span>دەرکردنی پسووڵە (PDF)</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const invId = selectedInvoice.id;
+                    setSelectedInvoice(null);
+                    navigate(`/purchases?edit=${invId}`);
+                  }}
+                  style={{
+                    height: '36px',
+                    padding: '0 18px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.84rem'
+                  }}
+                >
+                  <Edit2 size={14} />
+                  <span>دەستکاریکردن و زیادکردنی کاڵا</span>
+                </button>
+              </div>
               <button 
                 type="button"
-                onClick={() => handleExportInvoicePdfFromObject(selectedInvoice)}
+                onClick={() => setSelectedInvoice(null)}
                 style={{
-                  padding: '10px 18px',
-                  borderRadius: '10px',
+                  height: '36px',
+                  padding: '0 20px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
                   cursor: 'pointer',
                   fontWeight: 700,
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.85rem'
+                  fontSize: '0.84rem'
                 }}
-              >
-                <FileText size={16} />
-                <span>دەرکردنی پسووڵە (PDF)</span>
-              </button>
-              <button 
-                onClick={() => setSelectedInvoice(null)}
-                className="btn-secondary"
-                style={{ padding: '10px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 داخستن
               </button>
