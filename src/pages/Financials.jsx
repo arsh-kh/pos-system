@@ -1570,7 +1570,11 @@ const Financials = () => {
                         const unitsPerBox = Math.max(1, Number(it.units_per_box) || 1);
                         const isBox = it.unit_type === 'BOX' || (unitsPerBox > 1 && (Number(it.box_quantity) > 0 || (Number(it.quantity) % unitsPerBox === 0 && Number(it.quantity) >= unitsPerBox)));
                         const bQty = Number(it.box_quantity) > 0 ? Number(it.box_quantity) : Math.max(1, Math.round(Number(it.quantity) / unitsPerBox));
-                        const qtyDesc = isBox ? `${bQty} کارتۆن` : `${it.quantity} دانە`;
+                        const cleanPcs = parseFloat(it.quantity) || 0;
+                        const isWeighted = Boolean(it.is_weighted || it.unit === 'کگم');
+                        const boxUnitName = isWeighted ? 'گونیە' : 'کارتۆن';
+                        const pieceUnitName = isWeighted ? 'کگم' : 'دانە';
+                        const qtyDesc = isBox ? `${bQty} ${boxUnitName}` : `${cleanPcs} ${pieceUnitName}`;
                         const unitCost = isBox 
                           ? (Number(it.box_cost_price) || (it.line_total ? Math.round(Number(it.line_total) / bQty) : Math.round(Number(it.cost_price) * unitsPerBox)))
                           : Number(it.cost_price);

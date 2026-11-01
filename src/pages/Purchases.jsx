@@ -136,6 +136,14 @@ const Purchases = () => {
               const costPrice = Number(it.cost_price) || 0;
               const boxCostPrice = it.box_cost_price ? Number(it.box_cost_price) : Math.round(costPrice * unitsPerBox);
 
+              const rawBoxQty = it.box_quantity !== undefined && it.box_quantity !== null && it.box_quantity !== ''
+                ? parseFloat(it.box_quantity)
+                : (unitsPerBox > 0 ? parseFloat((Number(it.quantity) / unitsPerBox).toFixed(3)) : 1);
+              const cleanBoxQty = isNaN(rawBoxQty) ? '1' : String(rawBoxQty);
+
+              const rawQty = parseFloat(it.quantity) || 0;
+              const cleanQty = isNaN(rawQty) ? '0' : String(rawQty);
+
               return {
                 product_id: it.product_id,
                 name: it.product_name,
@@ -143,9 +151,9 @@ const Purchases = () => {
                 box_barcode: it.box_barcode || '',
                 units_per_box: unitsPerBox,
                 unit_type: it.unit_type || 'PIECE',
-                box_quantity: it.box_quantity ? String(it.box_quantity) : String(parseFloat((Number(it.quantity) / unitsPerBox).toFixed(2)) || 1),
+                box_quantity: cleanBoxQty,
                 box_cost_price: String(boxCostPrice),
-                quantity: String(it.quantity),
+                quantity: cleanQty,
                 cost_price: String(costPrice),
                 selling_price: it.selling_price || 0,
                 stock_before: it.current_stock || 0,
@@ -436,7 +444,7 @@ const Purchases = () => {
           } else {
             const safeVal = Math.max(0.001, parsed);
             it.box_quantity = value;
-            it.quantity = String(Math.round(safeVal * mult));
+            it.quantity = it.is_weighted ? String(parseFloat((safeVal * mult).toFixed(3))) : String(Math.round(safeVal * mult));
           }
         }
       } else if (field === 'box_cost_price') {
