@@ -600,7 +600,7 @@ exports.getRecentSalesForReturn = async (req, res) => {
             GROUP BY s.id
             HAVING (total_items_qty - total_returned_qty) > 0
             ORDER BY s.created_at DESC, s.id DESC
-            LIMIT 100
+            LIMIT 500
         `);
         res.json({ status: 'SUCCESS', data: rows });
     } catch (error) {

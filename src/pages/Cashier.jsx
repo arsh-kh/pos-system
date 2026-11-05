@@ -4077,8 +4077,19 @@ const Cashier = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                          دواین پسووڵەکان:
+                          سەرجەم پسووڵەکان {returnRecentSales.length > 0 ? `(${returnRecentSales.length})` : ''}:
                         </span>
+                        {returnSaleIdInput && (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            دۆزراوەتەوە: {returnRecentSales.filter(s => {
+                              const q = returnSaleIdInput.trim().toLowerCase();
+                              const digits = q.replace(/[^0-9]/g, '');
+                              const idMatch = digits ? String(s.id).includes(digits) : false;
+                              const nameMatch = (s.customer_name || '').toLowerCase().includes(q);
+                              return idMatch || nameMatch;
+                            }).length}
+                          </span>
+                        )}
                       </div>
 
                       <div 
@@ -4086,7 +4097,7 @@ const Cashier = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '8px',
-                          maxHeight: '340px',
+                          maxHeight: '360px',
                           overflowY: 'auto'
                         }}
                       >
