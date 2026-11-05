@@ -4077,7 +4077,7 @@ const Cashier = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                          سەرجەم پسووڵەکان {returnRecentSales.length > 0 ? `(${returnRecentSales.length})` : ''}:
+                          دواین ١٠٠ پسووڵە {returnRecentSales.length > 0 ? `(${returnRecentSales.length})` : ''}:
                         </span>
                         {returnSaleIdInput && (
                           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
