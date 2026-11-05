@@ -2589,7 +2589,7 @@ const Cashier = () => {
             width: '100%',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             boxSizing: 'border-box',
             overflow: 'hidden'
           }}>
@@ -3105,7 +3105,7 @@ const Cashier = () => {
             </div>
 
             {/* Bottom: Totals Breakdown, Auto-Print & Checkout Buttons */}
-            <div style={{ borderTop: 'none', paddingTop: '2px', marginTop: 'auto' }}>
+            <div style={{ borderTop: 'none', paddingTop: '2px', marginTop: '6px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 0 }}>
               
               {/* Dedicated Return Item Button - Fixed Position */}
               <div style={{ marginBottom: '5px' }}>
@@ -3229,8 +3229,9 @@ const Cashier = () => {
               {/* Big Grand Total Display (Higher & Taller across CASH, DEBT, and SPLIT) */}
               <div style={{ 
                 background: 'var(--bg-tertiary)', 
-                padding: '16px 12px', 
-                minHeight: '142px',
+                padding: '12px 12px', 
+                minHeight: '120px',
+                flex: 1,
                 borderRadius: '14px', 
                 border: '1.5px solid var(--border-color)', 
                 marginBottom: '8px',

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Moon, Sun, Database, Shield, CheckCircle2, AlertTriangle, 
-  Download, Upload, RefreshCw, HardDrive, FileJson, Clock, Check, X, 
-  AlertCircle, PlusCircle, Trash2, FolderOpen, Save,
-  Wifi, WifiOff, Cloud, Globe, Filter, Send, Eye, EyeOff, HelpCircle, Key, Lock,
-  Copy, ExternalLink, Edit2, Printer, ScanBarcode, Volume2, Zap, HelpCircle as HelpIcon,
-  Bot, Info, BookOpen, FileText, Folder,
-  User, Users, UserPlus, KeyRound, UserCheck, UserX
+  Moon, Sun, Shield, CheckCircle2, AlertTriangle, 
+  Download, Upload, RefreshCw, HardDrive, FileJson, Check, X, 
+  AlertCircle, Trash2, FolderOpen, Save,
+  Send, Eye, EyeOff, Key, Lock,
+  Copy, ExternalLink, Edit2, Printer, Zap,
+  User, Users, UserPlus
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -75,14 +74,12 @@ const DEFAULT_CASHIER_PERMISSIONS = {
 };
 
 const Settings = () => {
-  const { isAdmin, currentUser, changePassword, lockToCashier, cashierPermissions, updatePermissions } = useAuth();
+  const { isAdmin, currentUser, changePassword, lockToCashier } = useAuth();
+  const [activeTab, setActiveTab] = useState('CASHIERS'); // 'CASHIERS' | 'HARDWARE' | 'BACKUP' | 'SECURITY'
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
   const [savedNotice, setSavedNotice] = useState(false);
 
-
-  // -------------------------------------------------------------
-  // Hardware Management: Thermal Printer & Barcode Scanner State
-  // -------------------------------------------------------------
+  // Hardware Management: Thermal Printer State
   const [printersList, setPrintersList] = useState([]);
   const [selectedPrinter, setSelectedPrinter] = useState(() => localStorage.getItem('pos_selected_printer') || '');
   const [paperWidth, setPaperWidth] = useState(() => localStorage.getItem('pos_paper_width') || '80mm');
@@ -90,11 +87,6 @@ const Settings = () => {
   const [hardwareNotice, setHardwareNotice] = useState('');
   const [isTestPrinting, setIsTestPrinting] = useState(false);
   const [isDrawerTesting, setIsDrawerTesting] = useState(false);
-
-  // Live Barcode Scanner Test Pad State
-  const [scannerTestInput, setScannerTestInput] = useState('');
-  const [lastScannedItem, setLastScannedItem] = useState(null);
-  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   const fetchPrinters = async () => {
     const ipc = getIpc();
@@ -126,7 +118,6 @@ const Settings = () => {
     }
   };
 
-  // Fetch installed Windows printers on mount
   useEffect(() => {
     fetchPrinters();
   }, []);
@@ -135,7 +126,7 @@ const Settings = () => {
     localStorage.setItem('pos_selected_printer', selectedPrinter);
     localStorage.setItem('pos_paper_width', paperWidth);
     localStorage.setItem('pos_silent_print', silentPrint ? 'true' : 'false');
-    setHardwareNotice('ڕێکخستنەکانی چاپکەر و ئامێرەکان بە سەرکەوتوویی پاشەکەوت کران');
+    setHardwareNotice('ڕێکخستنەکانی چاپکەر پاشەکەوت کران');
     setTimeout(() => setHardwareNotice(''), 3500);
   };
 
@@ -177,43 +168,13 @@ const Settings = () => {
         await ipcRenderer.invoke('test-cash-drawer');
         ipcRenderer.send('open-cash-drawer');
       }
-      setHardwareNotice('فەرمانی کردنەوەی قاسەی پارە (RJ11 Pulse) نێردرا');
+      setHardwareNotice('فەرمانی کردنەوەی قاسەی پارە نێردرا');
     } catch (_) {
       setHardwareNotice('قاسەی پارە کرایەوە');
     } finally {
       setIsDrawerTesting(false);
       setTimeout(() => setHardwareNotice(''), 3000);
     }
-  };
-
-  const playScanBeep = () => {
-    try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1400, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.08);
-    } catch (_) {}
-  };
-
-  const handleScannerTestSubmit = (e) => {
-    e.preventDefault();
-    if (!scannerTestInput.trim()) return;
-    playScanBeep();
-    const cleanCode = scannerTestInput.trim();
-    setLastScannedItem({
-      code: cleanCode,
-      length: cleanCode.length,
-      time: new Date().toLocaleTimeString('en-GB'),
-      isScale: cleanCode.length === 13 && (cleanCode.startsWith('20') || cleanCode.startsWith('21') || cleanCode.startsWith('22'))
-    });
-    setScannerTestInput('');
   };
 
   // Multi-Cashier Accounts Management State
@@ -316,7 +277,7 @@ const Settings = () => {
         setShowEditCashierModal(false);
         setSelectedCashier(null);
         setEditCashierPassword('');
-        setCashierNotice('زانیاری و دەسەڵاتەکانی کاشێر بە سەرکەوتوویی نوێکرانەوە');
+        setCashierNotice('زانیاری و دەسەڵاتەکانی کاشێر نوێکرانەوە');
         setTimeout(() => setCashierNotice(''), 3500);
         fetchCashiersList();
         if (currentUser && currentUser.id === selectedCashier.id) {
@@ -352,7 +313,7 @@ const Settings = () => {
     try {
       const res = await axios.delete(`http://localhost:3001/api/users/cashiers/${cashier.id}`);
       if (res.data?.status === 'SUCCESS') {
-        setCashierNotice('هەژماری کاشێر بە سەرکەوتوویی سڕایەوە');
+        setCashierNotice('هەژماری کاشێر سڕایەوە');
         setTimeout(() => setCashierNotice(''), 3500);
         fetchCashiersList();
       }
@@ -361,43 +322,28 @@ const Settings = () => {
     }
   };
 
-  // Admin Security & Credentials Change State
+  // Admin Security & Credentials
   const [adminUsername, setAdminUsername] = useState(currentUser?.username || 'admin');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPass, setShowOldPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
 
   useEffect(() => {
     if (currentUser?.username) {
       setAdminUsername(currentUser.username);
     }
   }, [currentUser]);
-  const [showOldPass, setShowOldPass] = useState(false);
-  const [showNewPass, setShowNewPass] = useState(false);
-  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
-  const [passwordChangeError, setPasswordChangeError] = useState('');
-  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
-  
-  // Backup & Stats State
+
+  // Backup & Restore State
   const [backupStats, setBackupStats] = useState(null);
-  const [localSnapshots, setLocalSnapshots] = useState([]);
-  const [statsLoading, setStatsLoading] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
-  const [snapshotCreating, setSnapshotCreating] = useState(false);
-
-  // Sync & Cloud State
-  const [syncData, setSyncData] = useState(null);
-  const [syncLoading, setSyncLoading] = useState(false);
-  const [syncSaving, setSyncSaving] = useState(false);
-  const [cloudUrlInput, setCloudUrlInput] = useState('http://localhost:3001/api/cloud-sync');
-  const [autoSyncToggle, setAutoSyncToggle] = useState(true);
-  const [syncFilter, setSyncFilter] = useState('ALL'); // 'ALL', 'PENDING', 'SYNCED', 'FAILED'
-
-  // Telegram Cloud Backup State (Multiple Recipients Support)
   const [telegramSettings, setTelegramSettings] = useState(null);
-  const [telegramTesting, setTelegramTesting] = useState(false);
   const [telegramSending, setTelegramSending] = useState(false);
-  const [telegramSendSnapLoading, setTelegramSendSnapLoading] = useState(null);
   const [telegramNotice, setTelegramNotice] = useState(null);
   const [telegramCheckingPair, setTelegramCheckingPair] = useState(false);
   const [editingRecipientId, setEditingRecipientId] = useState(null);
@@ -408,12 +354,11 @@ const Settings = () => {
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [pendingBackupData, setPendingBackupData] = useState(null);
   const [pendingFileName, setPendingFileName] = useState('');
-  const [pendingSource, setPendingSource] = useState('UPLOAD'); // 'UPLOAD' or 'LOCAL'
+  const [pendingSource, setPendingSource] = useState('UPLOAD');
   const [confirmationInput, setConfirmationInput] = useState('');
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreResult, setRestoreResult] = useState(null);
 
-  // Apply theme immediately
   const applyTheme = (newTheme) => {
     setTheme(newTheme);
     localStorage.setItem('pos_theme', newTheme);
@@ -428,34 +373,19 @@ const Settings = () => {
   };
 
   const fetchBackupData = async () => {
-    setStatsLoading(true);
     try {
-      const [statsRes, snapsRes, syncRes, tgRes] = await Promise.all([
+      const [statsRes, tgRes] = await Promise.all([
         fetch('http://localhost:3001/api/backup/stats'),
-        fetch('http://localhost:3001/api/backup/local-snapshots'),
-        fetch('http://localhost:3001/api/sync/status'),
         fetch('http://localhost:3001/api/backup/telegram/settings')
       ]);
       const statsJson = await statsRes.json();
-      const snapsJson = await snapsRes.json();
-      const syncJson = await syncRes.json();
       const tgJson = await tgRes.json();
       if (statsJson.status === 'SUCCESS') setBackupStats(statsJson.data);
-      if (snapsJson.status === 'SUCCESS') setLocalSnapshots(snapsJson.data);
-      if (syncJson.status === 'SUCCESS') {
-        setSyncData(syncJson.data);
-        if (syncJson.data.settings) {
-          setCloudUrlInput(syncJson.data.settings.cloud_url || 'http://localhost:3001/api/cloud-sync');
-          setAutoSyncToggle(syncJson.data.settings.auto_sync_enabled);
-        }
-      }
       if (tgJson.status === 'SUCCESS' && tgJson.data) {
         setTelegramSettings(tgJson.data);
       }
     } catch (err) {
-      console.error('Error fetching backup & sync info:', err);
-    } finally {
-      setStatsLoading(false);
+      console.error('Error fetching backup info:', err);
     }
   };
 
@@ -464,13 +394,11 @@ const Settings = () => {
       fetchBackupData();
       const interval = setInterval(() => {
         fetchBackupData();
-      }, 7000);
+      }, 8000);
       return () => clearInterval(interval);
     }
   }, [isAdmin]);
 
-
-  // Handle Full Backup Download
   const handleDownloadBackup = async () => {
     setBackupLoading(true);
     try {
@@ -486,18 +414,15 @@ const Settings = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      // Refresh local snapshots list since server saves a copy
       fetchBackupData();
-      alert('باکئەپی تەواوی داتابەیس بە سەرکەوتوویی داگیرا و کۆپییەکی لەسەر سێرڤەریش پاشەکەوت کرا!');
+      alert('باکئەپی تەواوی داتابەیس بە سەرکەوتوویی داگیرا!');
     } catch (err) {
-      alert('هەڵەیەک ڕوویدا لە کاتی وەرگرتنی باکئەپ: ' + err.message);
+      alert('هەڵەیەک ڕوویدا لە کاتی باکئەپ: ' + err.message);
     } finally {
       setBackupLoading(false);
     }
   };
 
-  // Handle Native Save Backup via Electron Dialog
   const handleNativeSaveBackup = async () => {
     if (!ipcRenderer) {
       handleDownloadBackup();
@@ -517,7 +442,7 @@ const Settings = () => {
       });
 
       if (saveRes.success) {
-        alert(`باکئەپ بە سەرکەوتوویی لە شوێنی دیاریکراو پاشەکەوت کرا:\n${saveRes.filePath}`);
+        alert(`باکئەپ بە سەرکەوتوویی پاشەکەوت کرا:\n${saveRes.filePath}`);
         fetchBackupData();
       }
     } catch (err) {
@@ -527,53 +452,6 @@ const Settings = () => {
     }
   };
 
-  // Handle Create Manual Snapshot on Server
-  const handleCreateManualSnapshot = async () => {
-    const note = window.prompt('تێبینییەک بۆ ئەم باکئەپە بنووسە (ئارەزوومەندانە):', 'کۆپی دەستی پێش گۆڕانکاری');
-    if (note === null) return;
-
-    setSnapshotCreating(true);
-    try {
-      const response = await fetch('http://localhost:3001/api/backup/create-snapshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note })
-      });
-      const data = await response.json();
-      if (data.status === 'SUCCESS') {
-        alert('کۆپی یەدەگ بە سەرکەوتوویی لەسەر سێرڤەر دروستکرا!');
-        fetchBackupData();
-      } else {
-        throw new Error(data.message);
-      }
-    } catch (err) {
-      alert('هەڵە لە دروستکردنی باکئەپ: ' + err.message);
-    } finally {
-      setSnapshotCreating(false);
-    }
-  };
-
-  // Handle Delete Snapshot from Server
-  const handleDeleteSnapshot = async (filename) => {
-    if (!window.confirm(`ئایا دڵنیایت لە سڕینەوەی ئەم کۆپییە لەسەر سێرڤەر؟\n${filename}`)) {
-      return;
-    }
-    try {
-      const response = await fetch(`http://localhost:3001/api/backup/snapshots/${encodeURIComponent(filename)}`, {
-        method: 'DELETE'
-      });
-      const data = await response.json();
-      if (data.status === 'SUCCESS') {
-        fetchBackupData();
-      } else {
-        throw new Error(data.message);
-      }
-    } catch (err) {
-      alert('هەڵە لە کاتی سڕینەوەی پەڕگە: ' + err.message);
-    }
-  };
-
-  // Handle Open Backups Folder in Windows Explorer
   const handleOpenBackupsFolder = async () => {
     if (ipcRenderer) {
       const res = await ipcRenderer.invoke('open-backups-folder');
@@ -583,66 +461,6 @@ const Settings = () => {
     }
   };
 
-  // Handle Trigger Live Sync
-  const handleTriggerSyncNow = async () => {
-    setSyncLoading(true);
-    try {
-      const res = await fetch('http://localhost:3001/api/sync/trigger', { method: 'POST' });
-      const json = await res.json();
-      if (json.status === 'SUCCESS') {
-        alert(json.message);
-        fetchBackupData();
-      } else {
-        alert(json.message || 'هەڵە لە هاوکاتکردن');
-      }
-    } catch (err) {
-      alert('هەڵە لە پەیوەندی: ' + err.message);
-    } finally {
-      setSyncLoading(false);
-    }
-  };
-
-  // Handle Save Cloud & Sync Settings
-  const handleSaveSyncSettings = async () => {
-    setSyncSaving(true);
-    try {
-      const res = await fetch('http://localhost:3001/api/sync/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cloud_url: cloudUrlInput,
-          auto_sync_enabled: autoSyncToggle
-        })
-      });
-      const json = await res.json();
-      if (json.status === 'SUCCESS') {
-        setSavedNotice(true);
-        setTimeout(() => setSavedNotice(false), 2500);
-        fetchBackupData();
-      } else {
-        alert('هەڵە: ' + json.message);
-      }
-    } catch (err) {
-      alert('هەڵە لە پاشەکەوتکردن: ' + err.message);
-    } finally {
-      setSyncSaving(false);
-    }
-  };
-
-  // Handle Cleanup Synced Queue
-  const handleCleanupSynced = async () => {
-    if (!window.confirm('ئایا دڵنیایت لە سڕینەوەی تۆمارە هاوکاتکراوە کۆنەکان؟')) return;
-    try {
-      const res = await fetch('http://localhost:3001/api/sync/cleanup', { method: 'POST' });
-      const json = await res.json();
-      alert(json.message);
-      fetchBackupData();
-    } catch (err) {
-      alert('هەڵە لە پاککردنەوە: ' + err.message);
-    }
-  };
-
-  // Toggle Recipient Active Checkbox
   const handleToggleRecipient = async (id) => {
     try {
       const res = await fetch(`http://localhost:3001/api/backup/telegram/recipients/${id}/toggle`, { method: 'POST' });
@@ -655,7 +473,6 @@ const Settings = () => {
     }
   };
 
-  // Copy Telegram Bot Invite Link
   const handleCopyBotLink = () => {
     const link = `https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`;
     navigator.clipboard.writeText(link);
@@ -663,13 +480,11 @@ const Settings = () => {
     setTimeout(() => setCopiedBotLink(false), 3000);
   };
 
-  // Start Editing Recipient Name
   const handleStartEditRecipient = (r) => {
     setEditingRecipientId(r.id);
     setEditingRecipientName(r.recipient_name);
   };
 
-  // Save Recipient Name
   const handleSaveRecipientName = async (id) => {
     if (!editingRecipientName.trim()) return;
     try {
@@ -691,7 +506,6 @@ const Settings = () => {
     }
   };
 
-  // Delete Recipient
   const handleDeleteRecipient = async (id, name) => {
     if (!window.confirm(`ئایا دڵنیایت لە سڕینەوەی وەرگر: ${name}؟`)) return;
     try {
@@ -704,7 +518,6 @@ const Settings = () => {
     }
   };
 
-  // Test Specific Recipient Ping
   const handleTestRecipient = async (id) => {
     setTelegramNotice(null);
     try {
@@ -720,7 +533,6 @@ const Settings = () => {
     }
   };
 
-  // Toggle Auto-Backup
   const handleToggleTelegramAuto = async (enabled) => {
     try {
       const res = await fetch('http://localhost:3001/api/backup/telegram/toggle-auto', {
@@ -737,7 +549,6 @@ const Settings = () => {
     }
   };
 
-  // Check Pairing Status
   const handleCheckPairing = async () => {
     setTelegramCheckingPair(true);
     setTelegramNotice(null);
@@ -757,28 +568,6 @@ const Settings = () => {
     }
   };
 
-  // Handle Telegram Test Connection Ping
-  const handleTestTelegramConnection = async () => {
-    setTelegramTesting(true);
-    setTelegramNotice(null);
-    try {
-      const res = await fetch('http://localhost:3001/api/backup/telegram/test', {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.status === 'SUCCESS') {
-        setTelegramNotice({ type: 'success', message: data.message });
-      } else {
-        setTelegramNotice({ type: 'error', message: data.message || 'پشکنین سەرکەوتوو نەبوو' });
-      }
-    } catch (err) {
-      setTelegramNotice({ type: 'error', message: 'پەیوەندی سەرکەوتوو نەبوو: ' + err.message });
-    } finally {
-      setTelegramTesting(false);
-    }
-  };
-
-  // Handle Manual Instant Backup Send to Telegram
   const handleSendBackupToTelegram = async () => {
     setTelegramSending(true);
     setTelegramNotice(null);
@@ -788,10 +577,7 @@ const Settings = () => {
       });
       const data = await res.json();
       if (data.status === 'SUCCESS') {
-        setTelegramNotice({ 
-          type: 'success', 
-          message: data.message 
-        });
+        setTelegramNotice({ type: 'success', message: data.message });
         fetchBackupData();
       } else {
         setTelegramNotice({ type: 'error', message: data.message || 'ناردن سەرکەوتوو نەبوو' });
@@ -803,29 +589,6 @@ const Settings = () => {
     }
   };
 
-  // Handle Dispatch Specific Snapshot to Telegram
-  const handleSendSnapshotToTelegram = async (filename) => {
-    setTelegramSendSnapLoading(filename);
-    try {
-      const res = await fetch(`http://localhost:3001/api/backup/telegram/send-snapshot/${encodeURIComponent(filename)}`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.status === 'SUCCESS') {
-        alert(data.message);
-        fetchBackupData();
-      } else {
-        alert('هەڵە لە ناردنی کۆپی بۆ تێلیگرام: ' + (data.message || 'نەزانراو'));
-      }
-    } catch (err) {
-      alert('پەیوەندی سەرکەوتوو نەبوو: ' + err.message);
-    } finally {
-      setTelegramSendSnapLoading(null);
-    }
-  };
-
-
-  // Handle File Upload Selection
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -853,24 +616,9 @@ const Settings = () => {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    e.target.value = '';
   };
 
-  // Handle Select Local Snapshot
-  const handleSelectLocalSnapshot = async (snapshot) => {
-    setPendingFileName(snapshot.filename);
-    setPendingSource('LOCAL');
-    setPendingBackupData({
-      metadata: snapshot.metadata || { total_tables: '٢٣ خشتە' },
-      isLocal: true,
-      filename: snapshot.filename
-    });
-    setConfirmationInput('');
-    setRestoreResult(null);
-    setRestoreModalOpen(true);
-  };
-
-  // Execute Restore
   const handleExecuteRestore = async () => {
     if (confirmationInput.trim().toUpperCase() !== 'RESTORE') {
       alert('تکایە وشەی RESTORE بە پیتی گەورە بنووسە بۆ دڵنیابوونەوە');
@@ -924,74 +672,753 @@ const Settings = () => {
 
   return (
     <div className="dashboard-page p-8" style={{ position: 'relative' }}>
-      <div className="header mb-8" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* Top Header */}
+      <div className="header mb-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1>ڕێکخستنەکان</h1>
-          <p className="text-secondary">بەڕێوەبردنی ڕووکار، پاراستنی زانیارییەکان، و هێنانەوەی باکئەپ</p>
+          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800 }}>ڕێکخستنەکان</h1>
         </div>
         {savedNotice && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #10b981', color: '#10b981', padding: '8px 16px', borderRadius: '12px' }}>
-            <CheckCircle2 size={18} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981', padding: '6px 14px', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 700 }}>
+            <CheckCircle2 size={16} />
             گۆڕانکارییەکان پاشەکەوت کران
           </div>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-        
-        {/* Appearance Settings */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem', color: '#60a5fa' }}>
-            <Moon size={24} /> ڕووکاری سیستەم
-          </h3>
-          <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-            هەڵبژاردنی شێوازی بینینی سیستەم (تاریک یان ڕووناک)
-          </p>
-
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button 
-              onClick={() => applyTheme('dark')}
-              style={{ flex: 1, padding: '1.25rem', borderRadius: '16px', background: theme === 'dark' ? 'var(--primary-light)' : 'var(--bg-tertiary)', border: `2px solid ${theme === 'dark' ? 'var(--accent-color)' : 'var(--border-color)'}`, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+      {/* Clean 4-Tab Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginBottom: '1.75rem',
+        borderBottom: '1px solid var(--border-color)',
+        paddingBottom: '12px',
+        overflowX: 'auto'
+      }}>
+        {[
+          { id: 'CASHIERS', label: 'کاشێرەکان', icon: Users },
+          { id: 'HARDWARE', label: 'چاپکەر و ئامێرەکان', icon: Printer },
+          { id: 'BACKUP', label: 'باکئەپ و پاراستن', icon: Shield },
+          { id: 'SECURITY', label: 'ئاسایش و سیستەم', icon: Key }
+        ].map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 18px',
+                borderRadius: '12px',
+                border: isActive ? '1.5px solid var(--accent-color)' : '1px solid transparent',
+                background: isActive ? 'var(--primary-light)' : 'transparent',
+                color: isActive ? 'var(--accent-color)' : 'var(--text-secondary)',
+                fontWeight: isActive ? 800 : 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
             >
-              <Moon size={32} color={theme === 'dark' ? 'var(--accent-color)' : 'var(--text-muted)'} />
-              <span style={{ fontWeight: 'bold' }}>تاریک</span>
+              <Icon size={17} />
+              {tab.label}
             </button>
-            <button 
-              onClick={() => applyTheme('light')}
-              style={{ flex: 1, padding: '1.25rem', borderRadius: '16px', background: theme === 'light' ? 'var(--primary-light)' : 'var(--bg-tertiary)', border: `2px solid ${theme === 'light' ? 'var(--accent-color)' : 'var(--border-color)'}`, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+          );
+        })}
+      </div>
+
+      {/* TAB 1: CASHIERS */}
+      {activeTab === 'CASHIERS' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                هەژمارەکانی کاشێر
+              </h2>
+              {cashierNotice && (
+                <span style={{ fontSize: '0.82rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
+                  {cashierNotice}
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenAddCashierModal}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '9px 16px', borderRadius: '10px',
+                background: 'var(--primary-color, #2563eb)',
+                color: '#ffffff', border: 'none', fontWeight: 700,
+                cursor: 'pointer', fontSize: '0.88rem'
+              }}
             >
-              <Sun size={32} color={theme === 'light' ? '#f59e0b' : 'var(--text-muted)'} />
-              <span style={{ fontWeight: 'bold' }}>ڕووناک</span>
+              <UserPlus size={16} /> زیادکردنی کاشێری نوێ
             </button>
           </div>
+
+          {loadingCashiers ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+              کاشێرەکان باردەکرێن...
+            </div>
+          ) : cashiersList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+              هیچ کاشێرێک تۆمار نەکراوە
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+              {cashiersList.map((cashier) => {
+                const isActive = cashier.is_active === 1;
+                const activePermsCount = Object.values(cashier.permissions || {}).filter(Boolean).length;
+                return (
+                  <div
+                    key={cashier.id}
+                    style={{
+                      padding: '1.2rem',
+                      borderRadius: '16px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      opacity: isActive ? 1 : 0.65
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          background: isActive ? 'rgba(37, 99, 235, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: isActive ? '#2563eb' : '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Users size={18} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '0.96rem', color: 'var(--text-primary)' }}>
+                            {cashier.full_name || cashier.username}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            ناوی بەکارهێنەر: <strong style={{ color: 'var(--text-primary)' }}>{cashier.username}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '3px 7px',
+                          borderRadius: '6px',
+                          background: 'rgba(37, 99, 235, 0.1)',
+                          color: '#2563eb',
+                          border: '1px solid rgba(37, 99, 235, 0.25)'
+                        }}>
+                          {activePermsCount} دەسەڵات
+                        </span>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '3px 7px',
+                          borderRadius: '6px',
+                          background: isActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: isActive ? '#10b981' : '#ef4444',
+                          border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                        }}>
+                          {isActive ? 'چالاک' : 'ناچالاک'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditCashierModal(cashier)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(37, 99, 235, 0.3)',
+                            background: 'rgba(37, 99, 235, 0.08)',
+                            color: '#2563eb',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Shield size={14} /> دەستکاریکردن و دەسەڵاتەکان
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCashier(cashier)}
+                          style={{
+                            padding: '5px 8px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#ef4444',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}
+                          title="سڕینەوەی کاشێر"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCashierActive(cashier)}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          background: isActive ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: isActive ? '#dc2626' : '#10b981',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {isActive ? 'ناچالاککردن' : 'چالاککردنەوە'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
+      )}
 
+      {/* TAB 2: HARDWARE / PRINTER */}
+      {activeTab === 'HARDWARE' && (
+        <div style={{ maxWidth: '680px' }}>
+          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '18px' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 1.25rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Printer size={20} color="#0284c7" /> چاپکەری پسووڵە و سندوقی پارە
+            </h2>
 
-        {/* Security & Admin Credentials Management Card */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#f59e0b' }}>
-                <Key size={24} /> ئاسایش و هەژماری بەڕێوەبەر
-              </h3>
-              <span style={{ fontSize: '0.8rem', padding: '4px 10px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 600 }}>
-                هەژمار: {currentUser?.username || 'admin'}
+            {hardwareNotice && (
+              <div style={{ 
+                padding: '10px 14px', 
+                borderRadius: '10px', 
+                background: hardwareNotice.includes('هەڵە') ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)', 
+                color: hardwareNotice.includes('هەڵە') ? '#ef4444' : '#10b981', 
+                border: hardwareNotice.includes('هەڵە') ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
+                fontSize: '0.86rem', 
+                fontWeight: 700, 
+                marginBottom: '1.25rem' 
+              }}>
+                {hardwareNotice}
+              </div>
+            )}
+
+            {/* Printer Selection */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                چاپکەری دیاریکراو
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select
+                  value={selectedPrinter}
+                  onChange={(e) => setSelectedPrinter(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.88rem',
+                    outline: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  <option value="">چاپکەری سەرەکی سیستم (Default Windows Printer)</option>
+                  {printersList.map(p => (
+                    <option key={p.name} value={p.name}>
+                      {p.name} {p.isDefault ? ' (سەرەکی)' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={fetchPrinters}
+                  title="نوێکردنەوەی لیستی چاپکەرەکان"
+                  style={{
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <RefreshCw size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveHardwareSettings}
+                  title="پاشەکەوتکردن"
+                  className="btn-primary"
+                  style={{ padding: '0 14px', borderRadius: '10px', cursor: 'pointer' }}
+                >
+                  <Save size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Paper Size & Silent Print */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '10px 12px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 700 }}>
+                  قەبارەی کاغەز
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setPaperWidth('80mm'); localStorage.setItem('pos_paper_width', '80mm'); }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      borderRadius: '8px',
+                      border: paperWidth === '80mm' ? '1px solid #0284c7' : '1px solid var(--border-color)',
+                      background: paperWidth === '80mm' ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                      color: paperWidth === '80mm' ? '#0284c7' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    80mm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setPaperWidth('58mm'); localStorage.setItem('pos_paper_width', '58mm'); }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 8px',
+                      borderRadius: '8px',
+                      border: paperWidth === '58mm' ? '1px solid #0284c7' : '1px solid var(--border-color)',
+                      background: paperWidth === '58mm' ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
+                      color: paperWidth === '58mm' ? '#0284c7' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    58mm
+                  </button>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => {
+                  const nextVal = !silentPrint;
+                  setSilentPrint(nextVal);
+                  localStorage.setItem('pos_silent_print', nextVal ? 'true' : 'false');
+                }}
+                style={{ 
+                  padding: '10px 12px', 
+                  borderRadius: '12px', 
+                  background: 'var(--bg-tertiary)', 
+                  border: silentPrint ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid var(--border-color)', 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
+                }}
+              >
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>چاپکردنی بێدەنگ</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>بەبێ پەنجەرەی چاپ</span>
+                </div>
+                <div style={{
+                  width: '38px',
+                  height: '22px',
+                  borderRadius: '12px',
+                  background: silentPrint ? '#10b981' : 'rgba(148, 163, 184, 0.3)',
+                  position: 'relative',
+                  transition: 'background 0.2s ease',
+                  flexShrink: 0
+                }}>
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: '#ffffff',
+                    position: 'absolute',
+                    top: '3px',
+                    right: silentPrint ? '3px' : '19px',
+                    transition: 'right 0.2s ease'
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={handleTestPrint}
+                disabled={isTestPrinting}
+                style={{
+                  padding: '11px 14px',
+                  borderRadius: '10px',
+                  background: 'rgba(2, 132, 199, 0.12)',
+                  color: '#0284c7',
+                  border: '1px solid rgba(2, 132, 199, 0.35)',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  cursor: isTestPrinting ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Printer size={16} />
+                {isTestPrinting ? 'چاپ دەکرێت...' : 'تاقیکردنەوەی چاپکردن'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestDrawer}
+                disabled={isDrawerTesting}
+                style={{
+                  padding: '11px 14px',
+                  borderRadius: '10px',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  color: '#d97706',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  cursor: isDrawerTesting ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Zap size={16} />
+                {isDrawerTesting ? 'دەنێردرێت...' : 'تستکردنی قاسەی پارە'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: BACKUP & RESTORE */}
+      {activeTab === 'BACKUP' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+          {/* Local Computer Backup */}
+          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '18px' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 1.25rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <HardDrive size={20} color="#10b981" /> باکئەپ لەسەر کۆمپیوتەر
+            </h2>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>دوایین باکئەپ:</span>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#38bdf8' }}>
+                {backupStats?.latestBackup ? new Date(backupStats.latestBackup.createdAt).toLocaleDateString('en-GB') : 'ئەمڕۆ'}
               </span>
             </div>
 
-            <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-              ناوی بەکارهێنەر (یوزەرنەیم) و وشەی نهێنی بەڕێوەبەر نوێ بکەرەوە بۆ پاراستنی دارایی و سیستەم.
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }}>
+              <button 
+                onClick={ipcRenderer ? handleNativeSaveBackup : handleDownloadBackup} 
+                disabled={backupLoading}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '12px', fontSize: '0.92rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <Download size={17} /> {backupLoading ? 'کۆکردنەوەی داتابەیس...' : 'دروستکردنی باکئەپ (Download Backup)'}
+              </button>
+
+              {ipcRenderer && (
+                <button
+                  onClick={handleOpenBackupsFolder}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  <FolderOpen size={15} /> کردنەوەی بوخچەی باکئەپەکان
+                </button>
+              )}
+            </div>
+
+            {/* Restore Section */}
+            <div style={{ paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
+              <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#f59e0b', marginBottom: '8px' }}>
+                هێنانەوەی باکئەپ لە کۆمپیوتەرەوە
+              </label>
+              <label 
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', background: 'rgba(245, 158, 11, 0.08)', color: '#fbbf24', border: '1px dashed rgba(245, 158, 11, 0.35)', borderRadius: '12px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', boxSizing: 'border-box' }}
+              >
+                <FileJson size={18} /> هەڵبژاردنی فایلی باکئەپ (.json)
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleFileSelect} 
+                  style={{ display: 'none' }} 
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Telegram Cloud Backup */}
+          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '8px' }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Send size={20} color="#229ED9" /> باکئەپی تێلیگرام
+              </h2>
+              <span style={{ fontSize: '0.78rem', padding: '3px 8px', borderRadius: '8px', background: 'rgba(34, 158, 217, 0.12)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', fontWeight: 700 }}>
+                @{telegramSettings?.bot_username || 'cashier_system_bot'}
+              </span>
+            </div>
+
+            {telegramNotice && (
+              <div style={{ padding: '8px 12px', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '8px', background: telegramNotice.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', color: telegramNotice.type === 'success' ? '#34d399' : '#f87171', border: `1px solid ${telegramNotice.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
+                {telegramNotice.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+                <span>{telegramNotice.message}</span>
+              </div>
+            )}
+
+            {/* Recipients List */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  لیستی وەرگران ({telegramSettings?.activeCount || 0} چالاک)
+                </span>
+                <button
+                  onClick={handleCheckPairing}
+                  disabled={telegramCheckingPair}
+                  title="نوێکردنەوە"
+                  style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <RefreshCw size={12} className={telegramCheckingPair ? 'animate-spin' : ''} /> نوێکردنەوە
+                </button>
+              </div>
+
+              {(!telegramSettings?.recipients || telegramSettings.recipients.length === 0) ? (
+                <div style={{ padding: '1rem', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '10px', border: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  هیچ وەرگرێک تۆمار نەکراوە
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {telegramSettings.recipients.map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        background: r.is_active ? 'rgba(16, 185, 129, 0.06)' : 'var(--bg-tertiary)',
+                        border: `1px solid ${r.is_active ? 'rgba(16, 185, 129, 0.25)' : 'var(--border-color)'}`,
+                        borderRadius: '10px',
+                        gap: '8px'
+                      }}
+                    >
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}>
+                        <input
+                          type="checkbox"
+                          checked={r.is_active}
+                          onChange={() => handleToggleRecipient(r.id)}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+                        />
+                        {editingRecipientId === r.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={e => e.preventDefault()}>
+                            <input
+                              type="text"
+                              value={editingRecipientName}
+                              onChange={e => setEditingRecipientName(e.target.value)}
+                              style={{ padding: '3px 6px', borderRadius: '6px', background: 'var(--bg-primary)', border: '1px solid #38bdf8', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveRecipientName(r.id)}
+                              style={{ padding: '3px 6px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                              <Check size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingRecipientId(null)}
+                              style={{ padding: '3px 6px', background: 'rgba(255, 255, 255, 0.1)', color: '#94a3b8', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontWeight: 700, fontSize: '0.86rem', color: r.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                {r.recipient_name}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); handleStartEditRecipient(r); }}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '1px' }}
+                              >
+                                <Edit2 size={11} />
+                              </button>
+                            </div>
+                            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                              ID: {r.chat_id}
+                            </span>
+                          </div>
+                        )}
+                      </label>
+
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleTestRecipient(r.id)}
+                          title="تاقیکردنەوە"
+                          style={{ padding: '4px 8px', background: 'rgba(34, 158, 217, 0.12)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          پشکنین
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRecipient(r.id, r.recipient_name)}
+                          title="سڕینەوە"
+                          style={{ padding: '4px 6px', background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '6px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Invite Buttons */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={handleCopyBotLink}
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  background: 'var(--bg-tertiary)',
+                  color: copiedBotLink ? '#10b981' : 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '10px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                {copiedBotLink ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                {copiedBotLink ? 'کۆپیکرا!' : 'کۆپیکردنی لینک'}
+              </button>
+
+              <a
+                href={`https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  background: 'rgba(34, 158, 217, 0.15)',
+                  color: '#38bdf8',
+                  border: '1px solid rgba(34, 158, 217, 0.3)',
+                  borderRadius: '10px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  textDecoration: 'none'
+                }}
+              >
+                <ExternalLink size={14} /> کردنەوە لە تێلیگرام
+              </a>
+            </div>
+
+            {/* Auto Backup Toggle */}
+            <div style={{ padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramSettings?.auto_backup_enabled ?? true}
+                  onChange={e => handleToggleTelegramAuto(e.target.checked)}
+                  style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: '#10b981' }}
+                />
+                ناردنی خۆکاری ڕۆژانەی باکئەپ
+              </label>
+            </div>
+
+            {/* Send Now Button */}
+            <button
+              onClick={handleSendBackupToTelegram}
+              disabled={telegramSending || !telegramSettings?.activeCount}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '11px',
+                background: telegramSettings?.activeCount ? 'linear-gradient(135deg, #0284c7, #229ED9)' : 'var(--bg-tertiary)',
+                color: telegramSettings?.activeCount ? '#ffffff' : 'var(--text-muted)',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '0.92rem',
+                fontWeight: 700,
+                cursor: (!telegramSettings?.activeCount || telegramSending) ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <Send size={16} className={telegramSending ? 'animate-spin' : ''} />
+              {telegramSending ? 'باکئەپ دەنێردرێت...' : 'ناردنی باکئەپ ئێستا'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: SECURITY & THEME */}
+      {activeTab === 'SECURITY' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+          {/* Admin Credentials */}
+          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '18px' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 1.25rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Key size={20} color="#f59e0b" /> ئاسایش و هەژماری بەڕێوەبەر
+            </h2>
 
             {passwordChangeError && (
-              <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertCircle size={16} /> {passwordChangeError}
+              <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.84rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={15} /> {passwordChangeError}
               </div>
             )}
 
             {passwordChangeSuccess && (
-              <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle2 size={16} /> {passwordChangeSuccess}
+              <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '0.84rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={15} /> {passwordChangeSuccess}
               </div>
             )}
 
@@ -1001,12 +1428,12 @@ const Settings = () => {
               setPasswordChangeSuccess('');
 
               if (!adminUsername.trim()) {
-                setPasswordChangeError('تکایە ناوی بەکارهێنەر (یوزەرنەیم) بنووسە');
+                setPasswordChangeError('تکایە ناوی بەکارهێنەر بنووسە');
                 return;
               }
 
               if (!oldPassword) {
-                setPasswordChangeError('تکایە وشەی نهێنی ئێستا (کۆن) بنووسە بۆ دڵنیابوونەوە');
+                setPasswordChangeError('تکایە وشەی نهێنی ئێستا بنووسە');
                 return;
               }
 
@@ -1041,7 +1468,7 @@ const Settings = () => {
             }} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
                   ناوی بەکارهێنەر (یوزەرنەیم)
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -1049,26 +1476,25 @@ const Settings = () => {
                     type="text"
                     value={adminUsername}
                     onChange={e => setAdminUsername(e.target.value)}
-                    placeholder="ناوی بەکارهێنەر (یوزەرنەیم)..."
                     required
-                    style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px 9px 36px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
-                  <User size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
+                  <User size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  وشەی نهێنی ئێستا (کۆن)
+                <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
+                  وشەی نهێنی ئێستا
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input 
                     type={showOldPass ? 'text' : 'password'}
                     value={oldPassword}
                     onChange={e => setOldPassword(e.target.value)}
-                    placeholder="وشەی نهێنی کۆن بنووسە..."
+                    placeholder="وشەی نهێنی ئێستا..."
                     required
-                    style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px 9px 36px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                   <button
                     type="button"
@@ -1076,14 +1502,14 @@ const Settings = () => {
                     tabIndex="-1"
                     style={{ position: 'absolute', left: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                   >
-                    {showOldPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showOldPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  وشەی نهێنی نوێ (ئەگەر دەتەوێت بگۆڕێت)
+                <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
+                  وشەی نهێنی نوێ
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input 
@@ -1091,7 +1517,7 @@ const Settings = () => {
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                     placeholder="لانیکەم ٤ پیت یان ژمارە..."
-                    style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px 9px 36px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                   <button
                     type="button"
@@ -1099,21 +1525,21 @@ const Settings = () => {
                     tabIndex="-1"
                     style={{ position: 'absolute', left: '10px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                   >
-                    {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showNewPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
                   دووبارەکردنەوەی وشەی نهێنی نوێ
                 </label>
                 <input 
                   type="password"
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="دووبارە وشەی نهێنی نوێ بنووسەوە..."
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                  placeholder="دووبارەکردنەوە..."
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1121,220 +1547,52 @@ const Settings = () => {
                 <button
                   type="submit"
                   disabled={passwordChangeLoading}
-                  style={{ flex: 1, padding: '11px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '0.92rem', cursor: passwordChangeLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s' }}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#ffffff', border: 'none', fontWeight: 700, fontSize: '0.88rem', cursor: passwordChangeLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
-                  <Key size={16} />
-                  {passwordChangeLoading ? 'نوێ دەکرێتەوە...' : 'نوێکردنەوەی هەژمار و وشەی نهێنی'}
+                  <Key size={15} />
+                  {passwordChangeLoading ? 'نوێ دەکرێتەوە...' : 'نوێکردنەوەی هەژمار'}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => lockToCashier()}
                   title="قفڵکردنی بەڕێوەبەر و گەڕانەوە بۆ کاشێر"
-                  style={{ padding: '11px 16px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', fontWeight: 'bold', fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <Lock size={15} /> قوفڵکردن
+                  <Lock size={14} /> قوفڵکردن
                 </button>
               </div>
             </form>
           </div>
-        </div>
-      </div>
 
-      {/* Section 1.4: Multi-Cashier Accounts Management (بەڕێوەبردنی کاشێرەکان و بەکارهێنەران) */}
-      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={22} color="#2563eb" /> بەڕێوەبردنی کاشێرەکان (Cashier Accounts Management)
+          {/* Appearance Settings */}
+          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '18px' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 1.25rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Moon size={20} color="#60a5fa" /> ڕووکاری سیستەم
             </h2>
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-              دروستکردنی هەژماری جیاواز بۆ هەر کاشێرێک بە ناوی بەکارهێنەر و وشەی نهێنی تایبەت، بۆ چاودێری و وردبینی تەواو.
-            </p>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {cashierNotice && (
-              <span style={{ fontSize: '0.85rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>
-                {cashierNotice}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleOpenAddCashierModal}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 18px', borderRadius: '12px',
-                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                color: '#ffffff', border: 'none', fontWeight: 'bold',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                fontSize: '0.88rem'
-              }}
-            >
-              <UserPlus size={18} /> زیادکردنی کاشێری نوێ
-            </button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                onClick={() => applyTheme('dark')}
+                style={{ flex: 1, padding: '1.25rem', borderRadius: '14px', background: theme === 'dark' ? 'var(--primary-light)' : 'var(--bg-tertiary)', border: `2px solid ${theme === 'dark' ? 'var(--accent-color)' : 'var(--border-color)'}`, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                <Moon size={28} color={theme === 'dark' ? 'var(--accent-color)' : 'var(--text-muted)'} />
+                <span style={{ fontWeight: 'bold' }}>تاریک</span>
+              </button>
+              <button 
+                onClick={() => applyTheme('light')}
+                style={{ flex: 1, padding: '1.25rem', borderRadius: '14px', background: theme === 'light' ? 'var(--primary-light)' : 'var(--bg-tertiary)', border: `2px solid ${theme === 'light' ? 'var(--accent-color)' : 'var(--border-color)'}`, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                <Sun size={28} color={theme === 'light' ? '#f59e0b' : 'var(--text-muted)'} />
+                <span style={{ fontWeight: 'bold' }}>ڕووناک</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="glass-panel" style={{ padding: '1.5rem', borderRadius: '24px', marginBottom: '2.5rem' }}>
-        {loadingCashiers ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-            کاشێرەکان باردەکرێن...
-          </div>
-        ) : cashiersList.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-            هیچ کاشێرێک نەدۆزرایەوە
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-            {cashiersList.map((cashier) => {
-              const isActive = cashier.is_active === 1;
-              const activePermsCount = Object.values(cashier.permissions || {}).filter(Boolean).length;
-              return (
-                <div
-                  key={cashier.id}
-                  style={{
-                    padding: '1.2rem',
-                    borderRadius: '16px',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-color)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    opacity: isActive ? 1 : 0.65,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '12px',
-                        background: isActive ? 'rgba(37, 99, 235, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: isActive ? '#2563eb' : '#ef4444',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Users size={20} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text-primary)' }}>
-                          {cashier.full_name || cashier.username}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                          ناوی بەکارهێنەر: <strong style={{ color: 'var(--text-primary)' }}>{cashier.username}</strong>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status Badge & Active Perms Count */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        padding: '3px 7px',
-                        borderRadius: '6px',
-                        background: 'rgba(37, 99, 235, 0.1)',
-                        color: '#2563eb',
-                        border: '1px solid rgba(37, 99, 235, 0.25)'
-                      }}>
-                        {activePermsCount} دەسەڵات
-                      </span>
-                      <span style={{
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        background: isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: isActive ? '#10b981' : '#ef4444',
-                        border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                      }}>
-                        {isActive ? 'چالاک' : 'ناچالاک'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions Bar */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      {/* Edit Cashier & Permissions Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditCashierModal(cashier)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(37, 99, 235, 0.3)',
-                          background: 'rgba(37, 99, 235, 0.08)',
-                          color: '#2563eb',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px'
-                        }}
-                        title="دەستکاریکردنی ناو، وشەی نهێنی و دەسەڵاتەکان"
-                      >
-                        <Shield size={14} /> دەستکاریکردن و دەسەڵاتەکان
-                      </button>
-
-                      {/* Delete Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCashier(cashier)}
-                        style={{
-                          padding: '5px 8px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          background: 'rgba(239, 68, 68, 0.08)',
-                          color: '#ef4444',
-                          fontSize: '0.78rem',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center'
-                        }}
-                        title="سڕینەوەی کاشێر"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-
-                    {/* Toggle Active Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleCashierActive(cashier)}
-                      style={{
-                        padding: '5px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color)',
-                        background: isActive ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                        color: isActive ? '#dc2626' : '#10b981',
-                        fontSize: '0.76rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {isActive ? 'ناچالاککردن' : 'چالاککردنەوە'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Permissions Selector Helper */}
-      {(() => null)()}
-
-      {/* Add Cashier Modal with Simple Permissions Selector */}
-      {showAddCashierModal && (
+      {/* Add Cashier Modal */}
+            {showAddCashierModal && (
         <div className="pos-modal-overlay" onClick={() => setShowAddCashierModal(false)}>
           <div className="pos-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', width: '94%', direction: 'rtl', padding: '20px 24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -1552,8 +1810,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Edit Cashier Modal with Simple Permissions Selector */}
-      {showEditCashierModal && selectedCashier && (
+      {/* Edit Cashier Modal */}
+            {showEditCashierModal && selectedCashier && (
         <div className="pos-modal-overlay" onClick={() => setShowEditCashierModal(false)}>
           <div className="pos-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', width: '94%', direction: 'rtl', padding: '20px 24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -1755,758 +2013,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Hardware Setup Section: Thermal Receipt Printer, Cash Drawer & Barcode Scanner */}
-      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Printer size={22} color="#0284c7" /> ئامێرەکان: چاپکەر، سندوقی پارە، و سکانەری بارکۆد
-        </h2>
-        <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-          بەستنەوە، هەڵبژاردنی چاپکەری حەراری (80mm/58mm)، پشکنینی ڕاستەوخۆی سکانەر و کردنەوەی سندوقی پارە (قاسە).
-        </p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-        
-        {/* Card 1: Thermal Receipt Printer & Cash Drawer Setup */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '8px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#0284c7', fontSize: '1.15rem', fontWeight: 800 }}>
-              <Printer size={22} /> چاپکەری حەراری و سندوقی پارە
-            </h3>
-            <span style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '8px', background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', fontWeight: 700, border: '1px solid rgba(2, 132, 199, 0.3)' }}>
-              ESC/POS Hardware
-            </span>
-          </div>
-
-          {hardwareNotice && (
-            <div style={{ 
-              padding: '10px 14px', 
-              borderRadius: '12px', 
-              background: hardwareNotice.includes('هەڵە') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
-              color: hardwareNotice.includes('هەڵە') ? '#ef4444' : '#10b981', 
-              border: hardwareNotice.includes('هەڵە') ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
-              fontSize: '0.86rem', 
-              fontWeight: 700, 
-              marginBottom: '1rem' 
-            }}>
-              {hardwareNotice}
-            </div>
-          )}
-
-          {/* Printer Selection Dropdown */}
-          <div style={{ marginBottom: '1.2rem' }}>
-            <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-              چاپکەری دیاریکراو لە ویندۆز (Printer Device):
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <select
-                value={selectedPrinter}
-                onChange={(e) => setSelectedPrinter(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                  fontWeight: 600
-                }}
-              >
-                <option value="">چاپکەری سەرەکی سیستم (Default Windows Printer)</option>
-                {printersList.map(p => (
-                  <option key={p.name} value={p.name}>
-                    {p.name} {p.isDefault ? ' (سەرەکی)' : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={fetchPrinters}
-                title="نوێکردنەوە و پشکنینی چاپکەرەکان"
-                style={{
-                  padding: '0 12px',
-                  borderRadius: '10px',
-                  fontSize: '0.84rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <RefreshCw size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveHardwareSettings}
-                title="پاشەکەوتکردنی هەڵبژاردن"
-                className="btn-primary"
-                style={{ padding: '0 14px', borderRadius: '10px', fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <Save size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Paper Width & Silent Print Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '1.4rem' }}>
-            <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
-              <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 700 }}>قەبارەی کاغەز:</span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => { setPaperWidth('80mm'); localStorage.setItem('pos_paper_width', '80mm'); }}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    borderRadius: '8px',
-                    border: paperWidth === '80mm' ? '1px solid #0284c7' : '1px solid var(--border-color)',
-                    background: paperWidth === '80mm' ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
-                    color: paperWidth === '80mm' ? '#0284c7' : 'var(--text-secondary)',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  80mm (ستاندارد)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setPaperWidth('58mm'); localStorage.setItem('pos_paper_width', '58mm'); }}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    borderRadius: '8px',
-                    border: paperWidth === '58mm' ? '1px solid #0284c7' : '1px solid var(--border-color)',
-                    background: paperWidth === '58mm' ? 'rgba(2, 132, 199, 0.15)' : 'var(--bg-secondary)',
-                    color: paperWidth === '58mm' ? '#0284c7' : 'var(--text-secondary)',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  58mm (بچووک)
-                </button>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => {
-                const nextVal = !silentPrint;
-                setSilentPrint(nextVal);
-                localStorage.setItem('pos_silent_print', nextVal ? 'true' : 'false');
-              }}
-              style={{ 
-                padding: '10px', 
-                borderRadius: '12px', 
-                background: 'var(--bg-tertiary)', 
-                border: silentPrint ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid var(--border-color)', 
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}
-            >
-              <div>
-                <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>چاپکردنی بێدەنگ</span>
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>بەبێ پەنجەرەی چاپ</span>
-              </div>
-              <div style={{
-                width: '38px',
-                height: '22px',
-                borderRadius: '12px',
-                background: silentPrint ? '#10b981' : 'rgba(148, 163, 184, 0.3)',
-                position: 'relative',
-                transition: 'background 0.2s ease',
-                flexShrink: 0
-              }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: '#ffffff',
-                  position: 'absolute',
-                  top: '3px',
-                  right: silentPrint ? '3px' : '19px',
-                  transition: 'right 0.2s ease'
-                }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons: Test Print & Test Cash Drawer */}
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={handleTestPrint}
-              disabled={isTestPrinting}
-              style={{
-                flex: 1,
-                minWidth: '150px',
-                padding: '10px 14px',
-                borderRadius: '12px',
-                background: 'rgba(2, 132, 199, 0.12)',
-                color: '#0284c7',
-                border: '1px solid rgba(2, 132, 199, 0.35)',
-                fontWeight: 700,
-                fontSize: '0.86rem',
-                cursor: isTestPrinting ? 'wait' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <Printer size={16} />
-              {isTestPrinting ? 'چاپ دەکرێت...' : 'تاقیکردنەوەی چاپکردن'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleTestDrawer}
-              disabled={isDrawerTesting}
-              style={{
-                flex: 1,
-                minWidth: '150px',
-                padding: '10px 14px',
-                borderRadius: '12px',
-                background: 'rgba(245, 158, 11, 0.12)',
-                color: '#d97706',
-                border: '1px solid rgba(245, 158, 11, 0.35)',
-                fontWeight: 700,
-                fontSize: '0.86rem',
-                cursor: isDrawerTesting ? 'wait' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <Zap size={16} />
-              {isDrawerTesting ? 'دەنێردرێت...' : 'تستکردنی قاسەی پارە'}
-            </button>
-          </div>
-        </div>
-
-        {/* Card 2: Barcode Scanner Live Test Pad */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '8px' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#10b981', fontSize: '1.15rem', fontWeight: 800 }}>
-                <ScanBarcode size={22} /> پشکنینی سکانەری بارکۆد
-              </h3>
-              <span style={{ fontSize: '0.78rem', padding: '3px 10px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                Live Scanner Test Pad
-              </span>
-            </div>
-
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.5' }}>
-              سکانەرەکەت (USB یان بێتەل) ببەستەوە و لەم خانەیەی خوارەوە بارکۆدی هەر کاڵایەک سکان بکە بۆ دڵنیابوونەوە لە ناردنی کۆد و هێمای Enter:
-            </p>
-
-            <form onSubmit={handleScannerTestSubmit} style={{ marginBottom: '1rem' }}>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  placeholder="لێرە بارکۆدێک بە سکانەرەکەت لێبدە..."
-                  value={scannerTestInput}
-                  onChange={(e) => setScannerTestInput(e.target.value)}
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: '14px',
-                    background: 'var(--bg-secondary)',
-                    border: '2px dashed #10b981',
-                    color: 'var(--text-primary)',
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    textAlign: 'center',
-                    letterSpacing: '2px'
-                  }}
-                />
-              </div>
-            </form>
-
-            {/* Live Scan Confirmation Badge */}
-            {lastScannedItem ? (
-              <div style={{ 
-                padding: '12px 16px', 
-                borderRadius: '14px', 
-                background: 'rgba(16, 185, 129, 0.1)', 
-                border: '1.5px solid rgba(16, 185, 129, 0.4)',
-                marginBottom: '1rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontWeight: 800, fontSize: '0.9rem' }}>
-                    <CheckCircle2 size={16} /> سکانەرەکە بە سەرکەوتوویی ناسێندرا!
-                  </span>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{lastScannedItem.time}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: '8px', fontFamily: 'monospace', fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', letterSpacing: '1px' }}>
-                    {lastScannedItem.code}
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    درێژی: {lastScannedItem.length} پیت/ژمارە
-                  </span>
-                  {lastScannedItem.isScale && (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                      بارکۆدی تەرازووی دیجیتاڵ
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                هێشتا هیچ بارکۆدێک لەم بەشەدا سکان نەکراوە.
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <button
-              type="button"
-              onClick={() => setShowTroubleshoot(prev => !prev)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                background: 'transparent',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-secondary)',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <HelpCircle size={15} color="#0284c7" />
-              {showTroubleshoot ? 'شاردنەوەی ڕێبەری چارەسەری کێشەکان' : 'ڕێبەری هەنگاو بە هەنگاوی بەستنەوە و کێشەکان'}
-            </button>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Expandable Step-by-Step Hardware Guide */}
-      {showTroubleshoot && (
-        <div className="glass-panel" style={{ marginTop: '1.5rem', padding: '1.8rem', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BookOpen size={20} color="#0284c7" /> ڕێبەری تەواوی دانان و بەستنەوەی سکانەر، چاپکەر و قاسەی پارە
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-            
-            {/* Guide Step 1: Scanner */}
-            <div style={{ padding: '14px', borderRadius: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 800, color: '#10b981', fontSize: '0.92rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ١. بارکۆد سکانەر (Barcode Scanner)
-              </div>
-              <ul style={{ margin: 0, paddingRight: '18px', fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                <li>کێبڵی USB یان دانگڵی بێتەل (Wireless Dongle) بدە لە کۆمپیوتەر؛ ویندۆز دەستبەجێ وەک تەختەکلیل دەیناسێت.</li>
-                <li><strong>گرنگترین خاڵ:</strong> پێویستە سکانەرەکە لە کاتی لێدانی بارکۆددا هێمای <code>Enter (CR)</code> بنێرێت. ئەگەر پاش سکان لەسەر شاشەی کاشێر دانەنیشت، لەناو دەفتەرچەی کارگەیی سکانەرەکەتدا بارکۆدی <strong>«Add Enter Suffix»</strong> تەنها یەکجار سکان بکە.</li>
-                <li>سیستەمەکەمان خۆکارانە ژمارە عەرەبییەکان دەگۆڕێت بۆ ستاندارد، بۆیە کێشەی زمانی کیبۆرد ڕوونادات.</li>
-              </ul>
-            </div>
-
-            {/* Guide Step 2: Thermal Printer */}
-            <div style={{ padding: '14px', borderRadius: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 800, color: '#0284c7', fontSize: '0.92rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ٢. چاپکەری حەراری (Thermal Receipt Printer)
-              </div>
-              <ul style={{ margin: 0, paddingRight: '18px', fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                <li>کێبڵی کارەبا و کێبڵی USB لە پشتەوەی چاپکەرەکە ببەستە.</li>
-                <li>درایڤەری چاپکەرەکەت (وەک: Xprinter Driver یان POS-80 Driver) دابمەزرێنە و جۆری پۆرتەکە بکە بە <strong>USB</strong>.</li>
-                <li>لە ڕێکخستنی سەرەوە چاپکەرەکەت دیاریبکە و کرتە لە <strong>«تاقیکردنەوەی چاپکردن»</strong> بکە بۆ دڵنیابوونەوە لە سەرکەوتنی چاپ.</li>
-              </ul>
-            </div>
-
-            {/* Guide Step 3: Cash Drawer */}
-            <div style={{ padding: '14px', borderRadius: '14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 800, color: '#d97706', fontSize: '0.92rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ٣. سندوقی پارە - قاسە (Cash Drawer)
-              </div>
-              <ul style={{ margin: 0, paddingRight: '18px', fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                <li>قاسەی پارە پێویستی بە کارەبای جیاواز نییە؛ کێبڵە تەلەفۆنییەکەی (RJ11) لە پشتەوەی قاسەوە بدە لە پۆرتی <strong>DK (Drawer Kick)</strong> لە پشتەوەی چاپکەری حەرارییەکە.</li>
-                <li>لە کاتی هەر فرۆشتنێکی نەقد لە شاشەی کاشێر، چاپکەرەکە سیگناڵی لێدانی کارەبایی دەنێرێت و دەرگای قاسەکە خۆی دەکاتەوە!</li>
-                <li>دەتوانیت کلیلەکە بە شێوەی ستوونی (Vertical) دابنێیت بۆ ئەوەی بە فەرمانی ئەلیکترۆنی بکرێتەوە.</li>
-              </ul>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Section 2: Data Protection & Backups */}
-      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Shield size={22} color="var(--accent-color)" /> پاراستن و باکئەپی داتاکان
-        </h2>
-        <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-          هەموو فرۆشتن و داتاکانی مارکێت بە تەواوی پارێزراون. دەتوانیت لە ڕێگەی تێلیگرامەوە بە ئۆتۆماتیکی باکئەپ وەربگریت یان لەسەر کۆمپیوتەر دایگریت.
-        </p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-
-        {/* Telegram Cloud Backup Card (Multiple Recipients & Clean Folder Naming) */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#229ED9' }}>
-              <Send size={24} /> باکئەپی کلاودی تێلیگرام
-            </h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                <Bot size={15} /> @{telegramSettings?.bot_username || 'cashier_system_bot'}
-              </span>
-              <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                {telegramSettings?.activeCount || 0} وەرگر چالاکە
-              </span>
-            </div>
-          </div>
-
-          <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.2rem', lineHeight: '1.5' }}>
-            دەتوانیت چەندین چاتی تێلیگرام (خاوەنکار، شەریک، موحاسب، یان گرووپ) دیاریبکەیت؛ لە کاتی ناردندا باکئەپەکە بە شێوەیەکی خۆکار بۆ هەموو چاتە هەڵبژێردراوەکان دەنێردرێت.
-          </p>
-
-          {/* Status Alert if any */}
-          {telegramNotice && (
-            <div style={{ padding: '0.75rem 1rem', borderRadius: '12px', marginBottom: '1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', background: telegramNotice.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: telegramNotice.type === 'success' ? '#34d399' : '#f87171', border: `1px solid ${telegramNotice.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` }}>
-              {telegramNotice.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-              <span>{telegramNotice.message}</span>
-            </div>
-          )}
-
-          {/* Recipients List Section */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 'bold', color: '#cbd5e1' }}>
-                لیستی وەرگرانی باکئەپ (کێ فایلەکە وەربگرێت؟):
-              </span>
-              <button
-                onClick={handleCheckPairing}
-                disabled={telegramCheckingPair}
-                title="نوێکردنەوەی لیستی وەرگران"
-                style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <RefreshCw size={12} className={telegramCheckingPair ? 'animate-spin' : ''} /> نوێکردنەوە
-              </button>
-            </div>
-
-            {(!telegramSettings?.recipients || telegramSettings.recipients.length === 0) ? (
-              <div style={{ padding: '1rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '0.85rem' }}>
-                هیچ وەرگرێک تۆمار نەکراوە. دەتوانیت لە خوارەوە Chat ID زیادبکەیت یان بە مۆبایل بچیتە ناو @cashier_system_bot و Start لێبدەیت.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {telegramSettings.recipients.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 14px',
-                      background: r.is_active ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                      border: `1px solid ${r.is_active ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)'}`,
-                      borderRadius: '12px',
-                      transition: 'all 0.2s',
-                      gap: '12px'
-                    }}
-                  >
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', flex: 1 }}>
-                      <input
-                        type="checkbox"
-                        checked={r.is_active}
-                        onChange={() => handleToggleRecipient(r.id)}
-                        style={{ width: '17px', height: '17px', cursor: 'pointer', accentColor: '#10b981' }}
-                      />
-                      {editingRecipientId === r.id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.preventDefault()}>
-                          <input
-                            type="text"
-                            value={editingRecipientName}
-                            onChange={e => setEditingRecipientName(e.target.value)}
-                            placeholder="ناوی نوێ بنووسە"
-                            style={{ padding: '4px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid #38bdf8', color: 'var(--text-primary)', fontSize: '0.85rem' }}
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveRecipientName(r.id)}
-                            style={{ padding: '4px 8px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                          >
-                            <Check size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingRecipientId(null)}
-                            style={{ padding: '4px 8px', background: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: r.is_active ? '#34d399' : '#94a3b8' }}>
-                              {r.recipient_name}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.preventDefault(); handleStartEditRecipient(r); }}
-                              title="دەستکاریکردنی ناوی ئەم کەسە"
-                              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', padding: '2px' }}
-                            >
-                              <Edit2 size={12} />
-                            </button>
-                          </div>
-                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
-                            ID: {r.chat_id}
-                          </div>
-                        </div>
-                      )}
-                    </label>
-
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleTestRecipient(r.id)}
-                        title="ناردنی پەیامی تاقیکاری تەنها بۆ ئەم چاتە"
-                        style={{ padding: '5px 9px', background: 'rgba(34, 158, 217, 0.15)', color: '#38bdf8', border: '1px solid rgba(34, 158, 217, 0.3)', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <Zap size={13} /> پشکنین
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRecipient(r.id, r.recipient_name)}
-                        title="سڕینەوەی ئەم وەرگرە"
-                        style={{ padding: '5px 8px', background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Automatic Telegram Bot Invite & Pairing */}
-          <div style={{ padding: '1.2rem', background: 'rgba(34, 158, 217, 0.05)', borderRadius: '16px', border: '1px solid rgba(34, 158, 217, 0.2)', marginBottom: '1.2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Send size={18} color="#38bdf8" />
-                <span style={{ fontSize: '0.92rem', fontWeight: 'bold', color: '#38bdf8' }}>
-                  داوەتکردنی کەسی نوێ بۆ وەرگرتنی باکئەپ لە تێلیگرام:
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={handleCopyBotLink}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '7px 14px',
-                    background: copiedBotLink ? 'rgba(16, 185, 129, 0.2)' : 'rgba(34, 158, 217, 0.2)',
-                    color: copiedBotLink ? '#34d399' : '#38bdf8',
-                    border: `1px solid ${copiedBotLink ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 158, 217, 0.4)'}`,
-                    borderRadius: '10px',
-                    fontSize: '0.84rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {copiedBotLink ? <CheckCircle2 size={15} /> : <Copy size={15} />}
-                  {copiedBotLink ? 'لینکەکە کۆپیکرا!' : 'کۆپیکردنی لینکی بۆت'}
-                </button>
-
-                <a
-                  href={`https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '7px 14px',
-                    background: 'linear-gradient(135deg, #229ED9, #0284c7)',
-                    color: '#ffffff',
-                    borderRadius: '10px',
-                    fontSize: '0.84rem',
-                    fontWeight: 'bold',
-                    textDecoration: 'none'
-                  }}
-                >
-                  <ExternalLink size={15} /> کردنەوە لە تێلیگرام
-                </a>
-              </div>
-            </div>
-
-            <div style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: '1.6', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-              <Info size={16} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <strong>چۆنیەتی بەستنەوە:</strong> پێویست بە هیچ Chat ID و ژمارەیەک ناکات! تەنها ئەم بەستەرەی سەرەوە بنێرە بۆ هەر کەسێک کە دەتەوێت باکئەپی مارکێت وەربگرێت (شەریک، بەڕێوەبەر، ژمێریار). هەر کە لە تێلیگرام دوگمەی <strong>Start</strong> دادەگرن، ناویان بە شێوەیەکی ئۆتۆماتیکی لەم لیستەی سەرەوەدا زیاد دەبێت و دەتوانیت بە دوگمەی قەڵەمەکە (<Edit2 size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />) ناوەکەیان لە ئەپەکەدا دەستکاری بکەیت.
-              </div>
-            </div>
-          </div>
-
-          {/* Clean Naming & Folder Preview */}
-          <div style={{ padding: '0.8rem 1rem', background: 'rgba(56, 189, 248, 0.04)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.12)', marginBottom: '1.2rem', fontSize: '0.82rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <span style={{ color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <Folder size={14} color="#38bdf8" /> بوخچە لە تێلیگرام: <strong style={{ color: '#38bdf8' }}>POS_Backups_{new Date().toISOString().slice(0, 7)}/</strong>
-              </span>
-              <span style={{ color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <FileText size={14} color="#34d399" /> ناوی فایلی باکئەپ: <strong style={{ color: '#34d399' }}>POS_Backup_{new Date().toISOString().slice(0, 10)}_...json</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Auto-Backup Toggle */}
-          <div style={{ padding: '0.8rem 1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '1.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: '#cbd5e1' }}>
-              <input
-                type="checkbox"
-                checked={telegramSettings?.auto_backup_enabled ?? true}
-                onChange={e => handleToggleTelegramAuto(e.target.checked)}
-                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
-              />
-              ناردنی خۆکاری ڕۆژانەی باکئەپ بۆ هەموو وەرگرە چالاکەکان
-            </label>
-          </div>
-
-          {/* Broadcast Action Button */}
-          <button
-            onClick={handleSendBackupToTelegram}
-            disabled={telegramSending || !telegramSettings?.activeCount}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: telegramSettings?.activeCount ? 'linear-gradient(135deg, #0284c7, #229ED9)' : 'rgba(255,255,255,0.06)', color: telegramSettings?.activeCount ? 'white' : '#64748b', border: 'none', borderRadius: '14px', fontSize: '1rem', fontWeight: 'bold', cursor: (!telegramSettings?.activeCount || telegramSending) ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: telegramSettings?.activeCount ? '0 4px 15px rgba(34, 158, 217, 0.3)' : 'none' }}
-          >
-            <Send size={18} className={telegramSending ? 'animate-spin' : ''} />
-            {telegramSending ? 'باکئەپ دەنێردرێت بۆ هەموو وەرگرەکان...' : `ناردنی باکئەپ بۆ هەموو چاتە دیاریکراوەکان (${telegramSettings?.activeCount || 0} کەس)`}
-          </button>
-
-          {/* Last Sent Info */}
-          <div style={{ marginTop: '1rem', fontSize: '0.82rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-            <div>
-              <span>دواین باکئەپی نێردراو: </span>
-              {telegramSettings?.last_sent_at ? (
-                <span style={{ color: '#34d399', fontWeight: 'bold' }}>
-                  {new Date(telegramSettings.last_sent_at).toLocaleString('en-GB')}
-                </span>
-              ) : (
-                <span>هێشتا نەنێردراوە</span>
-              )}
-            </div>
-            {telegramSettings?.last_filename && (
-              <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: '0.78rem' }}>
-                {telegramSettings.last_filename} ({Math.round(telegramSettings.last_file_size / 1024)} KB)
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Local Computer Backup Card (Download & Restore) */}
-        <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, color: '#10b981' }}>
-                <HardDrive size={24} /> باکئەپ لەسەر کۆمپیوتەر
-              </h3>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                <CheckCircle2 size={13} /> پارێزراوە ({backupStats?.totalTables || 23} خشتە)
-              </span>
-            </div>
-
-            <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.25rem', lineHeight: '1.6' }}>
-              دەتوانیت هەر کاتێک بتەوێت کۆپییەکی تەواوی داتاکانی فرۆشتن و مەخزەن دابگریتە سەر کۆمپیوتەرەکەت یان فلاش، یاخود لە کاتی کڕینی کۆمپیوتەری نوێدا فایلەکە بهێنیتەوە.
-            </p>
-
-            {/* Quick Stats Pill */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
-              <div style={{ padding: '0.9rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>کۆی تۆمارەکان (دێڕ)</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981', marginTop: '2px' }}>
-                  {backupStats ? Number(backupStats.totalRows).toLocaleString() : '...'}
-                </div>
-              </div>
-              <div style={{ padding: '0.9rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>دوایین باکئەپ</div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>
-                  {backupStats?.latestBackup ? new Date(backupStats.latestBackup.createdAt).toLocaleDateString('en-GB') : 'ئەمڕۆ'}
-                </div>
-              </div>
-            </div>
-
-            {/* Download Options */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }}>
-              <button 
-                onClick={handleDownloadBackup} 
-                disabled={backupLoading}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '1rem', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: '14px', fontSize: '0.96rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
-              >
-                <Download size={18} /> {backupLoading ? 'کۆکردنەوەی داتابەیس...' : 'داگرتنی باکئەپ بۆ ناو کۆمپیوتەر (JSON)'}
-              </button>
-
-              {ipcRenderer && (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={handleNativeSaveBackup}
-                    disabled={backupLoading}
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0.8rem', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    <Save size={15} /> پاشەکەوتکردن لە فلاش (Save As)
-                  </button>
-                  <button
-                    onClick={handleOpenBackupsFolder}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0.8rem 14px', background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', fontSize: '0.85rem', cursor: 'pointer' }}
-                    title="کردنەوەی بوخچەی باکئەپ لە کۆمپیوتەر"
-                  >
-                    <FolderOpen size={15} /> بوخچە
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Restore Section */}
-          <div style={{ paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: '0.84rem', color: '#f59e0b', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Upload size={16} /> هێنانەوەی باکئەپ لە کۆمپیوتەرەوە:
-            </div>
-            <label 
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0.9rem', background: 'rgba(245, 158, 11, 0.08)', color: '#fbbf24', border: '1px dashed rgba(245, 158, 11, 0.35)', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', boxSizing: 'border-box' }}
-            >
-              <FileJson size={18} /> هەڵبژاردنی فایلی باکئەپ (.json)
-              <input 
-                type="file" 
-                accept=".json" 
-                onChange={handleFileSelect} 
-                style={{ display: 'none' }} 
-              />
-            </label>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Pre-flight Restore Modal */}
-      {restoreModalOpen && (
+      {/* Restore Confirmation Modal */}
+            {restoreModalOpen && (
         <div className="pos-modal-overlay" onClick={() => !restoreLoading && setRestoreModalOpen(false)}>
           <div className="pos-modal-card pos-modal-md" onClick={e => e.stopPropagation()}>
             
