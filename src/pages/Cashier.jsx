@@ -1401,6 +1401,7 @@ const Cashier = () => {
         baseName: 'کاڵای بێ بارکۆد',
         price: 250,
         single_price: 250,
+        cost_price: 150,
         wholesale_price: 0,
         units_per_box: 1,
         unit_type: 'PIECE',

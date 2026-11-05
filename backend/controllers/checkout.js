@@ -36,12 +36,26 @@ exports.processCheckout = async (req, res) => {
                 const customPrice = Math.max(0, Math.round(Number(item.price || item.selling_price) || 0));
                 const itemSellTotal = Math.round(customPrice * itemQty);
                 totalAmount += safeBigInt(itemSellTotal);
-                totalProfit += safeBigInt(itemSellTotal);
+
+                // Specific custom profit accounting:
+                // For 250 IQD unbarcoded item, profit is 100 IQD per 250 IQD piece (cost = 150 IQD)
+                let itemProfit = itemSellTotal;
+                let unitCost = 0;
+                if (item.barcode === 'CUSTOM_250' || item.cartKey === 'quick_unbarcoded_250' || (item.is_custom && customPrice === 250)) {
+                    unitCost = 150;
+                    itemProfit = Math.round(100 * itemQty);
+                } else if (item.cost_price !== undefined && !isNaN(Number(item.cost_price))) {
+                    unitCost = Math.max(0, Number(item.cost_price));
+                    itemProfit = Math.max(0, Math.round((customPrice - unitCost) * itemQty));
+                }
+
+                totalProfit += safeBigInt(itemProfit);
                 processedItems.push({
                     is_custom: true,
                     name: item.name || 'کاڵای دەستی / گشتی',
                     quantity: itemQty,
-                    price: customPrice
+                    price: customPrice,
+                    cost_price: unitCost
                 });
             } else {
                 const [rows] = await connection.query(
