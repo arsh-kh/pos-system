@@ -2597,7 +2597,7 @@ const Cashier = () => {
             <div>
 
               {/* Payment Mode Selector Tabs (CASH, DEBT, SPLIT) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px', width: '100%', boxSizing: 'border-box' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -2608,13 +2608,14 @@ const Cashier = () => {
                   style={{
                     width: '100%',
                     minWidth: 0,
-                    padding: '7px 4px',
-                    borderRadius: '8px',
+                    height: '36px',
+                    padding: '6px 4px',
+                    borderRadius: '9px',
                     border: paymentMode === 'CASH' ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
                     background: paymentMode === 'CASH' ? 'var(--success-light)' : 'var(--bg-tertiary)',
                     color: paymentMode === 'CASH' ? 'var(--success-color)' : 'var(--text-secondary)',
                     fontWeight: 700,
-                    fontSize: '0.8rem',
+                    fontSize: '0.86rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -2636,13 +2637,14 @@ const Cashier = () => {
                     style={{
                       width: '100%',
                       minWidth: 0,
-                      padding: '7px 4px',
-                      borderRadius: '8px',
+                      height: '36px',
+                      padding: '6px 4px',
+                      borderRadius: '9px',
                       border: paymentMode === 'DEBT' ? '1px solid var(--danger-color)' : '1px solid var(--border-color)',
                       background: paymentMode === 'DEBT' ? 'var(--danger-light)' : 'var(--bg-tertiary)',
                       color: paymentMode === 'DEBT' ? 'var(--danger-color)' : 'var(--text-secondary)',
                       fontWeight: 700,
-                      fontSize: '0.8rem',
+                      fontSize: '0.86rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -2661,13 +2663,14 @@ const Cashier = () => {
                     style={{
                       width: '100%',
                       minWidth: 0,
-                      padding: '7px 4px',
-                      borderRadius: '8px',
+                      height: '36px',
+                      padding: '6px 4px',
+                      borderRadius: '9px',
                       border: '1px solid var(--border-color)',
                       background: 'var(--bg-tertiary)',
                       color: 'var(--text-muted)',
                       fontWeight: 600,
-                      fontSize: '0.8rem',
+                      fontSize: '0.86rem',
                       cursor: 'not-allowed',
                       display: 'flex',
                       alignItems: 'center',
@@ -2695,13 +2698,14 @@ const Cashier = () => {
                     style={{
                       width: '100%',
                       minWidth: 0,
-                      padding: '7px 4px',
-                      borderRadius: '8px',
+                      height: '36px',
+                      padding: '6px 4px',
+                      borderRadius: '9px',
                       border: paymentMode === 'SPLIT' ? '1px solid var(--warning-color)' : '1px solid var(--border-color)',
                       background: paymentMode === 'SPLIT' ? 'var(--warning-light)' : 'var(--bg-tertiary)',
                       color: paymentMode === 'SPLIT' ? '#b45309' : 'var(--text-secondary)',
                       fontWeight: 700,
-                      fontSize: '0.8rem',
+                      fontSize: '0.86rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -2720,13 +2724,14 @@ const Cashier = () => {
                     style={{
                       width: '100%',
                       minWidth: 0,
-                      padding: '7px 4px',
-                      borderRadius: '8px',
+                      height: '36px',
+                      padding: '6px 4px',
+                      borderRadius: '9px',
                       border: '1px solid var(--border-color)',
                       background: 'var(--bg-tertiary)',
                       color: 'var(--text-muted)',
                       fontWeight: 600,
-                      fontSize: '0.8rem',
+                      fontSize: '0.86rem',
                       cursor: 'not-allowed',
                       display: 'flex',
                       alignItems: 'center',
@@ -2750,10 +2755,10 @@ const Cashier = () => {
                     display: 'flex', 
                     gap: '6px', 
                     alignItems: 'center', 
-                    marginBottom: '8px', 
+                    marginBottom: '10px', 
                     background: 'var(--bg-tertiary)', 
-                    padding: '5px 8px', 
-                    borderRadius: '8px', 
+                    padding: '7px 10px', 
+                    borderRadius: '10px', 
                     border: '1px solid var(--border-color)', 
                     flexShrink: 0, 
                     width: '100%', 
@@ -2785,12 +2790,13 @@ const Cashier = () => {
                         }}
                         style={{ 
                           width: '100%', 
-                          padding: selectedCustomerId ? '5px 24px 5px 8px' : '5px 8px', 
-                          borderRadius: '6px', 
+                          height: '36px',
+                          padding: selectedCustomerId ? '6px 28px 6px 10px' : '6px 10px', 
+                          borderRadius: '8px', 
                           background: 'var(--bg-secondary)', 
                           border: selectedCustomerId ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)', 
                           color: 'var(--text-primary)', 
-                          fontSize: '0.82rem', 
+                          fontSize: '0.86rem', 
                           fontWeight: selectedCustomerId ? 700 : 500,
                           outline: 'none',
                           textOverflow: 'ellipsis',
@@ -2898,17 +2904,18 @@ const Cashier = () => {
                     onClick={() => setIsQuickCustomerModalOpen(true)}
                     style={{
                       flexShrink: 0,
-                      padding: '5px 8px',
-                      borderRadius: '6px',
+                      height: '36px',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
                       background: 'rgba(37, 99, 235, 0.12)',
                       border: '1px solid rgba(37, 99, 235, 0.35)',
                       color: 'var(--primary-color)',
-                      fontSize: '0.76rem',
+                      fontSize: '0.82rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '3px',
+                      gap: '4px',
                       whiteSpace: 'nowrap'
                     }}
                     title="زیادکردنی خێرای کڕیاری نوێ"
@@ -2921,16 +2928,16 @@ const Cashier = () => {
               {/* Simple Clean Split Payment Section */}
               {paymentMode === 'SPLIT' && (
                 <div style={{ 
-                  marginBottom: '8px', 
-                  padding: '8px 10px', 
+                  marginBottom: '10px', 
+                  padding: '10px 10px', 
                   background: 'var(--bg-tertiary)', 
-                  borderRadius: '8px', 
+                  borderRadius: '10px', 
                   border: '1px solid var(--border-color)',
                   width: '100%',
                   boxSizing: 'border-box'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px', width: '100%', boxSizing: 'border-box' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px', width: '100%', boxSizing: 'border-box' }}>
+                    <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                       بڕی نەقد:
                     </span>
                     <input
@@ -2948,13 +2955,13 @@ const Cashier = () => {
                       style={{ 
                         width: '125px',
                         maxWidth: '135px',
-                        height: '32px',
+                        height: '36px',
                         padding: '4px 8px', 
-                        borderRadius: '6px', 
+                        borderRadius: '8px', 
                         background: 'var(--bg-secondary)', 
                         border: '1px solid var(--border-color)', 
                         color: 'var(--success-color)', 
-                        fontSize: '0.95rem', 
+                        fontSize: '1rem', 
                         fontWeight: 800, 
                         textAlign: 'center', 
                         outline: 'none',
@@ -2967,8 +2974,8 @@ const Cashier = () => {
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center',
-                    fontSize: '0.78rem', 
-                    paddingTop: '6px', 
+                    fontSize: '0.82rem', 
+                    paddingTop: '8px', 
                     borderTop: '1px solid var(--border-color)',
                     fontWeight: 800,
                     width: '100%',
@@ -2984,14 +2991,14 @@ const Cashier = () => {
               {paymentMode === 'CASH' && (
                 <div style={{
                   marginTop: '4px',
-                  marginBottom: '4px',
+                  marginBottom: '8px',
                   background: 'var(--bg-tertiary)',
-                  borderRadius: '9px',
+                  borderRadius: '12px',
                   border: '1px solid var(--border-color)',
-                  padding: '6px 8px',
+                  padding: '10px 10px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px',
+                  gap: '8px',
                   boxSizing: 'border-box',
                   width: '100%'
                 }}>
@@ -3007,13 +3014,13 @@ const Cashier = () => {
                     onChange={(e) => setCashReceived(e.target.value)}
                     style={{
                       width: '100%',
-                      height: '30px',
-                      padding: '3px 6px',
-                      borderRadius: '6px',
+                      height: '38px',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
                       background: 'var(--bg-secondary)',
                       border: '1.5px solid var(--border-color)',
                       color: 'var(--text-primary)',
-                      fontSize: '0.92rem',
+                      fontSize: '1.05rem',
                       fontWeight: 800,
                       textAlign: 'center',
                       outline: 'none',
@@ -3022,7 +3029,7 @@ const Cashier = () => {
                   />
 
                   {/* 2x2 Quick Banknote Buttons */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
                     {[
                       { label: '٥,٠٠٠ د.ع', val: 5000 },
                       { label: '١٠,٠٠٠ د.ع', val: 10000 },
@@ -3034,13 +3041,13 @@ const Cashier = () => {
                         type="button"
                         onClick={() => setCashReceived(String(denom.val))}
                         style={{
-                          height: '28px',
-                          padding: '3px 2px',
-                          borderRadius: '6px',
+                          height: '36px',
+                          padding: '4px 2px',
+                          borderRadius: '8px',
                           border: '1px solid var(--border-color)',
                           background: 'var(--bg-secondary)',
                           color: 'var(--text-primary)',
-                          fontSize: '0.78rem',
+                          fontSize: '0.86rem',
                           fontWeight: 800,
                           cursor: 'pointer',
                           transition: 'background 0.15s ease',
@@ -3065,10 +3072,10 @@ const Cashier = () => {
                     const shortAmount = isShort ? grandTotal - received : 0;
                     return (
                       <div style={{
-                        marginTop: '1px',
-                        padding: '3px 8px',
-                        minHeight: '26px',
-                        borderRadius: '6px',
+                        marginTop: '4px',
+                        padding: '6px 10px',
+                        minHeight: '34px',
+                        borderRadius: '8px',
                         background: isShort ? 'var(--danger-light)' : 'rgba(16, 185, 129, 0.16)',
                         border: isShort ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)',
                         display: 'flex',
@@ -3077,14 +3084,14 @@ const Cashier = () => {
                         boxSizing: 'border-box'
                       }}>
                         <span style={{
-                          fontSize: '0.76rem',
+                          fontSize: '0.82rem',
                           fontWeight: 700,
                           color: isShort ? 'var(--danger-color)' : 'var(--success-color)'
                         }}>
                           {isShort ? 'پارەی کەمە:' : 'باقی (گەڕاوە):'}
                         </span>
                         <span style={{
-                          fontSize: '0.92rem',
+                          fontSize: '1.05rem',
                           fontWeight: 900,
                           color: isShort ? 'var(--danger-color)' : 'var(--success-color)'
                         }}>
