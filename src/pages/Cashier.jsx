@@ -2590,8 +2590,7 @@ const Cashier = () => {
             flexDirection: 'column',
             justifyContent: 'space-between',
             boxSizing: 'border-box',
-            overflowY: 'auto',
-            overflowX: 'hidden'
+            overflow: 'hidden'
           }}>
             {/* Top: Payment Methods */}
             <div>
@@ -2991,14 +2990,14 @@ const Cashier = () => {
               {paymentMode === 'CASH' && (
                 <div style={{
                   marginTop: '4px',
-                  marginBottom: '8px',
+                  marginBottom: '4px',
                   background: 'var(--bg-tertiary)',
-                  borderRadius: '12px',
+                  borderRadius: '11px',
                   border: '1px solid var(--border-color)',
-                  padding: '10px 10px',
+                  padding: '8px 8px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '6px',
                   boxSizing: 'border-box',
                   width: '100%'
                 }}>
@@ -3014,13 +3013,13 @@ const Cashier = () => {
                     onChange={(e) => setCashReceived(e.target.value)}
                     style={{
                       width: '100%',
-                      height: '38px',
-                      padding: '6px 10px',
+                      height: '36px',
+                      padding: '4px 8px',
                       borderRadius: '8px',
                       background: 'var(--bg-secondary)',
                       border: '1.5px solid var(--border-color)',
                       color: 'var(--text-primary)',
-                      fontSize: '1.05rem',
+                      fontSize: '1.02rem',
                       fontWeight: 800,
                       textAlign: 'center',
                       outline: 'none',
@@ -3029,7 +3028,7 @@ const Cashier = () => {
                   />
 
                   {/* 2x2 Quick Banknote Buttons */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '5px' }}>
                     {[
                       { label: '٥,٠٠٠ د.ع', val: 5000 },
                       { label: '١٠,٠٠٠ د.ع', val: 10000 },
@@ -3041,13 +3040,13 @@ const Cashier = () => {
                         type="button"
                         onClick={() => setCashReceived(String(denom.val))}
                         style={{
-                          height: '36px',
-                          padding: '4px 2px',
-                          borderRadius: '8px',
+                          height: '34px',
+                          padding: '3px 2px',
+                          borderRadius: '7px',
                           border: '1px solid var(--border-color)',
                           background: 'var(--bg-secondary)',
                           color: 'var(--text-primary)',
-                          fontSize: '0.86rem',
+                          fontSize: '0.84rem',
                           fontWeight: 800,
                           cursor: 'pointer',
                           transition: 'background 0.15s ease',
@@ -3072,10 +3071,10 @@ const Cashier = () => {
                     const shortAmount = isShort ? grandTotal - received : 0;
                     return (
                       <div style={{
-                        marginTop: '4px',
-                        padding: '6px 10px',
-                        minHeight: '34px',
-                        borderRadius: '8px',
+                        marginTop: '2px',
+                        padding: '3px 8px',
+                        minHeight: '26px',
+                        borderRadius: '6px',
                         background: isShort ? 'var(--danger-light)' : 'rgba(16, 185, 129, 0.16)',
                         border: isShort ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)',
                         display: 'flex',
@@ -3084,14 +3083,14 @@ const Cashier = () => {
                         boxSizing: 'border-box'
                       }}>
                         <span style={{
-                          fontSize: '0.82rem',
+                          fontSize: '0.76rem',
                           fontWeight: 700,
                           color: isShort ? 'var(--danger-color)' : 'var(--success-color)'
                         }}>
                           {isShort ? 'پارەی کەمە:' : 'باقی (گەڕاوە):'}
                         </span>
                         <span style={{
-                          fontSize: '1.05rem',
+                          fontSize: '0.94rem',
                           fontWeight: 900,
                           color: isShort ? 'var(--danger-color)' : 'var(--success-color)'
                         }}>
@@ -3105,7 +3104,7 @@ const Cashier = () => {
             </div>
 
             {/* Bottom: Totals Breakdown, Auto-Print & Checkout Buttons */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: 'auto' }}>
+            <div style={{ borderTop: 'none', paddingTop: '2px', marginTop: 'auto' }}>
               
               {/* Dedicated Return Item Button - Fixed Position */}
               <div style={{ marginBottom: '5px' }}>
@@ -3229,11 +3228,11 @@ const Cashier = () => {
               {/* Big Grand Total Display (Higher & Taller across CASH, DEBT, and SPLIT) */}
               <div style={{ 
                 background: 'var(--bg-tertiary)', 
-                padding: '18px 12px', 
-                minHeight: '132px',
+                padding: '16px 12px', 
+                minHeight: '142px',
                 borderRadius: '14px', 
                 border: '1.5px solid var(--border-color)', 
-                marginBottom: '10px',
+                marginBottom: '8px',
                 textAlign: 'center',
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
                 display: 'flex',
