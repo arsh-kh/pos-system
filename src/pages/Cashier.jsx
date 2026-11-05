@@ -859,11 +859,11 @@ const Cashier = () => {
     try {
       const res = await axios.get('http://localhost:3001/api/returns/recent-sales');
       if (res.data?.status === 'SUCCESS' && Array.isArray(res.data.data)) {
-        setReturnRecentSales(res.data.data.slice(0, 15));
+        setReturnRecentSales(res.data.data);
       } else {
         const fallback = await axios.get('http://localhost:3001/api/checkout');
         const list = Array.isArray(fallback.data) ? fallback.data : (fallback.data?.data || []);
-        setReturnRecentSales(list.filter(s => Number(s.item_count) > 0).slice(0, 15));
+        setReturnRecentSales(list.filter(s => Number(s.item_count) > 0));
       }
     } catch (_) {}
   };
@@ -4077,23 +4077,29 @@ const Cashier = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                          پسووڵە نوێیەکان:
+                          دواین پسووڵەکان:
                         </span>
                       </div>
 
                       <div 
-                        className="hide-scrollbar"
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '8px',
-                          maxHeight: '260px',
+                          maxHeight: '340px',
                           overflowY: 'auto'
                         }}
                       >
                         {returnRecentSales.length > 0 ? (
                           returnRecentSales
-                            .filter(s => !returnSaleIdInput || String(s.id).includes(returnSaleIdInput.trim().replace(/[^0-9]/g, '')))
+                            .filter(s => {
+                              if (!returnSaleIdInput) return true;
+                              const q = returnSaleIdInput.trim().toLowerCase();
+                              const digits = q.replace(/[^0-9]/g, '');
+                              const idMatch = digits ? String(s.id).includes(digits) : false;
+                              const nameMatch = (s.customer_name || '').toLowerCase().includes(q);
+                              return idMatch || nameMatch;
+                            })
                             .map(s => (
                               <div
                                 key={s.id}
