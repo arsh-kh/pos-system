@@ -26,12 +26,16 @@ exports.getLoginUsers = async (req, res) => {
 exports.getCashiers = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, username, full_name, role, is_active, created_at FROM Users WHERE role = ? ORDER BY id ASC',
+      'SELECT id, username, full_name, role, is_active, permissions, created_at FROM Users WHERE role = ? ORDER BY id ASC',
       ['CASHIER']
     );
+    const parsedRows = rows.map(r => ({
+      ...r,
+      permissions: typeof r.permissions === 'string' ? JSON.parse(r.permissions) : (r.permissions || {})
+    }));
     res.json({
       status: 'SUCCESS',
-      data: rows
+      data: parsedRows
     });
   } catch (error) {
     console.error('Error fetching cashiers:', error);
@@ -45,11 +49,15 @@ exports.getCashiers = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, username, full_name, role, is_active, created_at FROM Users ORDER BY role ASC, id ASC'
+      'SELECT id, username, full_name, role, is_active, permissions, created_at FROM Users ORDER BY role ASC, id ASC'
     );
+    const parsedRows = rows.map(r => ({
+      ...r,
+      permissions: typeof r.permissions === 'string' ? JSON.parse(r.permissions) : (r.permissions || {})
+    }));
     res.json({
       status: 'SUCCESS',
-      data: rows
+      data: parsedRows
     });
   } catch (error) {
     console.error('Error fetching all users:', error);
@@ -61,7 +69,7 @@ exports.getAllUsers = async (req, res) => {
  * Create a new cashier account
  */
 exports.createCashier = async (req, res) => {
-  const { username, full_name, password } = req.body;
+  const { username, full_name, password, permissions } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە' });
@@ -87,9 +95,21 @@ exports.createCashier = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const displayName = full_name ? full_name.trim() : cleanUsername;
 
+    let permsJson = null;
+    if (permissions && typeof permissions === 'object') {
+      permsJson = JSON.stringify(permissions);
+    } else {
+      const [currentPerms] = await db.query('SELECT permission_key, is_enabled FROM Cashier_Permissions');
+      const defaultMap = {};
+      for (const p of currentPerms) {
+        defaultMap[p.permission_key] = Boolean(p.is_enabled);
+      }
+      permsJson = JSON.stringify(defaultMap);
+    }
+
     const [result] = await db.query(
-      'INSERT INTO Users (username, full_name, password, role, is_active) VALUES (?, ?, ?, ?, ?)',
-      [cleanUsername, displayName, hashedPassword, 'CASHIER', 1]
+      'INSERT INTO Users (username, full_name, password, role, is_active, permissions) VALUES (?, ?, ?, ?, ?, ?)',
+      [cleanUsername, displayName, hashedPassword, 'CASHIER', 1, permsJson]
     );
 
     await logAuditAction({
@@ -109,7 +129,8 @@ exports.createCashier = async (req, res) => {
         username: cleanUsername,
         full_name: displayName,
         role: 'CASHIER',
-        is_active: 1
+        is_active: 1,
+        permissions: permissions || JSON.parse(permsJson)
       }
     });
   } catch (error) {
@@ -119,11 +140,11 @@ exports.createCashier = async (req, res) => {
 };
 
 /**
- * Update an existing cashier (change password, name, or active status)
+ * Update an existing cashier (change password, name, active status, or permissions)
  */
 exports.updateCashier = async (req, res) => {
   const { id } = req.params;
-  const { full_name, password, is_active } = req.body;
+  const { full_name, password, is_active, permissions } = req.body;
 
   try {
     const [users] = await db.query('SELECT * FROM Users WHERE id = ?', [id]);
@@ -161,6 +182,13 @@ exports.updateCashier = async (req, res) => {
       updates.push('password = ?');
       params.push(hashedPassword);
       newState.password_changed = true;
+    }
+
+    if (permissions !== undefined) {
+      const permsVal = (permissions && typeof permissions === 'object') ? JSON.stringify(permissions) : JSON.stringify({});
+      updates.push('permissions = ?');
+      params.push(permsVal);
+      newState.permissions = permissions;
     }
 
     if (updates.length === 0) {

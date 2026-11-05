@@ -73,6 +73,11 @@ exports.login = async (req, res) => {
             details: `چوونەژوورەوەی سەرکەوتوو: ${user.full_name || user.username} (${user.role === 'ADMIN' ? 'ئەدمین' : 'کاشێر'})`
         });
 
+        let perms = user.permissions;
+        if (typeof perms === 'string') {
+            try { perms = JSON.parse(perms); } catch (_) { perms = {}; }
+        }
+
         res.json({
             status: 'SUCCESS',
             token,
@@ -80,7 +85,8 @@ exports.login = async (req, res) => {
                 id: user.id, 
                 username: user.username, 
                 full_name: user.full_name || user.username,
-                role: user.role 
+                role: user.role,
+                permissions: perms || {}
             }
         });
     } catch (error) {

@@ -392,133 +392,179 @@ exports.getReturnsHistory = async (req, res) => {
 };
 
 exports.processDirectReturn = async (req, res) => {
-    const { product_id, quantity, reason, refund_method, customer_id, unit_type, price, sale_id } = req.body;
+    const { reason, refund_method, customer_id, sale_id } = req.body;
+    const itemsInput = Array.isArray(req.body.items) && req.body.items.length > 0 
+        ? req.body.items 
+        : [{ 
+            product_id: req.body.product_id, 
+            quantity: req.body.quantity, 
+            unit_type: req.body.unit_type, 
+            price: req.body.price 
+        }];
+
+    if (itemsInput.length === 0 || !itemsInput[0].product_id) {
+        return res.status(400).json({ status: 'ERROR', message: 'هیچ کاڵایەک بۆ گەڕاندنەوە دیاری نەکراوە' });
+    }
+
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
-
-        const [products] = await connection.query(
-            'SELECT * FROM Products WHERE id = ? FOR UPDATE',
-            [product_id]
-        );
-        if (products.length === 0) {
-            throw new Error('کاڵا نەدۆزرایەوە');
-        }
-        const product = products[0];
-        const returnQty = Math.max(0.001, parseFloat(quantity) || 1);
-
-        const isBox = unit_type === 'BOX';
-        const multiplier = isBox ? Math.max(1, parseFloat(product.units_per_box) || 1) : 1;
-        const stockToAdd = returnQty * multiplier;
-
-        let unitPrice = Number(price);
-        if (!unitPrice || isNaN(unitPrice)) {
-            unitPrice = isBox && Number(product.wholesale_price) > 0 
-                ? Number(product.wholesale_price) 
-                : Number(product.selling_price || 0);
-        }
-        const refundedAmount = Math.round(unitPrice * returnQty);
 
         let finalRefundMethod = (refund_method || 'CASH').toUpperCase();
         if (!['CASH', 'DEBT'].includes(finalRefundMethod)) {
             finalRefundMethod = 'CASH';
         }
 
-        let debtTransactionId = null;
         let customerName = 'کڕیاری گشتی';
         if (customer_id) {
             const [custRows] = await connection.query('SELECT name FROM Customers WHERE id = ?', [customer_id]);
             if (custRows.length > 0) customerName = custRows[0].name;
-
-            if (finalRefundMethod === 'DEBT') {
-                const debtNote = `گەڕاندنەوەی کاڵا (${product.name} x ${returnQty}) - کەمکردنەوە لە قەرز`;
-                const [debtRes] = await connection.query(
-                    'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',
-                    [customer_id, refundedAmount, 'PAY', debtNote]
-                );
-                debtTransactionId = debtRes.insertId;
-            }
         }
 
-        // Insert into Returns
-        const [retResult] = await connection.query(
-            'INSERT INTO Returns (sale_id, product_id, quantity, refunded_amount, refund_method, customer_id, debt_transaction_id, reason, unit_type, units_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [sale_id || null, product_id, returnQty, refundedAmount, finalRefundMethod, customer_id || null, debtTransactionId, reason || 'گەڕاندنەوە لە کاشێر', isBox ? 'BOX' : 'PIECE', multiplier]
-        );
-        const returnId = retResult.insertId;
+        if (finalRefundMethod === 'DEBT' && !customer_id) {
+            throw new Error('تکایە سەرەتا کڕیارێک دیاریبکە بۆ کەمکردنەوە لە قەرز');
+        }
 
-        // Restore stock
-        await connection.query(
-            'UPDATE Products SET stock = stock + ? WHERE id = ?',
-            [stockToAdd, product_id]
-        );
+        let totalRefundedAmount = 0;
+        const processedItems = [];
 
-        // Restore Product_Batches FIFO remaining quantity
-        const [latestBatches] = await connection.query(`
-            SELECT id, remaining_quantity FROM Product_Batches 
-            WHERE product_id = ? 
-            ORDER BY id DESC LIMIT 1
-        `, [product_id]);
+        // 1. First pass: validate all items and calculate totals
+        for (const item of itemsInput) {
+            const pId = Number(item.product_id);
+            const [products] = await connection.query('SELECT * FROM Products WHERE id = ? FOR UPDATE', [pId]);
+            if (products.length === 0) {
+                throw new Error(`کاڵای ژمارە (${pId}) نەدۆزرایەوە`);
+            }
+            const product = products[0];
+            const returnQty = Math.max(0.001, parseFloat(item.quantity) || 1);
+            const isBox = item.unit_type === 'BOX';
+            const multiplier = isBox ? Math.max(1, parseFloat(product.units_per_box) || 1) : 1;
+            const stockToAdd = returnQty * multiplier;
 
-        if (latestBatches.length > 0) {
-            const lb = latestBatches[0];
-            const newRem = Number(lb.remaining_quantity) + stockToAdd;
-            await connection.query(
-                "UPDATE Product_Batches SET remaining_quantity = ?, status = 'ACTIVE' WHERE id = ?",
-                [newRem, lb.id]
+            let unitPrice = Number(item.price);
+            if (!unitPrice || isNaN(unitPrice)) {
+                unitPrice = isBox && Number(product.wholesale_price) > 0 
+                    ? Number(product.wholesale_price) 
+                    : Number(product.selling_price || 0);
+            }
+            const refundedAmount = Math.round(unitPrice * returnQty);
+            totalRefundedAmount += refundedAmount;
+
+            processedItems.push({
+                product,
+                returnQty,
+                unitPrice,
+                refundedAmount,
+                isBox,
+                multiplier,
+                stockToAdd
+            });
+        }
+
+        // 2. If DEBT refund, record in Customer_Debts
+        let debtTransactionId = null;
+        if (finalRefundMethod === 'DEBT' && customer_id && totalRefundedAmount > 0) {
+            const itemsSummary = processedItems.map(p => `${p.product.name} x ${p.returnQty}`).join('، ');
+            const debtNote = `گەڕاندنەوەی کاڵا لە کاشێر (${itemsSummary}) - کەمکردنەوە لە قەرز`;
+            const [debtRes] = await connection.query(
+                'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',
+                [customer_id, totalRefundedAmount, 'PAY', debtNote]
             );
+            debtTransactionId = debtRes.insertId;
+        }
+
+        // 3. Process each item: insert into Returns, update Products stock, and restore Product_Batches
+        const returnIds = [];
+        for (const pi of processedItems) {
+            const [retResult] = await connection.query(
+                'INSERT INTO Returns (sale_id, product_id, quantity, refunded_amount, refund_method, customer_id, debt_transaction_id, reason, unit_type, units_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    sale_id || null, 
+                    pi.product.id, 
+                    pi.returnQty, 
+                    pi.refundedAmount, 
+                    finalRefundMethod, 
+                    customer_id || null, 
+                    debtTransactionId, 
+                    reason || 'گەڕاندنەوە لە کاشێر', 
+                    pi.isBox ? 'BOX' : 'PIECE', 
+                    pi.multiplier
+                ]
+            );
+            returnIds.push(retResult.insertId);
+
+            // Restore product stock
+            await connection.query(
+                'UPDATE Products SET stock = stock + ? WHERE id = ?',
+                [pi.stockToAdd, pi.product.id]
+            );
+
+            // Restore FIFO batch remaining_quantity (add back to latest active batch of this product)
+            const [latestBatches] = await connection.query(
+                "SELECT id, remaining_quantity FROM Product_Batches WHERE product_id = ? ORDER BY id DESC LIMIT 1",
+                [pi.product.id]
+            );
+            if (latestBatches.length > 0) {
+                const lb = latestBatches[0];
+                const newRem = Number(lb.remaining_quantity) + pi.stockToAdd;
+                await connection.query(
+                    "UPDATE Product_Batches SET remaining_quantity = ?, status = 'ACTIVE' WHERE id = ?",
+                    [newRem, lb.id]
+                );
+            }
         }
 
         await connection.commit();
 
-        // Queue Sync Event
-        try {
-            await queueSyncEvent({
-                entity_type: 'RETURN',
-                entity_id: returnId,
-                action_type: 'CREATE',
-                payload: {
-                    return_id: returnId,
-                    product_id,
-                    return_qty: returnQty,
-                    refunded_amount: refundedAmount,
-                    refund_method: finalRefundMethod,
-                    customer_id: customer_id || null,
-                    timestamp: new Date().toISOString()
-                }
-            });
-        } catch (syncErr) {
-            console.error('Queue sync error (non-fatal):', syncErr);
+        // 4. Sync Queue & Audit Logs (post-commit)
+        for (let i = 0; i < processedItems.length; i++) {
+            const pi = processedItems[i];
+            const rId = returnIds[i];
+            try {
+                await queueSyncEvent({
+                    entity_type: 'RETURN',
+                    entity_id: rId,
+                    action_type: 'CREATE',
+                    payload: {
+                        return_id: rId,
+                        product_id: pi.product.id,
+                        return_qty: pi.returnQty,
+                        refunded_amount: pi.refundedAmount,
+                        refund_method: finalRefundMethod,
+                        customer_id: customer_id || null,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (_) {}
         }
 
-        // Audit log
         try {
+            const summaryNames = processedItems.map(p => `${p.product.name} (${p.returnQty} دانە)`).join('، ');
             await logAuditAction({
                 req,
                 action_type: 'CASHIER_RETURN',
                 entity_name: 'Returns',
-                entity_id: returnId,
-                new_value: { return_id: returnId, product_id, return_qty: returnQty, refunded_amount: refundedAmount },
-                details: `گەڕاندنەوەی کاشێر: ${product.name} x ${returnQty} بە بڕی ${refundedAmount.toLocaleString()} دینار (${finalRefundMethod === 'DEBT' ? 'لە قەرز کەمکرایەوە' : 'نەقد درایەوە'})`
+                entity_id: returnIds[0] || 0,
+                new_value: { return_ids: returnIds, total_refunded: totalRefundedAmount, refund_method: finalRefundMethod },
+                details: `گەڕاندنەوەی کاشێر بەبێ وەسڵ: [${summaryNames}] بە کۆی ${totalRefundedAmount.toLocaleString()} دینار (${finalRefundMethod === 'DEBT' ? 'کەمکرایەوە لە قەرزی ' + customerName : 'نەقد درایەوە لە سندوق'})`
             });
-        } catch (auditErr) {
-            console.error('Audit log error (non-fatal):', auditErr);
-        }
+        } catch (_) {}
 
         res.json({
             status: 'SUCCESS',
-            message: `کاڵای (${product.name}) بە سەرکەوتوویی گەڕێنرایەوە (${returnQty} دانە). بڕی ${refundedAmount.toLocaleString()} د.ع ${finalRefundMethod === 'DEBT' ? 'لە قەرز کەمکرایەوە' : 'بە نەقد درایەوە'}.`,
+            message: `گەڕاندنەوەی کاڵا بە سەرکەوتوویی ئەنجامدرا. کۆی ${totalRefundedAmount.toLocaleString()} د.ع ${finalRefundMethod === 'DEBT' ? 'لە قەرزی کڕیار کەمکرایەوە' : 'بە نەقد لە سندوق درایەوە'}.`,
             data: {
-                return_id: returnId,
-                product_id: product.id,
-                product_name: product.name,
-                barcode: product.barcode,
-                quantity: returnQty,
-                unit: product.unit || 'دانە',
-                refunded_amount: refundedAmount,
+                return_ids: returnIds,
+                total_refunded: totalRefundedAmount,
                 refund_method: finalRefundMethod,
                 customer_name: customerName,
-                created_at: new Date().toISOString()
+                items: processedItems.map(p => ({
+                    product_id: p.product.id,
+                    product_name: p.product.name,
+                    barcode: p.product.barcode,
+                    quantity: p.returnQty,
+                    refunded_amount: p.refundedAmount
+                }))
             }
         });
     } catch (error) {
@@ -530,7 +576,6 @@ exports.processDirectReturn = async (req, res) => {
     }
 };
 
-// Return list of recent sales with returnable items for quick return selection
 exports.getRecentSalesForReturn = async (req, res) => {
     try {
         const [rows] = await db.query(`

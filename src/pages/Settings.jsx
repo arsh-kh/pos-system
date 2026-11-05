@@ -25,6 +25,55 @@ const getIpc = () => {
 };
 let ipcRenderer = getIpc();
 
+const POS_ACTION_PERMISSIONS = [
+  { key: 'allow_manual_discount', label: 'داشکاندنی دەستی لەسەر پسووڵە' },
+  { key: 'allow_custom_price', label: 'دەستکاریکردنی نرخی فرۆشتن' },
+  { key: 'allow_delete_item', label: 'سڕینەوەی کاڵا لە سەبەتە' },
+  { key: 'allow_clear_cart', label: 'بەتاڵکردنەوەی تەواوی سەبەتە' },
+  { key: 'allow_debt_sale', label: 'فرۆشتن بە شێوازی قەرز' },
+  { key: 'allow_split_payment', label: 'پارەدانی تێکەڵ (نەقد + قەرز)' },
+  { key: 'allow_view_cost_price', label: 'بینینی نرخی کڕین (تێچوو)' }
+];
+
+const MODULE_PERMISSIONS = [
+  { key: 'pos_cashier', label: 'شاشەی کاشێر و فرۆشتن' },
+  { key: 'pos_shifts', label: 'قاسە و شیفتەکان' },
+  { key: 'pos_returns', label: 'گەڕاندنەوەی کاڵا' },
+  { key: 'pos_owes', label: 'قەرزی کڕیاران و وەرگرتنەوە' },
+  { key: 'inv_products', label: 'کاڵاکان و مەخزەن' },
+  { key: 'inv_needs', label: 'پێداویستییە کەمبووەکان' },
+  { key: 'inv_promotions', label: 'ئۆفەر و داشکاندن' },
+  { key: 'inv_purchases', label: 'پسووڵەی کڕین لە کۆمپانیا' },
+  { key: 'inv_audit', label: 'جەردکردنی کۆگا' },
+  { key: 'inv_wastage', label: 'زیان و فەوتانی کاڵا' },
+  { key: 'inv_vendor_returns', label: 'گەڕاندنەوە بۆ کۆمپانیا (RTV)' },
+  { key: 'mgmt_expenses', label: 'خەرجییەکانی مارکێت' },
+  { key: 'mgmt_history', label: 'مێژووی فرۆشتنە کۆنەکان' }
+];
+
+const DEFAULT_CASHIER_PERMISSIONS = {
+  pos_cashier: true,
+  pos_shifts: true,
+  pos_returns: true,
+  pos_owes: true,
+  inv_products: true,
+  inv_needs: true,
+  inv_promotions: false,
+  inv_purchases: false,
+  inv_audit: false,
+  inv_wastage: false,
+  inv_vendor_returns: false,
+  mgmt_expenses: false,
+  mgmt_history: false,
+  allow_manual_discount: true,
+  allow_custom_price: false,
+  allow_delete_item: true,
+  allow_clear_cart: true,
+  allow_debt_sale: true,
+  allow_split_payment: true,
+  allow_view_cost_price: false
+};
+
 const Settings = () => {
   const { isAdmin, currentUser, changePassword, lockToCashier, cashierPermissions, updatePermissions } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
@@ -167,34 +216,6 @@ const Settings = () => {
     setScannerTestInput('');
   };
 
-  // Cashier Selected Fields & Permissions State
-  const [permDraft, setPermDraft] = useState({});
-  const [permSaving, setPermSaving] = useState(false);
-  const [permNotice, setPermNotice] = useState('');
-
-  useEffect(() => {
-    if (cashierPermissions?.map) {
-      setPermDraft(cashierPermissions.map);
-    }
-  }, [cashierPermissions]);
-
-  const handleTogglePerm = (key) => {
-    setPermDraft(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleSavePermissions = async () => {
-    setPermSaving(true);
-    setPermNotice('');
-    const res = await updatePermissions(permDraft);
-    setPermSaving(false);
-    if (res?.success) {
-      setPermNotice('دەسەڵاتەکان بە سەرکەوتوویی پاشەکەوت کران');
-      setTimeout(() => setPermNotice(''), 3000);
-    } else {
-      alert(res?.message || 'هەڵە لە نوێکردنەوەی دەسەڵاتەکان');
-    }
-  };
-
   // Multi-Cashier Accounts Management State
   const [cashiersList, setCashiersList] = useState([]);
   const [loadingCashiers, setLoadingCashiers] = useState(false);
@@ -202,8 +223,10 @@ const Settings = () => {
   const [showEditCashierModal, setShowEditCashierModal] = useState(false);
   const [selectedCashier, setSelectedCashier] = useState(null);
   const [newCashierForm, setNewCashierForm] = useState({ username: '', full_name: '', password: '' });
+  const [newCashierPermissions, setNewCashierPermissions] = useState(DEFAULT_CASHIER_PERMISSIONS);
   const [editCashierPassword, setEditCashierPassword] = useState('');
   const [editCashierFullName, setEditCashierFullName] = useState('');
+  const [editCashierPermissions, setEditCashierPermissions] = useState(DEFAULT_CASHIER_PERMISSIONS);
   const [cashierNotice, setCashierNotice] = useState('');
   const [cashierError, setCashierError] = useState('');
   const [cashierSubmitting, setCashierSubmitting] = useState(false);
@@ -226,6 +249,25 @@ const Settings = () => {
     fetchCashiersList();
   }, []);
 
+  const handleOpenAddCashierModal = () => {
+    setNewCashierForm({ username: '', full_name: '', password: '' });
+    setNewCashierPermissions(DEFAULT_CASHIER_PERMISSIONS);
+    setCashierError('');
+    setShowAddCashierModal(true);
+  };
+
+  const handleOpenEditCashierModal = (cashier) => {
+    setSelectedCashier(cashier);
+    setEditCashierFullName(cashier.full_name || cashier.username);
+    setEditCashierPassword('');
+    const perms = (cashier.permissions && typeof cashier.permissions === 'object' && Object.keys(cashier.permissions).length > 0)
+      ? { ...DEFAULT_CASHIER_PERMISSIONS, ...cashier.permissions }
+      : DEFAULT_CASHIER_PERMISSIONS;
+    setEditCashierPermissions(perms);
+    setCashierError('');
+    setShowEditCashierModal(true);
+  };
+
   const handleCreateCashier = async (e) => {
     e.preventDefault();
     if (!newCashierForm.username.trim() || !newCashierForm.password) {
@@ -238,11 +280,13 @@ const Settings = () => {
       const res = await axios.post('http://localhost:3001/api/users/cashiers', {
         username: newCashierForm.username.trim(),
         full_name: newCashierForm.full_name.trim() || newCashierForm.username.trim(),
-        password: newCashierForm.password
+        password: newCashierForm.password,
+        permissions: newCashierPermissions
       });
       if (res.data?.status === 'SUCCESS') {
         setShowAddCashierModal(false);
         setNewCashierForm({ username: '', full_name: '', password: '' });
+        setNewCashierPermissions(DEFAULT_CASHIER_PERMISSIONS);
         setCashierNotice('کاشێری نوێ بە سەرکەوتوویی زیادکرا');
         setTimeout(() => setCashierNotice(''), 3500);
         fetchCashiersList();
@@ -260,7 +304,10 @@ const Settings = () => {
     setCashierSubmitting(true);
     setCashierError('');
     try {
-      const body = { full_name: editCashierFullName };
+      const body = { 
+        full_name: editCashierFullName,
+        permissions: editCashierPermissions
+      };
       if (editCashierPassword.trim()) {
         body.password = editCashierPassword.trim();
       }
@@ -269,9 +316,13 @@ const Settings = () => {
         setShowEditCashierModal(false);
         setSelectedCashier(null);
         setEditCashierPassword('');
-        setCashierNotice('زانیارییەکانی کاشێر بە سەرکەوتوویی نوێکرانەوە');
+        setCashierNotice('زانیاری و دەسەڵاتەکانی کاشێر بە سەرکەوتوویی نوێکرانەوە');
         setTimeout(() => setCashierNotice(''), 3500);
         fetchCashiersList();
+        if (currentUser && currentUser.id === selectedCashier.id) {
+          const updatedUser = { ...currentUser, full_name: editCashierFullName, permissions: editCashierPermissions };
+          sessionStorage.setItem('pos_user', JSON.stringify(updatedUser));
+        }
       }
     } catch (err) {
       setCashierError(err.response?.data?.message || 'هەڵە لە نوێکردنەوەی کاشێر');
@@ -1110,10 +1161,7 @@ const Settings = () => {
             )}
             <button
               type="button"
-              onClick={() => {
-                setCashierError('');
-                setShowAddCashierModal(true);
-              }}
+              onClick={handleOpenAddCashierModal}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '10px 18px', borderRadius: '12px',
@@ -1143,6 +1191,7 @@ const Settings = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
             {cashiersList.map((cashier) => {
               const isActive = cashier.is_active === 1;
+              const activePermsCount = Object.values(cashier.permissions || {}).filter(Boolean).length;
               return (
                 <div
                   key={cashier.id}
@@ -1183,49 +1232,56 @@ const Settings = () => {
                       </div>
                     </div>
 
-                    {/* Status Badge */}
-                    <span style={{
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      background: isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: isActive ? '#10b981' : '#ef4444',
-                      border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                    }}>
-                      {isActive ? 'چالاک' : 'ناچالاک'}
-                    </span>
+                    {/* Status Badge & Active Perms Count */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '3px 7px',
+                        borderRadius: '6px',
+                        background: 'rgba(37, 99, 235, 0.1)',
+                        color: '#2563eb',
+                        border: '1px solid rgba(37, 99, 235, 0.25)'
+                      }}>
+                        {activePermsCount} دەسەڵات
+                      </span>
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: isActive ? '#10b981' : '#ef4444',
+                        border: `1px solid ${isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                      }}>
+                        {isActive ? 'چالاک' : 'ناچالاک'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Actions Bar */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)', gap: '8px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      {/* Change Password Button */}
+                      {/* Edit Cashier & Permissions Button */}
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedCashier(cashier);
-                          setEditCashierFullName(cashier.full_name || cashier.username);
-                          setEditCashierPassword('');
-                          setCashierError('');
-                          setShowEditCashierModal(true);
-                        }}
+                        onClick={() => handleOpenEditCashierModal(cashier)}
                         style={{
-                          padding: '5px 10px',
+                          padding: '6px 12px',
                           borderRadius: '8px',
-                          border: '1px solid var(--border-color)',
-                          background: 'var(--bg-secondary)',
-                          color: 'var(--text-primary)',
+                          border: '1px solid rgba(37, 99, 235, 0.3)',
+                          background: 'rgba(37, 99, 235, 0.08)',
+                          color: '#2563eb',
                           fontSize: '0.78rem',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '5px'
                         }}
-                        title="دەستکاری ناو و وشەی نهێنی"
+                        title="دەستکاریکردنی ناو، وشەی نهێنی و دەسەڵاتەکان"
                       >
-                        <KeyRound size={13} /> گۆڕینی وشەی نهێنی
+                        <Shield size={14} /> دەستکاریکردن و دەسەڵاتەکان
                       </button>
 
                       {/* Delete Button */}
@@ -1274,11 +1330,14 @@ const Settings = () => {
         )}
       </div>
 
-      {/* Add Cashier Modal */}
+      {/* Permissions Selector Helper */}
+      {(() => null)()}
+
+      {/* Add Cashier Modal with Simple Permissions Selector */}
       {showAddCashierModal && (
         <div className="pos-modal-overlay" onClick={() => setShowAddCashierModal(false)}>
-          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()} style={{ direction: 'rtl' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div className="pos-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', width: '94%', direction: 'rtl', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <UserPlus size={20} color="#2563eb" />
                 <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>زیادکردنی کاشێری نوێ</h3>
@@ -1299,35 +1358,37 @@ const Settings = () => {
             )}
 
             <form onSubmit={handleCreateCashier}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
-                  ناوی تەواو (بۆ ناسینەوە)
-                </label>
-                <input
-                  type="text"
-                  placeholder="بۆ نموونە: ئاراس کەریم"
-                  value={newCashierForm.full_name}
-                  onChange={e => setNewCashierForm({ ...newCashierForm, full_name: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                    ناوی تەواو
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="بۆ نموونە: ئاراس کەریم"
+                    value={newCashierForm.full_name}
+                    onChange={e => setNewCashierForm({ ...newCashierForm, full_name: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', fontSize: '0.88rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                    ناوی بەکارهێنەر (Username) <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="بۆ نموونە: cashier3"
+                    value={newCashierForm.username}
+                    onChange={e => setNewCashierForm({ ...newCashierForm, username: e.target.value })}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', fontSize: '0.88rem' }}
+                  />
+                </div>
               </div>
 
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
-                  ناوی بەکارهێنەر (Username) <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="بۆ نموونە: cashier3"
-                  value={newCashierForm.username}
-                  onChange={e => setNewCashierForm({ ...newCashierForm, username: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
                   وشەی نهێنی (Password) <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
@@ -1336,22 +1397,152 @@ const Settings = () => {
                   placeholder="وشەی نهێنی بۆ کاشێر دیاری بکە..."
                   value={newCashierForm.password}
                   onChange={e => setNewCashierForm({ ...newCashierForm, password: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', fontSize: '0.88rem' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
+              {/* Per-Cashier Permissions Selector */}
+              <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Shield size={16} color="#10b981" /> دیاریکردنی دەسەڵاتەکان ({Object.values(newCashierPermissions || {}).filter(Boolean).length} لە {POS_ACTION_PERMISSIONS.length + MODULE_PERMISSIONS.length})
+                  </span>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allTrue = {};
+                        POS_ACTION_PERMISSIONS.forEach(p => { allTrue[p.key] = true; });
+                        MODULE_PERMISSIONS.forEach(p => { allTrue[p.key] = true; });
+                        setNewCashierPermissions(allTrue);
+                      }}
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      هەمووی
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewCashierPermissions(DEFAULT_CASHIER_PERMISSIONS)}
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid rgba(37, 99, 235, 0.4)', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      ستاندارد
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allFalse = {};
+                        POS_ACTION_PERMISSIONS.forEach(p => { allFalse[p.key] = false; });
+                        MODULE_PERMISSIONS.forEach(p => { allFalse[p.key] = false; });
+                        setNewCashierPermissions(allFalse);
+                      }}
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      لابردنی هەمووی
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '230px', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#2563eb', marginBottom: '6px' }}>
+                      • کردار و دەسەڵاتەکانی فرۆشتن لە کاشێر
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                      {POS_ACTION_PERMISSIONS.map(p => {
+                        const checked = Boolean(newCashierPermissions?.[p.key]);
+                        return (
+                          <label
+                            key={p.key}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setNewCashierPermissions(prev => ({ ...prev, [p.key]: !prev[p.key] }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '7px',
+                              padding: '6px 9px',
+                              borderRadius: '8px',
+                              background: checked ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-primary)',
+                              border: checked ? '1px solid #2563eb' : '1px solid var(--border-color)',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem',
+                              fontWeight: checked ? 700 : 500,
+                              color: checked ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              transition: 'all 0.12s ease',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {}}
+                              style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#2563eb' }}
+                            />
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', marginBottom: '6px' }}>
+                      • لاپەڕە و بەشە سەرەکییەکان
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                      {MODULE_PERMISSIONS.map(p => {
+                        const checked = Boolean(newCashierPermissions?.[p.key]);
+                        return (
+                          <label
+                            key={p.key}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setNewCashierPermissions(prev => ({ ...prev, [p.key]: !prev[p.key] }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '7px',
+                              padding: '6px 9px',
+                              borderRadius: '8px',
+                              background: checked ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-primary)',
+                              border: checked ? '1px solid #10b981' : '1px solid var(--border-color)',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem',
+                              fontWeight: checked ? 700 : 500,
+                              color: checked ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              transition: 'all 0.12s ease',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {}}
+                              style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#10b981' }}
+                            />
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
                 <button
                   type="submit"
                   disabled={cashierSubmitting}
-                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: cashierSubmitting ? 'not-allowed' : 'pointer' }}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: cashierSubmitting ? 'not-allowed' : 'pointer', fontSize: '0.92rem' }}
                 >
                   {cashierSubmitting ? 'تکایە چاوەڕوان بە...' : 'زیادکردنی کاشێر'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddCashierModal(false)}
-                  style={{ padding: '11px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                  style={{ padding: '11px 18px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600, fontSize: '0.92rem' }}
                 >
                   پاشگەزبوونەوە
                 </button>
@@ -1361,13 +1552,13 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Edit Cashier Modal */}
+      {/* Edit Cashier Modal with Simple Permissions Selector */}
       {showEditCashierModal && selectedCashier && (
         <div className="pos-modal-overlay" onClick={() => setShowEditCashierModal(false)}>
-          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()} style={{ direction: 'rtl' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div className="pos-modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px', width: '94%', direction: 'rtl', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <KeyRound size={20} color="#2563eb" />
+                <Shield size={20} color="#2563eb" />
                 <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>دەستکاریکردنی کاشێر: {selectedCashier.username}</h3>
               </div>
               <button 
@@ -1386,43 +1577,175 @@ const Settings = () => {
             )}
 
             <form onSubmit={handleUpdateCashier}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
-                  ناوی تەواو
-                </label>
-                <input
-                  type="text"
-                  value={editCashierFullName}
-                  onChange={e => setEditCashierFullName(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                    ناوی تەواو
+                  </label>
+                  <input
+                    type="text"
+                    value={editCashierFullName}
+                    onChange={e => setEditCashierFullName(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', fontSize: '0.88rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
+                    وشەی نهێنی نوێ (ئارەزوومەندانە)
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="ئەگەر بەتاڵ بێت، ناگۆڕدرێت"
+                    value={editCashierPassword}
+                    onChange={e => setEditCashierPassword(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', fontSize: '0.88rem' }}
+                  />
+                </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '5px' }}>
-                  وشەی نهێنی نوێ (ئەگەر بە بەتاڵی جێیبهێڵیت، ناگۆڕدرێت)
-                </label>
-                <input
-                  type="password"
-                  placeholder="وشەی نهێنی نوێ بنووسە..."
-                  value={editCashierPassword}
-                  onChange={e => setEditCashierPassword(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                />
+              {/* Per-Cashier Permissions Selector */}
+              <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Shield size={16} color="#10b981" /> دەسەڵاتەکان ({Object.values(editCashierPermissions || {}).filter(Boolean).length} لە {POS_ACTION_PERMISSIONS.length + MODULE_PERMISSIONS.length})
+                  </span>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allTrue = {};
+                        POS_ACTION_PERMISSIONS.forEach(p => { allTrue[p.key] = true; });
+                        MODULE_PERMISSIONS.forEach(p => { allTrue[p.key] = true; });
+                        setEditCashierPermissions(allTrue);
+                      }}
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      هەمووی
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditCashierPermissions(DEFAULT_CASHIER_PERMISSIONS)}
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid rgba(37, 99, 235, 0.4)', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      ستاندارد
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allFalse = {};
+                        POS_ACTION_PERMISSIONS.forEach(p => { allFalse[p.key] = false; });
+                        MODULE_PERMISSIONS.forEach(p => { allFalse[p.key] = false; });
+                        setEditCashierPermissions(allFalse);
+                      }}
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      لابردنی هەمووی
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '230px', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#2563eb', marginBottom: '6px' }}>
+                      • کردار و دەسەڵاتەکانی فرۆشتن لە کاشێر
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                      {POS_ACTION_PERMISSIONS.map(p => {
+                        const checked = Boolean(editCashierPermissions?.[p.key]);
+                        return (
+                          <label
+                            key={p.key}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setEditCashierPermissions(prev => ({ ...prev, [p.key]: !prev[p.key] }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '7px',
+                              padding: '6px 9px',
+                              borderRadius: '8px',
+                              background: checked ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-primary)',
+                              border: checked ? '1px solid #2563eb' : '1px solid var(--border-color)',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem',
+                              fontWeight: checked ? 700 : 500,
+                              color: checked ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              transition: 'all 0.12s ease',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {}}
+                              style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#2563eb' }}
+                            />
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', marginBottom: '6px' }}>
+                      • لاپەڕە و بەشە سەرەکییەکان
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                      {MODULE_PERMISSIONS.map(p => {
+                        const checked = Boolean(editCashierPermissions?.[p.key]);
+                        return (
+                          <label
+                            key={p.key}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setEditCashierPermissions(prev => ({ ...prev, [p.key]: !prev[p.key] }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '7px',
+                              padding: '6px 9px',
+                              borderRadius: '8px',
+                              background: checked ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-primary)',
+                              border: checked ? '1px solid #10b981' : '1px solid var(--border-color)',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem',
+                              fontWeight: checked ? 700 : 500,
+                              color: checked ? 'var(--text-primary)' : 'var(--text-secondary)',
+                              transition: 'all 0.12s ease',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {}}
+                              style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: '#10b981' }}
+                            />
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
                 <button
                   type="submit"
                   disabled={cashierSubmitting}
-                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: cashierSubmitting ? 'not-allowed' : 'pointer' }}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: cashierSubmitting ? 'not-allowed' : 'pointer', fontSize: '0.92rem' }}
                 >
                   {cashierSubmitting ? 'تکایە چاوەڕوان بە...' : 'پاشەکەوتکردن'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowEditCashierModal(false)}
-                  style={{ padding: '11px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                  style={{ padding: '11px 18px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600, fontSize: '0.92rem' }}
                 >
                   پاشگەزبوونەوە
                 </button>
@@ -1431,209 +1754,6 @@ const Settings = () => {
           </div>
         </div>
       )}
-
-      {/* Section 1.5: Cashier Selected Fields & Permissions Management (دەسەڵاتەکانی کاشێر و دیاریکردنی خانەکان) */}
-      <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Shield size={22} color="#10b981" /> دەسەڵاتەکانی کاشێر و دیاریکردنی خانەکان (Cashier Permissions & Fields)
-            </h2>
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-              وەک بەڕێوەبەر، دەتوانیت دیاری بکەیت کاشێر دەستی بە کام بەش و کام کردار و خانەی سیستەمەکە ڕابگات، بۆ ڕێگریکردن لە دەستکاری نەخوازراو.
-            </p>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {permNotice && (
-              <span style={{ fontSize: '0.85rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>
-                {permNotice}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleSavePermissions}
-              disabled={permSaving}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 20px', borderRadius: '12px',
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                color: '#ffffff', border: 'none', fontWeight: 'bold',
-                cursor: permSaving ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Save size={18} />
-              {permSaving ? 'پاشەکەوت دەکرێت...' : 'پاشەکەوتکردنی دەسەڵاتەکان'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-panel" style={{ padding: '2rem', borderRadius: '24px', marginBottom: '2.5rem' }}>
-        {/* Sub-section A: POS Actions & Selected Fields inside Cashier Screen */}
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2563eb' }}></span>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
-              کردار و خانەکانی ناو شاشەی فرۆشتن (POS Actions & Inputs)
-            </h3>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: 'auto' }}>
-              ڕێگەپێدان یان قفڵکردنی نرخ، داشکاندن و سڕینەوە بۆ کاشێر
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-            {[
-              { key: 'allow_manual_discount', label: 'داشکاندنی دەستی', desc: 'ڕێگەدان بە کاشێر داشکاندن لەسەر پسوولە بکات', color: '#f59e0b' },
-              { key: 'allow_custom_price', label: 'دەستکاری نرخی فرۆشتن', desc: 'ڕێگەدان بە کاشێر نرخی تاکەکەسی کاڵا لە سەبەتە بگۆڕێت', color: '#ef4444' },
-              { key: 'allow_delete_item', label: 'سڕینەوەی کاڵا لە سەبەتە', desc: 'ڕێگەدان بە کاشێر کاڵا لە سەبەتەی کڕین بسڕێتەوە', color: '#ec4899' },
-              { key: 'allow_clear_cart', label: 'بەتاڵکردنەوەی تەواوی سەبەتە', desc: 'ڕێگەدان بە کاشێر تەواوی پسوولەکە بە یەکجار بسڕێتەوە', color: '#f97316' },
-              { key: 'allow_debt_sale', label: 'فرۆشتن بە قەرز', desc: 'ڕێگەدان بە کاشێر پسوولەی قەرز لەسەر کڕیار تۆمار بکات', color: '#8b5cf6' },
-              { key: 'allow_split_payment', label: 'شێوازی پارەدانی فرەچەشن', desc: 'ڕێگەدان بە پارەدانی تێکەڵ (نەقد + قەرز یان کارت)', color: '#06b6d4' },
-              { key: 'allow_view_cost_price', label: 'پیشاندانی نرخی کڕین (تێچوو)', desc: 'کاشێر بتوانێت تێچووی کڕینی کاڵاکان لە کۆگا ببینێت', color: '#64748b' },
-            ].map(item => {
-              const enabled = !!permDraft[item.key];
-              return (
-                <div 
-                  key={item.key}
-                  onClick={() => handleTogglePerm(item.key)}
-                  style={{
-                    padding: '1.1rem',
-                    borderRadius: '16px',
-                    background: enabled ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
-                    border: `1.5px solid ${enabled ? item.color : 'var(--border-color)'}`,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    transition: 'all 0.2s ease',
-                    boxShadow: enabled ? `0 2px 10px ${item.color}22` : 'none'
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.92rem', color: enabled ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                        {item.label}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      {item.desc}
-                    </div>
-                  </div>
-
-                  {/* Toggle Switch */}
-                  <div style={{
-                    width: '46px',
-                    height: '26px',
-                    borderRadius: '14px',
-                    background: enabled ? item.color : 'rgba(148, 163, 184, 0.3)',
-                    position: 'relative',
-                    transition: 'background 0.2s ease',
-                    flexShrink: 0
-                  }}>
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      position: 'absolute',
-                      top: '3px',
-                      right: enabled ? '4px' : '22px',
-                      transition: 'right 0.2s ease',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Sub-section B: Modules Access Control (دەسەڵاتی بەشە سەرەکییەکان) */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></span>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
-              دەسەڵاتی بەشە سەرەکییەکان (Main Modules & Pages)
-            </h3>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: 'auto' }}>
-              دیاریکردنی کام پەڕانە کاشێر بتوانێت لە داشبۆرد کلیکیان لەسەر بکات
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-            {[
-              { key: 'pos_cashier', label: 'شاشەی کاشێر و فرۆشتن (POS)', desc: 'دەستڕاگەیشتن بە شاشەی سەرەکی فرۆشتن', color: '#2563eb' },
-              { key: 'pos_shifts', label: 'قاسە و شیفتەکان', desc: 'چاودێری باڵانسی قاسە و داخستنی شیفت', color: '#10b981' },
-              { key: 'pos_returns', label: 'گەڕاندنەوەی کاڵا', desc: 'گەڕاندنەوە لە کڕیار و دانەوەی پارە', color: '#0d9488' },
-              { key: 'pos_owes', label: 'قەرزی کڕیاران', desc: 'قەرزی کڕیاران و وەرگرتنەوەی قیست', color: '#d97706' },
-              { key: 'inv_products', label: 'کاڵاکان و مەخزەن', desc: 'مەخزەن، نرخەکان و خوێندنەوەی بارکۆد', color: '#0284c7' },
-              { key: 'inv_needs', label: 'پێداویستییە کەمبووەکان', desc: 'لیستی کاڵا کەمبووەوەکانی مارکێت', color: '#0284c7' },
-              { key: 'inv_promotions', label: 'ئۆفەر و داشکاندن', desc: 'داشکاندن و ئۆفەری کاتی بۆ فرۆشتن', color: '#0284c7' },
-              { key: 'inv_purchases', label: 'پسووڵەی کڕین لە کۆمپانیا', desc: 'تۆمارکردنی کڕین لە دابینکەران', color: '#7c3aed' },
-              { key: 'inv_audit', label: 'جەردکردنی کۆگا', desc: 'پشکنینی مەخزەن و دۆزینەوەی نوقسانی', color: '#0284c7' },
-              { key: 'inv_vendor_returns', label: 'گەڕاندنەوە بۆ کۆمپانیا', desc: 'گەڕاندنەوەی کاڵا بۆ مەندوب (RTV)', color: '#0284c7' },
-              { key: 'inv_wastage', label: 'زیان و فەوتانی کاڵا', desc: 'تۆمارکردنی کاڵای بەسەرچوو و شکاو', color: '#b91c1c' },
-              { key: 'mgmt_expenses', label: 'خەرجییەکانی مارکێت', desc: 'تۆمارکردنی خەرجی ڕۆژانەی مارکێت', color: '#b91c1c' },
-              { key: 'mgmt_history', label: 'مێژووی فرۆشتنە کۆنەکان', desc: 'گەڕان بەدوای پسووڵەکانی پێشوو', color: '#6366f1' }
-            ].map(item => {
-              const enabled = !!permDraft[item.key];
-              return (
-                <div 
-                  key={item.key}
-                  onClick={() => handleTogglePerm(item.key)}
-                  style={{
-                    padding: '1rem',
-                    borderRadius: '16px',
-                    background: enabled ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-tertiary)',
-                    border: `1.5px solid ${enabled ? item.color : 'var(--border-color)'}`,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: enabled ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                      {item.label}
-                    </span>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      {item.desc}
-                    </div>
-                  </div>
-
-                  <div style={{
-                    width: '42px',
-                    height: '24px',
-                    borderRadius: '12px',
-                    background: enabled ? item.color : 'rgba(148, 163, 184, 0.3)',
-                    position: 'relative',
-                    transition: 'background 0.2s ease',
-                    flexShrink: 0
-                  }}>
-                    <div style={{
-                      width: '18px',
-                      height: '18px',
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      position: 'absolute',
-                      top: '3px',
-                      right: enabled ? '3px' : '21px',
-                      transition: 'right 0.2s ease',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
       {/* Hardware Setup Section: Thermal Receipt Printer, Cash Drawer & Barcode Scanner */}
       <div style={{ marginTop: '2.5rem', marginBottom: '1.25rem' }}>

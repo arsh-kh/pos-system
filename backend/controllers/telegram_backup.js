@@ -130,6 +130,20 @@ const getActiveBotToken = async () => {
 let lastOffset = 0;
 let isPolling = false;
 
+// Ensure webhook is cleared on boot so getUpdates polling can work uninterrupted
+const clearWebhookIfActive = async () => {
+    try {
+        const token = await getActiveBotToken();
+        const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+        const info = await infoRes.json();
+        if (info.ok && info.result && info.result.url) {
+            console.log(`Clearing active Telegram webhook (${info.result.url}) for local polling...`);
+            await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`);
+        }
+    } catch (_) {}
+};
+clearWebhookIfActive();
+
 const pollTelegramUpdates = async () => {
     if (isPolling) return;
     isPolling = true;
@@ -140,6 +154,13 @@ const pollTelegramUpdates = async () => {
             signal: AbortSignal.timeout(10000)
         });
         const data = await res.json();
+
+        // Auto-fix if webhook conflict occurs
+        if (data.error_code === 409) {
+            console.warn('Telegram conflict 409 detected: Webhook is active. Auto-clearing webhook for local polling...');
+            await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`);
+            return;
+        }
 
         if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
             for (const update of data.result) {
@@ -187,6 +208,13 @@ const pollTelegramUpdates = async () => {
                             })
                         });
                     } catch (_) {}
+
+                    // Immediately dispatch an initial backup document upon registration!
+                    try {
+                        await handleIncomingBotCommand(chatId, '/backup', senderName);
+                    } catch (bErr) {
+                        console.warn('Initial backup dispatch on start error:', bErr.message);
+                    }
                 }
 
                 // Handle interactive two-way bot commands (/today, /backup, /status, /help)

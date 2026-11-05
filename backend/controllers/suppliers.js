@@ -3,13 +3,15 @@ const db = require('../db');
 exports.getAllSuppliers = async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT s.*, 
+            SELECT s.id, s.name, s.phone,
+                   COALESCE(SUM(pi.paid_amount), s.total_paid) as total_paid,
+                   COALESCE(SUM(pi.remaining_amount), s.total_remaining) as total_remaining,
                    COUNT(pi.id) as total_invoices,
                    COALESCE(SUM(pi.total_amount), (s.total_paid + s.total_remaining)) as total_purchases
             FROM Suppliers s
             LEFT JOIN Purchase_Invoices pi ON s.id = pi.supplier_id
             GROUP BY s.id
-            ORDER BY s.total_remaining DESC, s.id DESC
+            ORDER BY total_remaining DESC, s.id DESC
         `);
         res.json({ status: 'SUCCESS', data: rows });
     } catch (error) {

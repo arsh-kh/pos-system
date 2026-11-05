@@ -94,8 +94,14 @@ export const AuthProvider = ({ children }) => {
 
   // Check if Cashier has permission for a specific key
   // Admins always have permission for everything
+  // Cashiers use their own individual permissions object
   const canCashier = (permissionKey) => {
     if (currentUser?.role === 'ADMIN') return true;
+    if (currentUser?.permissions && typeof currentUser.permissions === 'object') {
+      if (currentUser.permissions[permissionKey] !== undefined) {
+        return Boolean(currentUser.permissions[permissionKey]);
+      }
+    }
     if (!cashierPermissions?.map || Object.keys(cashierPermissions.map).length === 0) {
       return true;
     }

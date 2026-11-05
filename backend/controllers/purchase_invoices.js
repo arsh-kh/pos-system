@@ -91,6 +91,69 @@ exports.createPurchaseInvoice = async (req, res) => {
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
+
+            // Resolve draft / new product safely inside this atomic transaction
+            let finalProductId = item.product_id;
+            const isDraft = item.is_draft || (finalProductId && String(finalProductId).startsWith('draft_')) || !finalProductId;
+
+            if (isDraft) {
+                const itemBarcode = item.barcode ? String(item.barcode).trim() : null;
+                const itemBoxBarcode = item.box_barcode && String(item.box_barcode).trim() !== '' ? String(item.box_barcode).trim() : null;
+
+                let existingProduct = null;
+                if (itemBarcode || itemBoxBarcode) {
+                    const queryParts = [];
+                    const queryParams = [];
+                    if (itemBarcode) {
+                        queryParts.push('barcode = ? OR box_barcode = ?');
+                        queryParams.push(itemBarcode, itemBarcode);
+                    }
+                    if (itemBoxBarcode) {
+                        queryParts.push('barcode = ? OR box_barcode = ?');
+                        queryParams.push(itemBoxBarcode, itemBoxBarcode);
+                    }
+                    const [existingRows] = await connection.query(
+                        `SELECT * FROM Products WHERE ${queryParts.join(' OR ')} LIMIT 1`,
+                        queryParams
+                    );
+                    if (existingRows.length > 0) {
+                        existingProduct = existingRows[0];
+                    }
+                }
+
+                if (existingProduct) {
+                    finalProductId = existingProduct.id;
+                } else {
+                    const prodName = item.name ? String(item.name).trim() : 'کاڵای نوێ';
+                    const prodBarcode = itemBarcode || `GEN-${Date.now().toString().slice(-8)}`;
+                    const prodCost = Math.max(0, Number(item.cost_price) || 0);
+                    const prodSelling = Math.max(0, Number(item.selling_price) || 0);
+                    const prodBoxCost = item.box_cost_price ? Math.round(Number(item.box_cost_price)) : null;
+                    const prodUnits = Math.max(1, parseFloat(item.units_per_box) || 1);
+                    const prodWeighted = Boolean(item.is_weighted || item.unit === 'کگم') ? 1 : 0;
+                    const prodUnit = prodWeighted ? 'کگم' : (item.unit || 'دانە');
+                    const prodCat = item.category_id || null;
+
+                    const [pRes] = await connection.query(
+                        'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit, box_cost_price) VALUES (?, ?, ?, ?, 0, 0, ?, 0, ?, 5, ?, ?, ?, ?, ?)',
+                        [
+                            prodName,
+                            prodBarcode,
+                            prodCost,
+                            prodSelling,
+                            prodCat,
+                            item.expiry_date || null,
+                            itemBoxBarcode,
+                            prodUnits,
+                            prodWeighted,
+                            prodUnit,
+                            prodBoxCost
+                        ]
+                    );
+                    finalProductId = pRes.insertId;
+                }
+            }
+
             const rawCostNum = Math.max(0, Number(item.cost_price) || 0);
             const itemQtyNum = Math.max(0.001, parseFloat(item.quantity) || 1);
             const itemSubtotal = (item.line_total !== undefined && item.line_total !== null && Number(item.line_total) >= 0)
@@ -121,7 +184,7 @@ exports.createPurchaseInvoice = async (req, res) => {
                 'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     invoice_id, 
-                    item.product_id, 
+                    finalProductId, 
                     itemQtyNum, 
                     safeBigInt(rawCostNum).toString(), 
                     landedUnitCost.toString(), 
@@ -135,7 +198,7 @@ exports.createPurchaseInvoice = async (req, res) => {
             );
 
             // Insert new FIFO batch with landedUnitCost and specific units_per_box
-            const batchNum = item.batch_number || `BATCH-${invoice_id}-${item.product_id}`;
+            const batchNum = item.batch_number || `BATCH-${invoice_id}-${finalProductId}`;
             await connection.query(`
                 INSERT INTO Product_Batches (
                     product_id,
@@ -151,7 +214,7 @@ exports.createPurchaseInvoice = async (req, res) => {
                     created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
             `, [
-                item.product_id,
+                finalProductId,
                 invoice_id,
                 batchNum,
                 itemQtyNum,
@@ -168,7 +231,7 @@ exports.createPurchaseInvoice = async (req, res) => {
             // ONLY increment inventory stock!
             await connection.query(
                 'UPDATE Products SET stock = stock + ? WHERE id = ?',
-                [itemQtyNum, item.product_id]
+                [itemQtyNum, finalProductId]
             );
         }
 
@@ -301,7 +364,70 @@ exports.updatePurchaseInvoice = async (req, res) => {
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const pId = Number(item.product_id);
+
+            // Resolve draft / new product safely inside this atomic transaction
+            let finalProductId = item.product_id;
+            const isDraft = item.is_draft || (finalProductId && String(finalProductId).startsWith('draft_')) || !finalProductId;
+
+            if (isDraft) {
+                const itemBarcode = item.barcode ? String(item.barcode).trim() : null;
+                const itemBoxBarcode = item.box_barcode && String(item.box_barcode).trim() !== '' ? String(item.box_barcode).trim() : null;
+
+                let existingProduct = null;
+                if (itemBarcode || itemBoxBarcode) {
+                    const queryParts = [];
+                    const queryParams = [];
+                    if (itemBarcode) {
+                        queryParts.push('barcode = ? OR box_barcode = ?');
+                        queryParams.push(itemBarcode, itemBarcode);
+                    }
+                    if (itemBoxBarcode) {
+                        queryParts.push('barcode = ? OR box_barcode = ?');
+                        queryParams.push(itemBoxBarcode, itemBoxBarcode);
+                    }
+                    const [existingRows] = await connection.query(
+                        `SELECT * FROM Products WHERE ${queryParts.join(' OR ')} LIMIT 1`,
+                        queryParams
+                    );
+                    if (existingRows.length > 0) {
+                        existingProduct = existingRows[0];
+                    }
+                }
+
+                if (existingProduct) {
+                    finalProductId = existingProduct.id;
+                } else {
+                    const prodName = item.name ? String(item.name).trim() : 'کاڵای نوێ';
+                    const prodBarcode = itemBarcode || `GEN-${Date.now().toString().slice(-8)}`;
+                    const prodCost = Math.max(0, Number(item.cost_price) || 0);
+                    const prodSelling = Math.max(0, Number(item.selling_price) || 0);
+                    const prodBoxCost = item.box_cost_price ? Math.round(Number(item.box_cost_price)) : null;
+                    const prodUnits = Math.max(1, parseFloat(item.units_per_box) || 1);
+                    const prodWeighted = Boolean(item.is_weighted || item.unit === 'کگم') ? 1 : 0;
+                    const prodUnit = prodWeighted ? 'کگم' : (item.unit || 'دانە');
+                    const prodCat = item.category_id || null;
+
+                    const [pRes] = await connection.query(
+                        'INSERT INTO Products (name, barcode, cost_price, selling_price, usd_price, stock, category_id, wholesale_price, expiry_date, low_stock_threshold, box_barcode, units_per_box, is_weighted, unit, box_cost_price) VALUES (?, ?, ?, ?, 0, 0, ?, 0, ?, 5, ?, ?, ?, ?, ?)',
+                        [
+                            prodName,
+                            prodBarcode,
+                            prodCost,
+                            prodSelling,
+                            prodCat,
+                            item.expiry_date || null,
+                            itemBoxBarcode,
+                            prodUnits,
+                            prodWeighted,
+                            prodUnit,
+                            prodBoxCost
+                        ]
+                    );
+                    finalProductId = pRes.insertId;
+                }
+            }
+
+            const pId = Number(finalProductId);
             processedProductIds.add(pId);
 
             const rawCostNum = Math.max(0, Number(item.cost_price) || 0);

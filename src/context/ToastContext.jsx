@@ -5,13 +5,15 @@ const ToastContext = createContext(null);
 let globalToast = {
   success: (msg) => console.log('[Toast Success]', msg),
   error: (msg) => console.error('[Toast Error]', msg),
-  info: (msg) => console.log('[Toast Info]', msg)
+  info: (msg) => console.log('[Toast Info]', msg),
+  warning: (msg) => console.log('[Toast Warning]', msg)
 };
 
 export const toast = {
   success: (msg) => globalToast.success(msg),
   error: (msg) => globalToast.error(msg),
-  info: (msg) => globalToast.info(msg)
+  info: (msg) => globalToast.info(msg),
+  warning: (msg) => (globalToast.warning || globalToast.info)(msg)
 };
 
 export const useToast = () => {
@@ -47,6 +49,7 @@ export const ToastProvider = ({ children }) => {
     globalToast.success = (msg) => addToast(msg, 'success');
     globalToast.error = (msg) => addToast(msg, 'error');
     globalToast.info = (msg) => addToast(msg, 'info');
+    globalToast.warning = (msg) => addToast(msg, 'info');
 
     // Override native browser window.alert globally across Electron
     const originalAlert = window.alert;

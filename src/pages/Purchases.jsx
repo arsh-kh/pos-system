@@ -110,6 +110,24 @@ const Purchases = () => {
     } catch (err) {
       console.error('Failed to fetch categories:', err);
     }
+
+    // Auto-clean draft if this invoice number has already been successfully committed in DB
+    try {
+      const currentDraft = getInitialDraft();
+      if (currentDraft && currentDraft.invoiceNumber && !editInvoiceId) {
+        const invCheck = await axios.get('http://localhost:3001/api/purchase-invoices', config);
+        const alreadySaved = invCheck.data?.data?.some(inv => inv.invoice_number === currentDraft.invoiceNumber);
+        if (alreadySaved) {
+          localStorage.removeItem('pos_purchase_draft');
+          setSupplierId('');
+          setInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+          setItems([]);
+          setPaymentMethod('CASH');
+          setPaidAmount('');
+          setAdditionalCost('');
+        }
+      }
+    } catch (_) {}
   };
 
   useEffect(() => {
@@ -695,34 +713,7 @@ const Purchases = () => {
     try {
       const config = getAuthConfig();
 
-      // Step 1: Persist any drafted products to DB before saving invoice
-      const draftMap = new Map();
-      for (const item of items) {
-        const isDraft = item.is_draft || String(item.product_id).startsWith('draft_');
-        if (isDraft && !draftMap.has(item.product_id)) {
-          const basePayload = item.draft_payload ? { ...item.draft_payload } : {};
-          const draftPayload = {
-            name: basePayload.name || item.name,
-            barcode: basePayload.barcode || item.barcode,
-            cost_price: Number(basePayload.cost_price || item.cost_price) || 0,
-            selling_price: Number(basePayload.selling_price || item.selling_price) || 0,
-            stock: 0,
-            wholesale_price: Number(basePayload.wholesale_price) || 0,
-            expiry_date: basePayload.expiry_date || null,
-            low_stock_threshold: basePayload.low_stock_threshold !== undefined ? basePayload.low_stock_threshold : 5,
-            box_barcode: basePayload.box_barcode || item.box_barcode || null,
-            units_per_box: basePayload.units_per_box || item.units_per_box || 1,
-            is_weighted: (basePayload.is_weighted || item.is_weighted) ? 1 : 0,
-            unit: (basePayload.is_weighted || item.is_weighted) ? 'کگم' : (basePayload.unit || item.unit || 'دانە'),
-            category_id: basePayload.category_id || item.category_id || null,
-            box_cost_price: basePayload.box_cost_price || item.box_cost_price || null
-          };
-          const createRes = await axios.post('http://localhost:3001/api/products', draftPayload, config);
-          const realId = createRes.data?.id || createRes.data?.data?.id;
-          draftMap.set(item.product_id, realId);
-        }
-      }
-
+      // Backend handles draft product creation and auto-deduplication atomically inside the SQL transaction
       const payload = {
         supplier_id: supplierId,
         invoice_number: invoiceNumber || null,
@@ -745,10 +736,27 @@ const Purchases = () => {
                 ? Number(i.exact_cost_price)
                 : Math.max(0, Number(i.cost_price) || 0));
 
-          const finalProductId = draftMap.has(i.product_id) ? draftMap.get(i.product_id) : i.product_id;
+          // Pre-resolve product_id from existing products if available
+          let finalProductId = i.product_id;
+          const isDraft = i.is_draft || (finalProductId && String(finalProductId).startsWith('draft_')) || !finalProductId;
+          if (isDraft && Array.isArray(products)) {
+            const existing = products.find(p => 
+              (i.barcode && p.barcode === i.barcode) ||
+              (i.box_barcode && p.box_barcode === i.box_barcode)
+            );
+            if (existing) finalProductId = existing.id;
+          }
 
           return {
             product_id: finalProductId,
+            name: i.name,
+            barcode: i.barcode,
+            box_barcode: i.box_barcode,
+            is_draft: isDraft,
+            category_id: i.category_id || null,
+            expiry_date: i.expiry_date || null,
+            unit: i.unit || 'دانە',
+            is_weighted: Boolean(i.is_weighted),
             quantity: Math.round(totalPieces * 1000) / 1000,
             cost_price: Math.round(pieceCost),
             purchase_price: Math.round(pieceCost),
