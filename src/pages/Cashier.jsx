@@ -689,11 +689,12 @@ const Cashier = () => {
   // Filtered Products for Scale Search Combobox (تەنیا ئەو کاڵایانەی بە کێش / تەرازوو دەفرۆشرێن)
   const filteredScaleProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
-    // Prioritize products marked as weighted (is_weighted = 1 or unit = 'کگم')
-    const weightedOnly = products.filter(p => Boolean(p.is_weighted) || p.unit === 'کگم');
-    const sourceList = (weightedOnly.length > 0 && !scaleItemName.trim()) ? weightedOnly : products;
-    if (!scaleItemName.trim()) return sourceList.slice(0, 15);
-    return sourceList.filter(p => kurdishSearchMatch([p.name, p.barcode], scaleItemName)).slice(0, 15);
+    // Strictly filter products marked as weighted (is_weighted = 1 or unit = 'کگم' or similar)
+    const weightedOnly = products.filter(p => Boolean(p.is_weighted) || p.unit === 'کگم' || p.unit === 'کیلۆگرام' || p.unit === 'کغم');
+    if (!scaleItemName.trim()) {
+      return weightedOnly.slice(0, 30);
+    }
+    return weightedOnly.filter(p => kurdishSearchMatch([p.name, p.barcode], scaleItemName)).slice(0, 30);
   }, [products, scaleItemName]);
 
   const handleOpenScaleModal = () => {
