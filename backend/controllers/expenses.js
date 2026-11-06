@@ -1,19 +1,76 @@
 const db = require('../db');
 const { logAuditAction } = require('../middleware/auditLogger');
 
+// Ensure persistent table for learned expense categories
+const ensureCategoriesTable = async () => {
+    try {
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS Expense_Categories (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const defaultCats = [
+            'کرێی دوکان',
+            'مووچەی کارمەندان',
+            'کارەبا و مۆلیدە',
+            'خواردن و میوانداری',
+            'پاککردنەوە و پێداویستی',
+            'هەمەجۆر / تر'
+        ];
+        for (const cat of defaultCats) {
+            await db.query('INSERT IGNORE INTO Expense_Categories (name) VALUES (?)', [cat]);
+        }
+    } catch (err) {
+        console.warn('Ensure Expense_Categories error:', err.message);
+    }
+};
+ensureCategoriesTable();
+
+exports.getExpenseCategories = async (req, res) => {
+    try {
+        await ensureCategoriesTable();
+        const [rows] = await db.query(`
+            SELECT DISTINCT name FROM (
+                SELECT name FROM Expense_Categories
+                UNION
+                SELECT category as name FROM Expenses WHERE category IS NOT NULL AND category != ''
+            ) AS combined
+            ORDER BY name ASC
+        `);
+        res.json({
+            status: 'SUCCESS',
+            data: rows.map(r => r.name)
+        });
+    } catch (error) {
+        console.error('Get Expense Categories Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
 exports.createExpense = async (req, res) => {
     const { title, category, amount, expense_date, notes } = req.body;
     const numAmount = Math.max(0, Math.round(Number(amount) || 0));
 
-    if (!title || !category || numAmount <= 0) {
-        return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی خەرجی، جۆر و بڕی پارەی دروست دیاری بکە' });
+    const cleanTitle = (title || '').trim();
+    const cleanCategory = (category || 'هەمەجۆر / تر').trim();
+
+    if (!cleanTitle || numAmount <= 0) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی خەرجی و بڕی پارەی دروست دیاری بکە' });
     }
 
     try {
+        await ensureCategoriesTable();
+        // Self-learning: automatically save new category to list
+        if (cleanCategory) {
+            await db.query('INSERT IGNORE INTO Expense_Categories (name) VALUES (?)', [cleanCategory]);
+        }
+
         const dateVal = expense_date ? expense_date : new Date().toISOString().split('T')[0];
         const [result] = await db.query(
             'INSERT INTO Expenses (title, description, category, amount, expense_date, notes) VALUES (?, ?, ?, ?, ?, ?)',
-            [title.trim(), title.trim(), category.trim(), numAmount, dateVal, notes || null]
+            [cleanTitle, cleanTitle, cleanCategory, numAmount, dateVal, notes ? notes.trim() : null]
         );
 
         // Audit log expense creation
@@ -22,17 +79,70 @@ exports.createExpense = async (req, res) => {
             action_type: 'EXPENSE_CREATE',
             entity_name: 'Expenses',
             entity_id: result.insertId,
-            new_value: { title, category, amount: numAmount, expense_date: dateVal, notes },
-            details: `تۆمارکردنی خەرجی نوێ: "${title}" بە بڕی ${numAmount.toLocaleString()} دینار بۆ جۆری [${category}]`
+            new_value: { title: cleanTitle, category: cleanCategory, amount: numAmount, expense_date: dateVal, notes },
+            details: `تۆمارکردنی خەرجی نوێ: "${cleanTitle}" بە بڕی ${numAmount.toLocaleString()} دینار بۆ جۆری [${cleanCategory}]`
         });
 
         res.status(201).json({
             status: 'SUCCESS',
             message: 'خەرجی بە سەرکەوتوویی تۆمارکرا',
-            data: { id: result.insertId, title, category, amount: numAmount, expense_date: dateVal, notes }
+            data: { id: result.insertId, title: cleanTitle, category: cleanCategory, amount: numAmount, expense_date: dateVal, notes }
         });
     } catch (error) {
         console.error('Create Expense Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+exports.updateExpense = async (req, res) => {
+    const { id } = req.params;
+    const { title, category, amount, expense_date, notes } = req.body;
+    const numAmount = Math.max(0, Math.round(Number(amount) || 0));
+
+    const cleanTitle = (title || '').trim();
+    const cleanCategory = (category || 'هەمەجۆر / تر').trim();
+
+    if (!cleanTitle || numAmount <= 0) {
+        return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی خەرجی و بڕی پارەی دروست دیاری بکە' });
+    }
+
+    try {
+        const [existing] = await db.query('SELECT * FROM Expenses WHERE id = ?', [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ status: 'ERROR', message: 'خەرجی نەدۆزرایەوە' });
+        }
+        const oldExpense = existing[0];
+
+        await ensureCategoriesTable();
+        if (cleanCategory) {
+            await db.query('INSERT IGNORE INTO Expense_Categories (name) VALUES (?)', [cleanCategory]);
+        }
+
+        const dateVal = expense_date ? expense_date : (oldExpense.expense_date || new Date().toISOString().split('T')[0]);
+
+        await db.query(
+            'UPDATE Expenses SET title = ?, description = ?, category = ?, amount = ?, expense_date = ?, notes = ? WHERE id = ?',
+            [cleanTitle, cleanTitle, cleanCategory, numAmount, dateVal, notes ? notes.trim() : null, id]
+        );
+
+        // Audit log
+        await logAuditAction({
+            req,
+            action_type: 'EXPENSE_UPDATE',
+            entity_name: 'Expenses',
+            entity_id: id,
+            old_value: oldExpense,
+            new_value: { title: cleanTitle, category: cleanCategory, amount: numAmount, expense_date: dateVal, notes },
+            details: `دەستکاریکردنی خەرجی: "${cleanTitle}" بە بڕی ${numAmount.toLocaleString()} دینار`
+        });
+
+        res.json({
+            status: 'SUCCESS',
+            message: 'خەرجی بە سەرکەوتوویی نوێکرایەوە',
+            data: { id, title: cleanTitle, category: cleanCategory, amount: numAmount, expense_date: dateVal, notes }
+        });
+    } catch (error) {
+        console.error('Update Expense Error:', error);
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
