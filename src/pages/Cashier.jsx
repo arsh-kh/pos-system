@@ -1482,9 +1482,8 @@ const Cashier = () => {
     const promo = activePromotions[item.id];
     const regularPrice = Number(item.price);
     const qty = Number(item.quantity);
-    const minQty = Math.max(1, Number(promo?.min_qty) || 1);
 
-    if (!promo || promo.savings_per_unit <= 0 || qty < minQty) {
+    if (!promo) {
       return {
         hasPromo: false,
         promoQty: 0,
@@ -1492,27 +1491,45 @@ const Cashier = () => {
         promoPrice: regularPrice,
         regularPrice: regularPrice,
         maxLimit: null,
-        minQty: promo ? minQty : null,
+        minQty: 1,
         lineTotal: Math.round(regularPrice * qty),
         totalSavings: 0
       };
     }
 
-    const promoPrice = promo.promo_price;
-    const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-    const promoQty = Math.min(qty, maxLimit);
-    const regularQty = Math.max(0, qty - promoQty);
-    const lineTotal = Math.round((promoQty * promoPrice) + (regularQty * regularPrice));
+    const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+    const bundlePrice = Number(promo.promo_price);
+    const completedBundles = Math.floor(qty / bundleQty);
+    const remainderQty = qty - (completedBundles * bundleQty);
+    const regularBundleTotal = regularPrice * bundleQty;
+
+    if (completedBundles <= 0 || bundlePrice >= regularBundleTotal) {
+      return {
+        hasPromo: false,
+        promoQty: 0,
+        regularQty: qty,
+        promoPrice: regularPrice,
+        regularPrice: regularPrice,
+        maxLimit: null,
+        minQty: bundleQty,
+        lineTotal: Math.round(regularPrice * qty),
+        totalSavings: 0
+      };
+    }
+
+    const lineTotal = Math.round((completedBundles * bundlePrice) + (remainderQty * regularPrice));
     const totalSavings = Math.max(0, Math.round(qty * regularPrice) - lineTotal);
 
     return {
-      hasPromo: true,
-      promoQty,
-      regularQty,
-      promoPrice,
-      regularPrice,
+      hasPromo: totalSavings > 0,
+      promoQty: completedBundles * bundleQty,
+      regularQty: remainderQty,
+      bundleQty,
+      bundlePrice,
+      promoPrice: Math.round(bundlePrice / bundleQty),
+      regularPrice: regularPrice,
       maxLimit: promo.max_qty_per_sale,
-      minQty,
+      minQty: bundleQty,
       lineTotal,
       totalSavings
     };
@@ -2457,7 +2474,7 @@ const Cashier = () => {
                               )}
                               {pricing.hasPromo && item.unit_type !== 'BOX' && (
                                 <span style={{ fontSize: '0.68rem', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
-                                  ئۆفەر
+                                  ئۆفەر {pricing.bundleQty > 1 ? `(${pricing.bundleQty} بە ${pricing.bundlePrice.toLocaleString()})` : ''}
                                 </span>
                               )}
                             </div>
@@ -2540,8 +2557,8 @@ const Cashier = () => {
                         </div>
 
                         {/* نرخ */}
-                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: pricing.hasPromo ? '#d97706' : 'var(--text-secondary)', fontWeight: 700 }}>
-                          {(pricing.hasPromo ? pricing.promoPrice : item.price).toLocaleString()} د.ع
+                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: (pricing.hasPromo && pricing.bundleQty <= 1) ? '#d97706' : 'var(--text-secondary)', fontWeight: 700 }}>
+                          {(pricing.hasPromo && pricing.bundleQty <= 1 ? pricing.promoPrice : item.price).toLocaleString()} د.ع
                         </div>
 
                         {/* کۆ */}

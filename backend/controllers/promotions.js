@@ -51,18 +51,19 @@ exports.getActivePromotions = async (req, res) => {
         rows.forEach(promo => {
             if (activeMap[promo.product_id]) return; // Newest id already recorded due to ORDER BY p.id DESC
             const orig = Number(promo.original_price);
-            let promoPrice = orig;
+            const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+            let bundlePrice = orig * bundleQty;
             if (promo.discount_type === 'PERCENT') {
-                promoPrice = Math.max(0, Math.round(orig - (orig * Number(promo.discount_value)) / 100));
+                bundlePrice = Math.max(0, Math.round((orig * bundleQty) - ((orig * bundleQty * Number(promo.discount_value)) / 100)));
             } else {
-                promoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
             }
 
             activeMap[promo.product_id] = {
                 ...promo,
-                min_qty: promo.min_qty ? Number(promo.min_qty) : 1,
-                promo_price: promoPrice,
-                savings_per_unit: Math.max(0, orig - promoPrice)
+                min_qty: bundleQty,
+                promo_price: bundlePrice,
+                savings_per_bundle: Math.max(0, (orig * bundleQty) - bundlePrice)
             };
         });
 

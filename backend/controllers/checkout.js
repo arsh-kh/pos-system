@@ -132,27 +132,27 @@ exports.processCheckout = async (req, res) => {
 
                     if (promos.length > 0) {
                         const promo = promos[0];
-                        const minQty = Math.max(1, Number(promo.min_qty) || 1);
+                        const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+                        let bundlePrice = regularPrice * bundleQty;
+                        if (promo.discount_type === 'PERCENT') {
+                            bundlePrice = Math.max(0, Math.round((regularPrice * bundleQty) - ((regularPrice * bundleQty * Number(promo.discount_value)) / 100)));
+                        } else {
+                            bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                        }
 
-                        if (itemQty >= minQty) {
-                            let promoPrice = regularPrice;
-                            if (promo.discount_type === 'PERCENT') {
-                                promoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
-                            } else {
-                                promoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
-                            }
+                        const completedBundles = Math.floor(itemQty / bundleQty);
+                        const remainderQty = itemQty - (completedBundles * bundleQty);
 
-                            const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-                            const promoQty = Math.min(itemQty, maxLimit);
-                            const regularQty = Math.max(0, itemQty - promoQty);
-
-                            itemSellTotal = Math.round((promoQty * promoPrice) + (regularQty * regularPrice));
-                            effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : promoPrice;
+                        if (completedBundles > 0 && bundlePrice < (regularPrice * bundleQty)) {
+                            itemSellTotal = Math.round((completedBundles * bundlePrice) + (remainderQty * regularPrice));
+                            effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : regularPrice;
                         } else {
                             itemSellTotal = Math.round(regularPrice * itemQty);
+                            effectivePriceAtSale = regularPrice;
                         }
                     } else {
                         itemSellTotal = Math.round(regularPrice * itemQty);
+                        effectivePriceAtSale = regularPrice;
                     }
                 }
 
