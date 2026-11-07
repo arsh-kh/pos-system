@@ -54,6 +54,17 @@ CREATE TABLE IF NOT EXISTS Purchase_Invoices (
     FOREIGN KEY (supplier_id) REFERENCES Suppliers(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS Supplier_Payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier_id INT NOT NULL,
+    invoice_id INT NULL,
+    amount BIGINT NOT NULL,
+    payment_method VARCHAR(50) DEFAULT 'CASH',
+    notes VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES Suppliers(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS Discounts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,

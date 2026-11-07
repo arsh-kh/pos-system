@@ -65,6 +65,53 @@ const Financials = () => {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [isPayingDebt, setIsPayingDebt] = useState(false);
+  const [profileViewFilter, setProfileViewFilter] = useState('ALL'); // 'ALL', 'INVOICES', 'PAYMENTS'
+
+  const profileLedger = useMemo(() => {
+    if (!selectedProfile) return [];
+    const rows = [];
+
+    // Invoices
+    (selectedProfile.invoices || []).forEach(inv => {
+      rows.push({
+        id: `inv-${inv.id}`,
+        rawId: inv.id,
+        type: 'INVOICE',
+        number: inv.invoice_number ? `#${inv.invoice_number}` : `#INV-${inv.id}`,
+        date: inv.created_at,
+        total_amount: Number(inv.total_amount) || 0,
+        paid_amount: Number(inv.paid_amount) || 0,
+        remaining_amount: Number(inv.remaining_amount) || 0,
+        payment_method: inv.payment_method,
+        notes: null,
+        raw: inv
+      });
+    });
+
+    // Payments
+    (selectedProfile.payments || []).forEach(pay => {
+      rows.push({
+        id: `pay-${pay.id}`,
+        rawId: pay.id,
+        type: 'PAYMENT',
+        number: `#PAY-${pay.id}`,
+        date: pay.created_at,
+        total_amount: null,
+        paid_amount: Number(pay.amount) || 0,
+        remaining_amount: 0,
+        payment_method: 'CASH',
+        notes: pay.notes || (pay.invoice_number ? `دانەوەی قەرزی پسووڵەی #${pay.invoice_number}` : 'دانەوەی قەرز'),
+        raw: pay
+      });
+    });
+
+    // Sort descending by date (newest first)
+    rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (profileViewFilter === 'INVOICES') return rows.filter(r => r.type === 'INVOICE');
+    if (profileViewFilter === 'PAYMENTS') return rows.filter(r => r.type === 'PAYMENT');
+    return rows;
+  }, [selectedProfile, profileViewFilter]);
 
   // Invoice Details Modal
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -214,6 +261,7 @@ const Financials = () => {
 
   const openProfile = async (id) => {
     try {
+      setProfileViewFilter('ALL');
       const res = await axios.get(`http://localhost:3001/api/suppliers/${id}`);
       if (res.data.status === 'SUCCESS') {
         setSelectedProfile(res.data.data);
@@ -1742,42 +1790,146 @@ const Financials = () => {
               </div>
             )}
 
-            {/* Invoices List under Profile: Strict Bordered Data Grid */}
+            {/* Filter Toggle between All Ledger Entries, Invoices, and Debt Payments */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 2px 0', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'inline-flex', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setProfileViewFilter('ALL')}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '0.80rem',
+                    fontWeight: profileViewFilter === 'ALL' ? 700 : 500,
+                    background: profileViewFilter === 'ALL' ? '#ffffff' : 'transparent',
+                    color: profileViewFilter === 'ALL' ? '#0f172a' : '#64748b',
+                    boxShadow: profileViewFilter === 'ALL' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  کەشف حیساب ({ (selectedProfile.invoices?.length || 0) + (selectedProfile.payments?.length || 0) })
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProfileViewFilter('INVOICES')}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '0.80rem',
+                    fontWeight: profileViewFilter === 'INVOICES' ? 700 : 500,
+                    background: profileViewFilter === 'INVOICES' ? '#ffffff' : 'transparent',
+                    color: profileViewFilter === 'INVOICES' ? '#0f172a' : '#64748b',
+                    boxShadow: profileViewFilter === 'INVOICES' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  پسووڵەکانی کڕین ({ selectedProfile.invoices?.length || 0 })
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProfileViewFilter('PAYMENTS')}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '0.80rem',
+                    fontWeight: profileViewFilter === 'PAYMENTS' ? 700 : 500,
+                    background: profileViewFilter === 'PAYMENTS' ? '#ffffff' : 'transparent',
+                    color: profileViewFilter === 'PAYMENTS' ? '#0f172a' : '#64748b',
+                    boxShadow: profileViewFilter === 'PAYMENTS' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  وەسڵەکانی دانەوەی قەرز ({ selectedProfile.payments?.length || 0 })
+                </button>
+              </div>
+            </div>
+
+            {/* Invoices & Payments Ledger: Strict Bordered Data Grid */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', direction: 'rtl' }}>
                 <colgroup>
                   <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '13%' }} />
                   <col style={{ width: '14%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '12%' }} />
                   <col style={{ width: '17%' }} />
                 </colgroup>
                 <thead>
                   <tr style={{ height: '38px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569', fontWeight: 700 }}>
-                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>ژمارەی پسووڵە</th>
-                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>بەروار</th>
+                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>ژمارەی بەڵگەنامە</th>
+                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>بەروار و کات</th>
                     <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>کۆی پسووڵە</th>
                     <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>پارەی دراو</th>
-                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>پارەی ماوە (قەرز)</th>
-                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>شێوازی پارەدان</th>
-                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>کردار</th>
+                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>ماوە (قەرز)</th>
+                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>جۆری مامەڵە</th>
+                    <th style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>تێبینی / کردار</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {!selectedProfile.invoices || selectedProfile.invoices.length === 0 ? (
+                  {profileLedger.length === 0 ? (
                     <tr>
                       <td colSpan="7" style={{ border: '1px solid #e2e8f0', height: '48px', textAlign: 'center', color: '#64748b', fontSize: '0.84rem' }}>
-                        هیچ پسووڵەیەک نییە
+                        هیچ تۆمارێک نەدۆزرایەوە
                       </td>
                     </tr>
                   ) : (
-                    selectedProfile.invoices.map(inv => {
+                    profileLedger.map(item => {
+                      if (item.type === 'PAYMENT') {
+                        return (
+                          <tr 
+                            key={item.id}
+                            style={{ height: '38px', borderBottom: '1px solid #e2e8f0', background: 'rgba(16, 185, 129, 0.04)', transition: 'background 0.15s ease' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)'}
+                          >
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', fontFamily: 'monospace', color: '#059669', fontWeight: 800, fontSize: '0.84rem' }}>
+                              {item.number}
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', color: '#059669', fontSize: '0.82rem', fontWeight: 600 }}>
+                              {formatDateTime(item.date, { twelveHour: true })}
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
+                              —
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', color: '#059669', fontWeight: 800, fontSize: '0.88rem' }}>
+                              +{item.paid_amount.toLocaleString()} د.ع
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', color: '#10b981', fontWeight: 700, fontSize: '0.86rem' }}>
+                              0
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', fontSize: '0.80rem' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                background: '#ecfdf5',
+                                color: '#059669',
+                                border: '1px solid #a7f3d0'
+                              }}>
+                                دانەوەی قەرز
+                              </span>
+                            </td>
+                            <td style={{ border: '1px solid #e2e8f0', padding: '6px 8px', textAlign: 'center', fontSize: '0.80rem', color: '#475569' }}>
+                              <span title={item.notes} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.notes}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      // INVOICE ROW
+                      const inv = item.raw;
                       const rem = Number(inv.remaining_amount) || 0;
                       return (
                         <tr 
-                          key={inv.id} 
+                          key={item.id} 
                           onClick={() => navigate(`/purchases?edit=${inv.id}`)}
                           title="کلیک بکە بۆ دەستکاریکردنی ئەم پسووڵەیە و زیادکردنی کاڵا"
                           style={{ height: '38px', borderBottom: '1px solid #e2e8f0', transition: 'background 0.15s ease', cursor: 'pointer' }}
@@ -1785,7 +1937,7 @@ const Financials = () => {
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
                           <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', fontFamily: 'monospace', color: '#0284c7', fontWeight: 700, fontSize: '0.84rem' }}>
-                            #{inv.invoice_number || inv.id}
+                            {item.number}
                           </td>
                           <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
                             {formatDate(inv.created_at)}

@@ -1,5 +1,26 @@
 const db = require('../db');
 
+// Ensure persistent table for supplier debt payments
+const ensureSupplierPaymentsTable = async () => {
+    try {
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS Supplier_Payments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                supplier_id INT NOT NULL,
+                invoice_id INT NULL,
+                amount BIGINT NOT NULL,
+                payment_method VARCHAR(50) DEFAULT 'CASH',
+                notes VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (supplier_id) REFERENCES Suppliers(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+    } catch (err) {
+        console.warn('Ensure Supplier_Payments error:', err.message);
+    }
+};
+ensureSupplierPaymentsTable();
+
 exports.getAllSuppliers = async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -128,11 +149,20 @@ exports.deleteSupplier = async (req, res) => {
 exports.getSupplierProfile = async (req, res) => {
     const { id } = req.params;
     try {
+        await ensureSupplierPaymentsTable();
         const [supplier] = await db.query('SELECT * FROM Suppliers WHERE id = ?', [id]);
         if (supplier.length === 0) return res.status(404).json({ status: 'ERROR', message: 'کۆمپانیا نەدۆزرایەوە' });
         
         const [invoices] = await db.query('SELECT * FROM Purchase_Invoices WHERE supplier_id = ? ORDER BY created_at DESC', [id]);
         
+        const [payments] = await db.query(`
+            SELECT sp.*, pi.invoice_number
+            FROM Supplier_Payments sp
+            LEFT JOIN Purchase_Invoices pi ON sp.invoice_id = pi.id
+            WHERE sp.supplier_id = ?
+            ORDER BY sp.created_at DESC, sp.id DESC
+        `, [id]);
+
         let totalPaid = Number(supplier[0].total_paid) || 0;
         let totalRemaining = Number(supplier[0].total_remaining) || 0;
 
@@ -147,7 +177,8 @@ exports.getSupplierProfile = async (req, res) => {
                 ...supplier[0], 
                 total_paid: totalPaid,
                 total_remaining: totalRemaining,
-                invoices 
+                invoices,
+                payments
             } 
         });
     } catch (error) {
@@ -157,7 +188,7 @@ exports.getSupplierProfile = async (req, res) => {
 
 exports.paySupplierDebt = async (req, res) => {
     const { id } = req.params;
-    const { amount, invoice_id } = req.body;
+    const { amount, invoice_id, notes } = req.body;
     const payAmount = Math.max(0, Math.round(Number(amount) || 0));
 
     if (payAmount <= 0) {
@@ -166,6 +197,7 @@ exports.paySupplierDebt = async (req, res) => {
 
     const connection = await db.getConnection();
     try {
+        await ensureSupplierPaymentsTable();
         await connection.beginTransaction();
 
         const [suppliers] = await connection.query('SELECT * FROM Suppliers WHERE id = ? FOR UPDATE', [id]);
@@ -190,6 +222,7 @@ exports.paySupplierDebt = async (req, res) => {
         const [unpaidInvoices] = await connection.query(querySql, queryParams);
 
         let remainingToPay = payAmount;
+        let primaryInvoiceId = invoice_id ? Number(invoice_id) : (unpaidInvoices[0]?.id || null);
 
         // 2. Allocate payment to invoices (FIFO or prioritised invoice)
         for (const inv of unpaidInvoices) {
@@ -208,7 +241,14 @@ exports.paySupplierDebt = async (req, res) => {
             remainingToPay -= toDeduct;
         }
 
-        // 3. Recalculate Supplier's total_paid and total_remaining from all invoices
+        // 3. Record payment voucher in Supplier_Payments table
+        const paymentNotes = (notes || '').trim() || `دانەوەی قەرزی کۆمپانیا${primaryInvoiceId ? ` (پسووڵەی #${primaryInvoiceId})` : ''}`;
+        await connection.query(`
+            INSERT INTO Supplier_Payments (supplier_id, invoice_id, amount, payment_method, notes, created_at)
+            VALUES (?, ?, ?, 'CASH', ?, NOW())
+        `, [id, primaryInvoiceId, payAmount, paymentNotes]);
+
+        // 4. Recalculate Supplier's total_paid and total_remaining from all invoices
         const [invTotals] = await connection.query(`
             SELECT COALESCE(SUM(paid_amount), 0) as calc_paid,
                    COALESCE(SUM(remaining_amount), 0) as calc_remaining
@@ -232,7 +272,7 @@ exports.paySupplierDebt = async (req, res) => {
             [finalTotalPaid, finalTotalRemaining, id]
         );
 
-        // 4. Audit Log
+        // 5. Audit Log
         try {
             await connection.query(`
                 INSERT INTO Audit_Logs (user_id, username, user_role, action_type, entity_name, entity_id, details)
