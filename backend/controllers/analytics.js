@@ -533,7 +533,7 @@ exports.getPeriodReport = async (req, res) => {
         const totalDamagesUnits = Number(damagesRows[0].total_damages_units) || 0;
 
         const netSales = Math.max(0, rawSales - totalRefunded);
-        const adjustedGrossProfit = Math.max(0, totalProfitRaw - returnedProfit);
+        const adjustedGrossProfit = totalProfitRaw - returnedProfit;
         const netProfit = adjustedGrossProfit - totalExpenses - totalDamagesLoss;
         const profitMargin = netSales > 0 ? ((netProfit / netSales) * 100).toFixed(1) : 0;
         const avgInvoice = totalInvoices > 0 ? Math.round(netSales / totalInvoices) : 0;

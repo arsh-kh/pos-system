@@ -306,11 +306,29 @@ const ThisMonth = () => {
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>
                 کۆی فرۆشتن
               </div>
               <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                 {totalSales.toLocaleString()} <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>دینار</span>
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '4px', 
+                marginTop: '8px', 
+                paddingTop: '6px', 
+                borderTop: '1px solid var(--border-color, #334155)',
+                fontSize: '0.82rem' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>ژمارەی پسووڵە:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{totalInvoices.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>تێکڕای پسووڵە:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{avgInvoice.toLocaleString()} د.ع</span>
+                </div>
               </div>
             </div>
 
@@ -324,11 +342,35 @@ const ThisMonth = () => {
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '4px' }}>
                 صافی قازانج
               </div>
-              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <div style={{ 
+                fontSize: '1.65rem', 
+                fontWeight: 800, 
+                color: netProfit < 0 ? '#ef4444' : (netProfit > 0 ? '#10b981' : 'var(--text-primary)') 
+              }}>
                 {netProfit.toLocaleString()} <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>دینار</span>
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '4px', 
+                marginTop: '8px', 
+                paddingTop: '6px', 
+                borderTop: '1px solid var(--border-color, #334155)',
+                fontSize: '0.82rem' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>قازانجی کاڵاکان:</span>
+                  <span style={{ fontWeight: 700, color: '#10b981' }}>{grossProfit.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>خەرجی:</span>
+                  <span style={{ fontWeight: 700, color: totalExpenses > 0 ? '#ef4444' : 'var(--text-primary)' }}>
+                    {totalExpenses > 0 ? `-${totalExpenses.toLocaleString()} د.ع` : '0'}
+                  </span>
+                </div>
               </div>
             </div>
 
