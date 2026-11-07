@@ -1486,9 +1486,14 @@ const Cashier = () => {
     if (!promo) {
       return {
         hasPromo: false,
+        promoQty: 0,
+        regularQty: qty,
+        promoPrice: regularPrice,
+        regularPrice,
+        maxLimit: null,
+        minQty: null,
         lineTotal: Math.round(regularPrice * qty),
-        totalSavings: 0,
-        regularPrice
+        totalSavings: 0
       };
     }
 
@@ -1500,10 +1505,14 @@ const Cashier = () => {
     if (savingsPerBundle <= 0 || qty < bundleQty) {
       return {
         hasPromo: false,
-        lineTotal: Math.round(regularPrice * qty),
-        totalSavings: 0,
+        promoQty: 0,
+        regularQty: qty,
+        promoPrice: regularPrice,
         regularPrice,
-        minQty: bundleQty
+        maxLimit: null,
+        minQty: bundleQty,
+        lineTotal: Math.round(regularPrice * qty),
+        totalSavings: 0
       };
     }
 
@@ -1516,6 +1525,7 @@ const Cashier = () => {
 
     const lineTotal = Math.round((applicableBundles * bundlePrice) + (regularItemsCount * regularPrice));
     const totalSavings = Math.max(0, Math.round(qty * regularPrice) - lineTotal);
+    const effectiveUnitPrice = qty > 0 ? Math.round(lineTotal / qty) : regularPrice;
 
     return {
       hasPromo: totalSavings > 0,
@@ -1527,6 +1537,7 @@ const Cashier = () => {
       lineTotal,
       totalSavings,
       regularPrice,
+      promoPrice: effectiveUnitPrice,
       minQty: bundleQty
     };
   }, [activePromotions]);
@@ -2395,12 +2406,12 @@ const Cashier = () => {
                             ? 'rgba(245, 158, 11, 0.16)'
                             : (item.unit_type === 'BOX' 
                               ? 'rgba(2, 132, 199, 0.08)' 
-                              : (pricing.hasPromo ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-tertiary)')),
+                              : (pricing.hasPromo ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)')),
                           border: isSelected
                             ? '1.5px solid #f59e0b'
                             : (item.unit_type === 'BOX' 
                               ? '1px solid rgba(2, 132, 199, 0.35)' 
-                              : (pricing.hasPromo ? '1px solid rgba(217, 119, 6, 0.35)' : '1px solid var(--border-color)')),
+                              : (pricing.hasPromo ? '1px solid rgba(37, 99, 235, 0.35)' : '1px solid var(--border-color)')),
                           boxShadow: isSelected ? '0 0 0 1px #f59e0b' : 'none',
                           transition: 'all 0.15s ease'
                         }}
@@ -2469,7 +2480,7 @@ const Cashier = () => {
                                 </span>
                               )}
                               {pricing.hasPromo && item.unit_type !== 'BOX' && (
-                                <span style={{ fontSize: '0.68rem', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', padding: '0 5px', borderRadius: '4px', fontWeight: 700 }}>
                                   ئۆفەر
                                 </span>
                               )}
@@ -2553,8 +2564,8 @@ const Cashier = () => {
                         </div>
 
                         {/* نرخ */}
-                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: pricing.hasPromo ? '#d97706' : 'var(--text-secondary)', fontWeight: 700 }}>
-                          {(pricing.hasPromo ? pricing.promoPrice : item.price).toLocaleString()} د.ع
+                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: pricing.hasPromo ? '#2563eb' : 'var(--text-secondary)', fontWeight: 700 }}>
+                          {Number(pricing.hasPromo ? (pricing.promoPrice ?? item.price) : item.price).toLocaleString()} د.ع
                         </div>
 
                         {/* کۆ */}
