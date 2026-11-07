@@ -653,7 +653,7 @@ const Promotions = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {formData.discount_type === 'FIXED_PRICE' ? 'نرخی نوێ (دینار)' : 'ڕێژەی داشکاندن (%)'}
+                        {formData.discount_type === 'FIXED_PRICE' ? 'نرخی داشکاندن' : 'ڕێژەی داشکاندن (%)'}
                       </label>
                       <input 
                         type="number" 
@@ -688,7 +688,7 @@ const Promotions = () => {
                   {/* Max Limit per invoice */}
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      ماکسیمەمی پسووڵە (ئارەزوومەندانە)
+                      چەن دانە لە پسووڵەیەکدا؟
                     </label>
                     <input 
                       type="number" 
@@ -741,7 +741,7 @@ const Promotions = () => {
                   {/* Max Limit */}
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      ماکسیمەمی پسووڵە (ئارەزوومەندانە)
+                      چەن دانە لە پسووڵەیەکدا؟
                     </label>
                     <input 
                       type="number" 
@@ -786,32 +786,24 @@ const Promotions = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Action Button */}
+              <div>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
                   style={{ 
-                    flex: 1, 
-                    padding: '9px', 
+                    width: '100%', 
+                    padding: '10px', 
                     borderRadius: '6px', 
                     background: '#2563eb', 
                     color: 'white', 
                     border: 'none', 
                     cursor: 'pointer', 
                     fontWeight: 700, 
-                    fontSize: '0.88rem'
+                    fontSize: '0.92rem'
                   }}
                 >
                   {isSubmitting ? 'کەمێک بوەستە...' : 'تۆمارکردن'}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  className="btn-secondary"
-                  style={{ padding: '9px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                  داخستن
                 </button>
               </div>
             </form>
