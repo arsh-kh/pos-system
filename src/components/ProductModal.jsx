@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
-import { kurdishSearchMatch } from '../utils/kurdishSearch';
+import { kurdishSearchMatch, fixBidiProductName } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
 import { toast } from '../context/ToastContext';
 
@@ -146,7 +146,7 @@ const ProductModal = ({
       );
 
       setFormData({
-        name: editProduct.name || '',
+        name: fixBidiProductName(editProduct.name || ''),
         barcode: editProduct.barcode || '',
         cost_price: cleanNumericValue(editProduct.cost_price, ''),
         selling_price: cleanNumericValue(editProduct.selling_price, ''),
@@ -268,6 +268,24 @@ const ProductModal = ({
     }
   };
 
+  const handleNameChange = (e) => {
+    const inputEl = e.target;
+    const rawVal = inputEl.value;
+    const cursorPos = inputEl.selectionStart;
+
+    const formatted = fixBidiProductName(rawVal);
+    const addedChars = formatted.length - rawVal.length;
+
+    setFormData(prev => ({ ...prev, name: formatted }));
+
+    if (addedChars > 0 && inputEl) {
+      requestAnimationFrame(() => {
+        const newPos = Math.min(formatted.length, (cursorPos || 0) + addedChars);
+        inputEl.setSelectionRange(newPos, newPos);
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -313,7 +331,7 @@ const ProductModal = ({
       const resolvedStock = isPurchaseMode ? 0 : (formData.stock ? parseFloat(formData.stock) : 0);
 
       const payload = {
-        name: formData.name.trim(),
+        name: fixBidiProductName(formData.name).trim(),
         barcode: finalBarcode,
         cost_price: formData.cost_price ? Number(formData.cost_price) : 0,
         box_cost_price: formData.box_cost_price ? Number(formData.box_cost_price) : null,
@@ -469,10 +487,23 @@ const ProductModal = ({
               <input 
                 type="text" 
                 required 
+                dir="auto"
                 placeholder="ناوی کاڵاکە بنووسە..."
                 value={formData.name} 
-                onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onChange={handleNameChange} 
+                style={{ 
+                  width: '100%', 
+                  height: '38px', 
+                  padding: '0 10px', 
+                  borderRadius: '8px', 
+                  background: '#ffffff', 
+                  border: '1px solid #cbd5e1', 
+                  color: '#1e293b', 
+                  boxSizing: 'border-box', 
+                  fontSize: '0.88rem', 
+                  textAlign: 'right',
+                  direction: 'rtl'
+                }} 
               />
             </div>
             

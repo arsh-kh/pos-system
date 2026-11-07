@@ -270,12 +270,35 @@ export function kurdishFilter(items, query, extractFields) {
   });
 }
 
+/**
+ * Automatically corrects Bidirectional (BiDi) visual ordering for mixed Kurdish/Arabic and Latin product names.
+ * When an inventory item has Kurdish text followed by an English brand and numbers/units (e.g. "سائل جل ABC 1500مل"),
+ * standard Unicode BiDi binds the numbers to the Latin word (forming "ABC 1500"), which visually flips "1500" to the right of "ABC".
+ * Inserting an invisible Right-to-Left Mark (\u200F) cleanly isolates the Latin word, keeping the natural reading order:
+ * [سائل جل] -> [ABC] -> [1500مل].
+ */
+export function fixBidiProductName(str) {
+  if (!str || typeof str !== 'string') return '';
+  const hasRtl = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(str);
+  if (!hasRtl) return str;
+
+  // Clean existing RLM/LRM markers to prevent duplicate accumulation
+  let cleaned = str.replace(/[\u200E\u200F]/g, '');
+
+  // Latin word(s) followed by space and numbers: e.g. "ABC 1500" or "ABC 1500مل"
+  // Insert \u200F right before the numbers so they do not attach as LTR to the Latin word
+  cleaned = cleaned.replace(/([a-zA-Z]+(?:\s+[a-zA-Z]+)*)\s+([0-9]+)/g, '$1 \u200F$2');
+
+  return cleaned;
+}
+
 export default {
   normalizeDigits,
   latinToKurdish,
   kurdishToLatin,
   normalizeKurdishText,
   kurdishSearchMatch,
-  kurdishFilter
+  kurdishFilter,
+  fixBidiProductName
 };
 
