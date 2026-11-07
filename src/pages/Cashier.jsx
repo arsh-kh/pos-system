@@ -3562,12 +3562,6 @@ const Cashier = () => {
 
           <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
 
-          {printedReceipt.promotionalSavings > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#d97706', fontWeight: 'bold', padding: '0 2px', width: '100%' }}>
-              <span>پاشەکەوتی ئۆفەرەکان:</span>
-              <span>-{printedReceipt.promotionalSavings.toLocaleString()} دینار</span>
-            </div>
-          )}
 
           {printedReceipt.discount > 0 && (
             <>
