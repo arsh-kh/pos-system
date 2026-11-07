@@ -548,7 +548,7 @@ const Cashier = () => {
     }
 
     setCart(prevCart => {
-      const singlePrice = Number(product.active_batch_selling_price || product.selling_price) || 0;
+      const singlePrice = Number(product.selling_price || product.active_batch_selling_price) || 0;
       const boxPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(singlePrice * unitsPerBox);
       const effectivePrice = isBox ? boxPrice : singlePrice;
       const cartKey = `${product.id}_${unitType}`;

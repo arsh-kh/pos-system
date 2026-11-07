@@ -158,6 +158,14 @@ exports.updateProduct = async (req, res) => {
             ]
         );
 
+        // Synchronize active batch selling price with master product updates
+        if (selling_price !== undefined && selling_price !== null && Number(selling_price) > 0) {
+            await db.query(
+                "UPDATE Product_Batches SET selling_price = ? WHERE product_id = ? AND status = 'ACTIVE' AND remaining_quantity > 0",
+                [BigInt(Math.round(Number(selling_price))).toString(), id]
+            );
+        }
+
         // 3. Detect and log price changes
         const priceChanged = Number(oldP.selling_price) !== Number(selling_price) || Number(oldP.cost_price) !== Number(cost_price || 0);
         if (priceChanged) {
