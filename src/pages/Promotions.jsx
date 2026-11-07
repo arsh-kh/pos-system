@@ -527,10 +527,10 @@ const Promotions = () => {
             className="pos-modal-card" 
             onClick={e => e.stopPropagation()} 
             style={{ 
-              maxWidth: '480px', 
+              maxWidth: '640px', 
               width: '95%', 
-              borderRadius: '12px', 
-              padding: '18px 20px',
+              borderRadius: '14px', 
+              padding: '22px 24px',
               boxShadow: '0 16px 40px rgba(0,0,0,0.3)'
             }}
           >
