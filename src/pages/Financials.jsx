@@ -1633,8 +1633,8 @@ const Financials = () => {
           {/* Profile Body Content */}
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
             
-            {/* Pay Debt Section (Only if debt > 0) */}
-            {Number(selectedProfile.total_remaining) > 0 && (
+            {/* Pay Debt Section */}
+            {Number(selectedProfile.total_remaining) > 0 ? (
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -1725,6 +1725,21 @@ const Financials = () => {
                   ))}
                 </div>
               </div>
+            ) : (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                padding: '8px 14px', 
+                background: '#f0fdf4', 
+                border: '1px solid #bbf7d0', 
+                borderRadius: '8px', 
+                fontSize: '0.84rem', 
+                color: '#16a34a' 
+              }}>
+                <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle2 size={16} /> سەرجەم قەرزەکانی ئەم کۆمپانیایە پاکتاوکراون (هیچ قەرزێک نەماوە)
+                </span>
+              </div>
             )}
 
             {/* Invoices List under Profile: Strict Bordered Data Grid */}
@@ -1790,14 +1805,39 @@ const Financials = () => {
                               borderRadius: '4px',
                               fontWeight: 600,
                               fontSize: '0.78rem',
-                              background: inv.payment_method === 'DEBT' ? '#fef2f2' : inv.payment_method === 'PARTIAL' ? '#fffbeb' : '#f0fdf4',
-                              color: inv.payment_method === 'DEBT' ? '#ef4444' : inv.payment_method === 'PARTIAL' ? '#b45309' : '#16a34a'
+                              background: rem === 0 ? '#f0fdf4' : (inv.payment_method === 'DEBT' ? '#fef2f2' : inv.payment_method === 'PARTIAL' ? '#fffbeb' : '#f0fdf4'),
+                              color: rem === 0 ? '#16a34a' : (inv.payment_method === 'DEBT' ? '#ef4444' : inv.payment_method === 'PARTIAL' ? '#b45309' : '#16a34a')
                             }}>
-                              {inv.payment_method === 'DEBT' ? 'قەرز' : inv.payment_method === 'PARTIAL' ? 'بەشێک قەرز' : 'نەقد'}
+                              {rem === 0 ? 'دراوە (پاکتاوکراو)' : (inv.payment_method === 'DEBT' ? 'قەرز' : inv.payment_method === 'PARTIAL' ? 'بەشێک قەرز' : 'نەقد')}
                             </span>
                           </td>
                           <td style={{ border: '1px solid #e2e8f0', padding: '6px 8px', textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                              {rem > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPayAmount(rem.toString());
+                                  }}
+                                  title="دانانی بڕی ئەم پسووڵەیە بۆ دانەوە"
+                                  style={{
+                                    background: '#fef2f2',
+                                    color: '#ef4444',
+                                    border: '1px solid #fecaca',
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                >
+                                  <span>دانەوە</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); handleExportInvoicePdfById(inv.id); }}

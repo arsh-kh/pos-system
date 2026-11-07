@@ -133,7 +133,23 @@ exports.getSupplierProfile = async (req, res) => {
         
         const [invoices] = await db.query('SELECT * FROM Purchase_Invoices WHERE supplier_id = ? ORDER BY created_at DESC', [id]);
         
-        res.json({ status: 'SUCCESS', data: { ...supplier[0], invoices } });
+        let totalPaid = Number(supplier[0].total_paid) || 0;
+        let totalRemaining = Number(supplier[0].total_remaining) || 0;
+
+        if (invoices.length > 0) {
+            totalPaid = invoices.reduce((sum, inv) => sum + (Number(inv.paid_amount) || 0), 0);
+            totalRemaining = invoices.reduce((sum, inv) => sum + (Number(inv.remaining_amount) || 0), 0);
+        }
+
+        res.json({ 
+            status: 'SUCCESS', 
+            data: { 
+                ...supplier[0], 
+                total_paid: totalPaid,
+                total_remaining: totalRemaining,
+                invoices 
+            } 
+        });
     } catch (error) {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
@@ -141,38 +157,113 @@ exports.getSupplierProfile = async (req, res) => {
 
 exports.paySupplierDebt = async (req, res) => {
     const { id } = req.params;
-    const { amount } = req.body;
+    const { amount, invoice_id } = req.body;
     const payAmount = Math.max(0, Math.round(Number(amount) || 0));
 
     if (payAmount <= 0) {
         return res.status(400).json({ status: 'ERROR', message: 'بڕی پارەی دراو نادروستە' });
     }
 
+    const connection = await db.getConnection();
     try {
-        const [supplier] = await db.query('SELECT * FROM Suppliers WHERE id = ?', [id]);
-        if (supplier.length === 0) {
+        await connection.beginTransaction();
+
+        const [suppliers] = await connection.query('SELECT * FROM Suppliers WHERE id = ? FOR UPDATE', [id]);
+        if (suppliers.length === 0) {
+            await connection.rollback();
+            connection.release();
             return res.status(404).json({ status: 'ERROR', message: 'کۆمپانیا نەدۆزرایەوە' });
         }
+        const supplier = suppliers[0];
 
-        const currentRemaining = Number(supplier[0].total_remaining) || 0;
-        const actualDeduction = Math.min(currentRemaining, payAmount);
+        // 1. Fetch unpaid/partially paid purchase invoices for this supplier
+        let querySql = 'SELECT * FROM Purchase_Invoices WHERE supplier_id = ? AND remaining_amount > 0';
+        const queryParams = [id];
 
-        await db.query(`
-            UPDATE Suppliers 
-            SET total_paid = total_paid + ?, 
-                total_remaining = GREATEST(0, total_remaining - ?)
-            WHERE id = ?
-        `, [payAmount, actualDeduction, id]);
+        if (invoice_id) {
+            querySql += ' ORDER BY (id = ?) DESC, created_at ASC, id ASC FOR UPDATE';
+            queryParams.push(invoice_id);
+        } else {
+            querySql += ' ORDER BY created_at ASC, id ASC FOR UPDATE';
+        }
+
+        const [unpaidInvoices] = await connection.query(querySql, queryParams);
+
+        let remainingToPay = payAmount;
+
+        // 2. Allocate payment to invoices (FIFO or prioritised invoice)
+        for (const inv of unpaidInvoices) {
+            if (remainingToPay <= 0) break;
+            const invRem = Number(inv.remaining_amount) || 0;
+            const toDeduct = Math.min(invRem, remainingToPay);
+            const newRem = Math.max(0, invRem - toDeduct);
+            const newPaid = (Number(inv.paid_amount) || 0) + toDeduct;
+            const newPaymentMethod = newRem === 0 ? 'CASH' : 'PARTIAL';
+
+            await connection.query(
+                'UPDATE Purchase_Invoices SET paid_amount = ?, remaining_amount = ?, payment_method = ? WHERE id = ?',
+                [newPaid, newRem, newPaymentMethod, inv.id]
+            );
+
+            remainingToPay -= toDeduct;
+        }
+
+        // 3. Recalculate Supplier's total_paid and total_remaining from all invoices
+        const [invTotals] = await connection.query(`
+            SELECT COALESCE(SUM(paid_amount), 0) as calc_paid,
+                   COALESCE(SUM(remaining_amount), 0) as calc_remaining
+            FROM Purchase_Invoices
+            WHERE supplier_id = ?
+        `, [id]);
+
+        let finalTotalPaid = Number(invTotals[0].calc_paid);
+        let finalTotalRemaining = Number(invTotals[0].calc_remaining);
+
+        // If there were no invoices or remaining payment exceeded invoices
+        if (unpaidInvoices.length === 0) {
+            const currentRem = Number(supplier.total_remaining) || 0;
+            const actualDeduction = Math.min(currentRem, payAmount);
+            finalTotalPaid = (Number(supplier.total_paid) || 0) + payAmount;
+            finalTotalRemaining = Math.max(0, currentRem - actualDeduction);
+        }
+
+        await connection.query(
+            'UPDATE Suppliers SET total_paid = ?, total_remaining = ? WHERE id = ?',
+            [finalTotalPaid, finalTotalRemaining, id]
+        );
+
+        // 4. Audit Log
+        try {
+            await connection.query(`
+                INSERT INTO Audit_Logs (user_id, username, user_role, action_type, entity_name, entity_id, details)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [
+                req.user?.id || 1,
+                req.user?.username || 'admin',
+                req.user?.role || 'admin',
+                'SUPPLIER_DEBT_PAYMENT',
+                'Suppliers',
+                id,
+                `دانەوەی قەرزی کۆمپانیای «${supplier.name}» بە بڕی ${payAmount.toLocaleString()} د.ع`
+            ]);
+        } catch (_) {}
+
+        await connection.commit();
+        connection.release();
 
         res.json({ 
             status: 'SUCCESS', 
             message: 'پارەدان بە سەرکەوتوویی تۆمارکرا',
             data: {
                 paid_amount: payAmount,
-                new_remaining: Math.max(0, currentRemaining - actualDeduction)
+                new_remaining: finalTotalRemaining,
+                new_paid: finalTotalPaid
             }
         });
     } catch (error) {
+        await connection.rollback();
+        connection.release();
+        console.error('Pay Supplier Debt Error:', error);
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
