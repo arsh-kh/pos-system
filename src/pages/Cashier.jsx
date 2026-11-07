@@ -519,10 +519,155 @@ const Cashier = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   });
 
+  // Helper: Build Cart Items for a Product (with seamless multi-row promotion splitting)
+  const buildProductCartRows = (product, totalUnits, unitType = 'PIECE', baseItemProps = {}) => {
+    const isBox = unitType === 'BOX';
+    const unitsPerBox = Math.max(1, parseFloat(product.active_units_per_box || product.units_per_box) || 1);
+    const singlePrice = Number(product.selling_price || product.active_batch_selling_price || product.single_price || product.price) || 0;
+    const boxPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(singlePrice * unitsPerBox);
+    const regularPrice = isBox ? boxPrice : singlePrice;
+    const isWeightedProd = Boolean(product.is_weighted || product.unit === 'کگم');
+    const baseName = product.baseName || product.name?.replace(/\s*\((کارتۆن|گونیە).*?\)/, '') || product.name;
+    const displayName = isBox ? (isWeightedProd ? `${baseName} (گونیە - ${unitsPerBox} کگم)` : `${baseName} (کارتۆن - ${unitsPerBox} دانە)`) : baseName;
+    const unitLabel = isBox ? (isWeightedProd ? 'گونیە' : 'کارتۆن') : (product.unit || 'دانە');
+
+    const commonProps = {
+      id: product.id,
+      baseName,
+      name: displayName,
+      barcode: product.barcode,
+      box_barcode: product.box_barcode,
+      single_price: singlePrice,
+      wholesale_price: Number(product.wholesale_price) || 0,
+      units_per_box: unitsPerBox,
+      unit_type: unitType,
+      stock: product.stock || 0,
+      unit: unitLabel,
+      is_weighted: isWeightedProd,
+      ...baseItemProps
+    };
+
+    if (totalUnits <= 0) return [];
+
+    const promo = (!isBox) ? activePromotions[product.id] : null;
+
+    if (!promo) {
+      return [{
+        ...commonProps,
+        cartKey: `${product.id}_${unitType}`,
+        price: regularPrice,
+        quantity: totalUnits,
+        is_promo_tier: false,
+        force_regular: false
+      }];
+    }
+
+    const isBundle = promo.offer_type === 'BUNDLE_PACKAGE';
+
+    if (isBundle) {
+      const bundleQty = Math.max(1, Number(promo.min_qty || promo.bundle_qty) || 1);
+      const bundlePrice = Number(promo.bundle_price ?? promo.promo_price ?? (promo.discount_value || regularPrice * bundleQty));
+      const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+      const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
+      const completedBundles = Math.floor(totalUnits / bundleQty);
+      const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
+
+      if (applicableBundles > 0 && bundlePrice < (regularPrice * bundleQty)) {
+        const promoCount = applicableBundles * bundleQty;
+        const remainderCount = Math.round((totalUnits - promoCount) * 1000) / 1000;
+        const effectiveUnitBundlePrice = promoCount > 0 ? Math.round((applicableBundles * bundlePrice) / promoCount) : regularPrice;
+
+        const promoRow = {
+          ...commonProps,
+          cartKey: `${product.id}_${unitType}_promo`,
+          price: effectiveUnitBundlePrice,
+          bundle_price: bundlePrice,
+          bundle_qty: bundleQty,
+          line_total_override: applicableBundles * bundlePrice,
+          quantity: promoCount,
+          is_promo_tier: true,
+          force_regular: false
+        };
+
+        if (remainderCount > 0) {
+          const regRow = {
+            ...commonProps,
+            cartKey: `${product.id}_${unitType}_regular`,
+            price: regularPrice,
+            quantity: remainderCount,
+            is_promo_tier: false,
+            force_regular: true
+          };
+          return [promoRow, regRow];
+        }
+        return [promoRow];
+      }
+
+      return [{
+        ...commonProps,
+        cartKey: `${product.id}_${unitType}`,
+        price: regularPrice,
+        quantity: totalUnits,
+        is_promo_tier: false,
+        force_regular: false
+      }];
+    } else {
+      // UNIT_DISCOUNT
+      const minQty = Math.max(1, Number(promo.min_qty) || 1);
+      let unitPromoPrice = Number(promo.unit_promo_price ?? promo.promo_price);
+      if (isNaN(unitPromoPrice) || unitPromoPrice <= 0) {
+        if (promo.discount_type === 'PERCENT') {
+          unitPromoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
+        } else {
+          unitPromoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+        }
+      }
+
+      const savingsPerUnit = Math.max(0, regularPrice - unitPromoPrice);
+
+      if (savingsPerUnit <= 0 || totalUnits < minQty) {
+        return [{
+          ...commonProps,
+          cartKey: `${product.id}_${unitType}`,
+          price: regularPrice,
+          quantity: totalUnits,
+          is_promo_tier: false,
+          force_regular: false
+        }];
+      }
+
+      const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+      const promoQty = Math.min(totalUnits, maxLimit);
+      const regularQty = Math.round((totalUnits - promoQty) * 1000) / 1000;
+
+      const promoRow = {
+        ...commonProps,
+        cartKey: `${product.id}_${unitType}_promo`,
+        price: unitPromoPrice,
+        quantity: promoQty,
+        is_promo_tier: true,
+        force_regular: false
+      };
+
+      if (regularQty > 0) {
+        const regRow = {
+          ...commonProps,
+          cartKey: `${product.id}_${unitType}_regular`,
+          price: regularPrice,
+          quantity: regularQty,
+          is_promo_tier: false,
+          force_regular: true
+        };
+        return [promoRow, regRow];
+      }
+
+      return [promoRow];
+    }
+  };
+
   // Cart Add & Update
   const addToCart = (product, addQty = 1, unitType = 'PIECE') => {
     const isBox = unitType === 'BOX';
-    // Active FIFO batch multiplier: NEVER fall back to product.units_per_box
     const unitsPerBox = Math.max(1, parseFloat(product.active_units_per_box) || 1);
     const addingUnits = isBox ? (Number(addQty) * unitsPerBox) : Number(addQty);
     const availableStock = Number(product.stock) || 0;
@@ -548,74 +693,56 @@ const Cashier = () => {
     }
 
     setCart(prevCart => {
-      const singlePrice = Number(product.selling_price || product.active_batch_selling_price) || 0;
-      const boxPrice = Number(product.wholesale_price) > 0 ? Number(product.wholesale_price) : Math.round(singlePrice * unitsPerBox);
-      const effectivePrice = isBox ? boxPrice : singlePrice;
-      const cartKey = `${product.id}_${unitType}`;
+      const existingItems = prevCart.filter(it => it.id === product.id && (it.unit_type || 'PIECE') === unitType);
+      const currentTotalUnits = existingItems.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+      const newTotalUnits = Math.round((currentTotalUnits + Number(addQty)) * 1000) / 1000;
 
-      const existingIdx = prevCart.findIndex(item => (item.cartKey === cartKey) || (item.id === product.id && (item.unit_type || 'PIECE') === unitType));
+      const newRows = buildProductCartRows(product, newTotalUnits, unitType);
 
-      if (existingIdx >= 0) {
-        const currentItem = prevCart[existingIdx];
-        const newQty = Math.round((Number(currentItem.quantity) + Number(addQty)) * 1000) / 1000;
-        return prevCart.map((item, idx) => 
-          idx === existingIdx ? { ...item, quantity: Math.max(0.001, newQty) } : item
-        );
+      if (existingItems.length > 0) {
+        const firstIdx = prevCart.findIndex(it => it.id === product.id && (it.unit_type || 'PIECE') === unitType);
+        const filtered = prevCart.filter(it => !(it.id === product.id && (it.unit_type || 'PIECE') === unitType));
+        const updated = [...filtered];
+        updated.splice(firstIdx, 0, ...newRows);
+        return updated;
       } else {
-        const isWeightedProd = Boolean(product.is_weighted || product.unit === 'کگم');
-        const newItem = {
-          id: product.id,
-          cartKey: cartKey,
-          baseName: product.name,
-          name: isBox ? (isWeightedProd ? `${product.name} (گونیە - ${unitsPerBox} کگم)` : `${product.name} (کارتۆن - ${unitsPerBox} دانە)`) : product.name,
-          barcode: product.barcode,
-          box_barcode: product.box_barcode,
-          price: effectivePrice,
-          single_price: singlePrice,
-          wholesale_price: Number(product.wholesale_price) || 0,
-          units_per_box: unitsPerBox,
-          unit_type: unitType,
-          stock: product.stock || 0,
-          quantity: Math.max(0.001, Number(addQty)),
-          unit: isBox ? (isWeightedProd ? 'گونیە' : 'کارتۆن') : (product.unit || 'دانە'),
-          is_weighted: isWeightedProd
-        };
-        return [...prevCart, newItem];
+        return [...prevCart, ...newRows];
       }
     });
   };
 
   const setItemUnitType = (key, targetUnitType) => {
     setCart(prevCart => {
-      return prevCart.map(item => {
-        if (item.cartKey !== key && item.barcode !== key) return item;
-        if (item.unit_type === targetUnitType) return item;
+      const targetItem = prevCart.find(it => it.cartKey === key || (!it.cartKey && it.barcode === key));
+      if (!targetItem) return prevCart;
+      if (targetItem.unit_type === targetUnitType) return prevCart;
 
-        const isToBox = targetUnitType === 'BOX';
-        const unitsPerBox = Number(item.units_per_box) || 1;
-        const singlePrice = Number(item.single_price) || Number(item.price);
-        const boxPrice = Number(item.wholesale_price) > 0 ? Number(item.wholesale_price) : Math.round(singlePrice * unitsPerBox);
-        const baseName = item.baseName || item.name.replace(/\s*\((کارتۆن|گونیە).*?\)/, '');
-        const isW = Boolean(item.is_weighted || item.unit === 'کگم' || item.unit === 'گونیە');
-
-        return {
-          ...item,
-          cartKey: `${item.id}_${targetUnitType}`,
-          unit_type: targetUnitType,
-          price: isToBox ? boxPrice : singlePrice,
-          name: isToBox 
-            ? (isW ? `${baseName} (گونیە - ${unitsPerBox} کگم)` : `${baseName} (کارتۆن - ${unitsPerBox} دانە)`) 
-            : baseName,
-          unit: isToBox ? (isW ? 'گونیە' : 'کارتۆن') : (isW ? 'کگم' : 'دانە'),
-          is_weighted: isW
-        };
+      const prod = products.find(p => p.id === targetItem.id) || targetItem;
+      const currentTotalUnits = Number(targetItem.quantity) || 1;
+      const newRows = buildProductCartRows(prod, currentTotalUnits, targetUnitType, {
+        baseName: targetItem.baseName
       });
+
+      const firstIdx = prevCart.findIndex(it => it.id === targetItem.id && (it.unit_type || 'PIECE') === targetItem.unit_type);
+      const filtered = prevCart.filter(it => !(it.id === targetItem.id && (it.unit_type || 'PIECE') === targetItem.unit_type));
+      const updated = [...filtered];
+      updated.splice(firstIdx >= 0 ? firstIdx : updated.length, 0, ...newRows);
+      return updated;
     });
   };
 
   const updateQuantity = (key, newQty) => {
     const qty = parseFloat(newQty);
     if (isNaN(qty)) return;
+
+    const targetItem = cart.find(item => item.cartKey === key || (!item.cartKey && item.barcode === key));
+    if (!targetItem) return;
+
+    const prod = products.find(p => p.id === targetItem.id) || targetItem;
+    const unitType = targetItem.unit_type || 'PIECE';
+    const isPromoKey = key && key.endsWith('_promo');
+    const isRegularKey = key && key.endsWith('_regular');
+
     if (qty <= 0) {
       if (!allowDeleteItem) {
         alert('بەڕێوەبەر سڕینەوەی کاڵای بۆ کاشێر قفڵ کردووە');
@@ -625,17 +752,14 @@ const Cashier = () => {
       return;
     }
 
-    const targetItem = cart.find(item => item.cartKey === key || item.barcode === key);
-
     // Stock Check: Non-blocking informative warning
-    if (targetItem && !targetItem.is_weighted) {
-      const prod = products.find(p => p.id === targetItem.id);
+    if (!targetItem.is_weighted) {
       const availableStock = prod ? (Number(prod.stock) || 0) : (Number(targetItem.stock) || 0);
       const unitsPerBox = targetItem.unit_type === 'BOX' ? (Number(targetItem.units_per_box) || 1) : 1;
       const requestedUnits = qty * unitsPerBox;
 
       const otherUnits = cart.reduce((sum, it) => {
-        if (it.id === targetItem.id && it !== targetItem) {
+        if (it.id === targetItem.id && it.cartKey !== key) {
           const itMult = it.unit_type === 'BOX' ? (Number(it.units_per_box) || 1) : 1;
           return sum + (Number(it.quantity) * itMult);
         }
@@ -647,8 +771,33 @@ const Cashier = () => {
       }
     }
 
-    const roundedQty = Math.round(qty * 1000) / 1000;
-    setCart(prev => prev.map(item => (item.cartKey === key || item.barcode === key) ? { ...item, quantity: roundedQty } : item));
+    setCart(prevCart => {
+      const existingItems = prevCart.filter(it => it.id === targetItem.id && (it.unit_type || 'PIECE') === unitType);
+
+      let targetTotalUnits = qty;
+      if (isRegularKey) {
+        const promoItem = existingItems.find(it => it.cartKey.endsWith('_promo'));
+        const promoUnits = promoItem ? Number(promoItem.quantity) : 0;
+        targetTotalUnits = Math.round((promoUnits + qty) * 1000) / 1000;
+      } else if (isPromoKey) {
+        const regItem = existingItems.find(it => it.cartKey.endsWith('_regular'));
+        const regUnits = regItem ? Number(regItem.quantity) : 0;
+        if (qty < Number(targetItem.quantity)) {
+          targetTotalUnits = Math.round((Number(targetItem.quantity) + regUnits - 1) * 1000) / 1000;
+        } else {
+          targetTotalUnits = Math.round((qty + regUnits) * 1000) / 1000;
+        }
+      }
+
+      const newRows = buildProductCartRows(prod, targetTotalUnits, unitType, targetItem);
+      const firstIdx = prevCart.findIndex(it => it.id === targetItem.id && (it.unit_type || 'PIECE') === unitType);
+      const filtered = prevCart.filter(it => !(it.id === targetItem.id && (it.unit_type || 'PIECE') === unitType));
+      const updated = [...filtered];
+      if (newRows.length > 0) {
+        updated.splice(firstIdx >= 0 ? firstIdx : updated.length, 0, ...newRows);
+      }
+      return updated;
+    });
   };
 
   const removeFromCart = (key) => {
@@ -656,7 +805,19 @@ const Cashier = () => {
       alert('بەڕێوەبەر دەسەڵاتی سڕینەوەی کاڵای لە سەبەتە قفڵ کردووە');
       return;
     }
-    setCart(prev => prev.filter(item => item.cartKey !== key && item.barcode !== key));
+    setCart(prevCart => {
+      const targetItem = prevCart.find(it => it.cartKey === key || (!it.cartKey && it.barcode === key));
+      if (!targetItem) return prevCart.filter(it => it.cartKey !== key && it.barcode !== key);
+
+      // If user clicked ✕ on the overflow regular row, remove ONLY that row
+      if (key && key.endsWith('_regular')) {
+        return prevCart.filter(it => it.cartKey !== key);
+      }
+
+      // If user clicked ✕ on the promo row or standard row, remove the whole product
+      const unitType = targetItem.unit_type || 'PIECE';
+      return prevCart.filter(it => !(it.id === targetItem.id && (it.unit_type || 'PIECE') === unitType));
+    });
   };
 
   const updateItemPrice = (key, newPrice) => {
@@ -1463,25 +1624,43 @@ const Cashier = () => {
 
   // Helper: Calculate item pricing considering active promotion & tiered quantity limits
   const getItemPricing = useCallback((item) => {
-    // If item is sold as a carton/box, wholesale price applies directly
-    if (item.unit_type === 'BOX') {
-      const boxPrice = Number(item.price);
-      const qty = Number(item.quantity);
+    const qty = Number(item.quantity) || 0;
+    const itemPrice = Number(item.price) || 0;
+    const regPrice = Number(item.single_price || item.regularPrice || item.price) || itemPrice;
+
+    // Dedicated promo row from buildProductCartRows
+    if (item.is_promo_tier) {
+      const lineTotal = item.line_total_override !== undefined 
+        ? Number(item.line_total_override) 
+        : Math.round(itemPrice * qty);
+      const totalSavings = Math.max(0, Math.round(regPrice * qty) - lineTotal);
       return {
-        hasPromo: false,
-        promoQty: 0,
-        regularQty: qty,
-        promoPrice: boxPrice,
-        regularPrice: boxPrice,
-        maxLimit: null,
-        lineTotal: Math.round(boxPrice * qty),
-        totalSavings: 0
+        hasPromo: true,
+        promoPrice: itemPrice,
+        regularPrice: regPrice,
+        lineTotal,
+        totalSavings,
+        promoQty: qty,
+        regularQty: 0
       };
     }
 
+    // Dedicated regular/overflow row or box
+    if (item.force_regular || item.unit_type === 'BOX') {
+      return {
+        hasPromo: false,
+        promoPrice: itemPrice,
+        regularPrice: itemPrice,
+        lineTotal: Math.round(itemPrice * qty),
+        totalSavings: 0,
+        promoQty: 0,
+        regularQty: qty
+      };
+    }
+
+    // Fallback: If an item in cart hasn't been pre-processed
     const promo = activePromotions[item.id];
-    const regularPrice = Number(item.price);
-    const qty = Number(item.quantity);
+    const regularPrice = itemPrice;
 
     if (!promo) {
       return {
@@ -1544,7 +1723,7 @@ const Cashier = () => {
         minQty: bundleQty
       };
     } else {
-      // UNIT_DISCOUNT: Direct unit discount up to max_qty_per_sale
+      // UNIT_DISCOUNT
       const minQty = Math.max(1, Number(promo.min_qty) || 1);
       let unitPromoPrice = Number(promo.unit_promo_price ?? promo.promo_price);
       if (isNaN(unitPromoPrice) || unitPromoPrice <= 0) {
@@ -1718,7 +1897,8 @@ const Cashier = () => {
           price: i.price,
           name: i.name,
           unit_type: i.unit_type || 'PIECE',
-          units_per_box: i.units_per_box || 1
+          units_per_box: i.units_per_box || 1,
+          force_regular: Boolean(i.force_regular)
         })),
         customer_id: selectedCustomerId || null,
         paid_amount: effectiveCashPaid,
@@ -1756,7 +1936,7 @@ const Cashier = () => {
             return {
               name: i.name,
               quantity: i.quantity,
-              price: i.price,
+              price: pricing.hasPromo ? pricing.promoPrice : i.price,
               total: pricing.lineTotal,
               hasPromo: pricing.hasPromo,
               promoSavings: pricing.totalSavings,

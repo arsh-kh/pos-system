@@ -28,6 +28,7 @@ exports.processCheckout = async (req, res) => {
         let totalAmount = 0n;
         let totalProfit = 0n;
         const processedItems = [];
+        const promoConsumedByProduct = new Map();
 
         // Verify and process items
         for (const item of items) {
@@ -130,7 +131,7 @@ exports.processCheckout = async (req, res) => {
                         ORDER BY id DESC LIMIT 1
                     `, [product.id]);
 
-                    if (promos.length > 0) {
+                    if (promos.length > 0 && !item.force_regular) {
                         const promo = promos[0];
                         const isBundle = promo.offer_type === 'BUNDLE_PACKAGE';
 
@@ -146,8 +147,12 @@ exports.processCheckout = async (req, res) => {
 
                             const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
                             const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
+                            const consumedBundles = promoConsumedByProduct.get(product.id) || 0;
+                            const remainingBundlesAllowed = Math.max(0, maxAllowedBundles - consumedBundles);
+
                             const completedBundles = Math.floor(itemQty / bundleQty);
-                            const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
+                            const applicableBundles = Math.min(completedBundles, remainingBundlesAllowed);
+                            promoConsumedByProduct.set(product.id, consumedBundles + applicableBundles);
 
                             if (applicableBundles > 0 && bundlePrice < (regularPrice * bundleQty)) {
                                 const promoItemsCount = applicableBundles * bundleQty;
@@ -161,7 +166,11 @@ exports.processCheckout = async (req, res) => {
                         } else {
                             // UNIT_DISCOUNT: Discount applies to each unit up to max_qty_per_sale
                             const minQty = Math.max(1, Number(promo.min_qty) || 1);
-                            if (itemQty >= minQty) {
+                            const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+                            const consumedUnits = promoConsumedByProduct.get(product.id) || 0;
+                            const remainingPromoAllowed = Math.max(0, maxLimit - consumedUnits);
+
+                            if (itemQty >= minQty && remainingPromoAllowed > 0) {
                                 let unitPromoPrice = regularPrice;
                                 if (promo.discount_type === 'PERCENT') {
                                     unitPromoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
@@ -169,9 +178,9 @@ exports.processCheckout = async (req, res) => {
                                     unitPromoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
                                 }
 
-                                const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-                                const promoQty = Math.min(itemQty, maxLimit);
+                                const promoQty = Math.min(itemQty, remainingPromoAllowed);
                                 const regularQty = Math.max(0, itemQty - promoQty);
+                                promoConsumedByProduct.set(product.id, consumedUnits + promoQty);
 
                                 itemSellTotal = Math.round((promoQty * unitPromoPrice) + (regularQty * regularPrice));
                                 effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : unitPromoPrice;
