@@ -132,28 +132,53 @@ exports.processCheckout = async (req, res) => {
 
                     if (promos.length > 0) {
                         const promo = promos[0];
-                        const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
-                        let bundlePrice = regularPrice * bundleQty;
+                        const isBundle = promo.offer_type === 'BUNDLE_PACKAGE';
 
-                        if (promo.discount_type === 'PERCENT') {
-                            bundlePrice = Math.max(0, Math.round((regularPrice * bundleQty) - ((regularPrice * bundleQty * Number(promo.discount_value)) / 100)));
+                        if (isBundle) {
+                            const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+                            let bundlePrice = regularPrice * bundleQty;
+
+                            if (promo.discount_type === 'PERCENT') {
+                                bundlePrice = Math.max(0, Math.round((regularPrice * bundleQty) - ((regularPrice * bundleQty * Number(promo.discount_value)) / 100)));
+                            } else {
+                                bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                            }
+
+                            const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+                            const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
+                            const completedBundles = Math.floor(itemQty / bundleQty);
+                            const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
+
+                            if (applicableBundles > 0 && bundlePrice < (regularPrice * bundleQty)) {
+                                const promoItemsCount = applicableBundles * bundleQty;
+                                const regularItemsCount = itemQty - promoItemsCount;
+                                itemSellTotal = Math.round((applicableBundles * bundlePrice) + (regularItemsCount * regularPrice));
+                                effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : regularPrice;
+                            } else {
+                                itemSellTotal = Math.round(regularPrice * itemQty);
+                                effectivePriceAtSale = regularPrice;
+                            }
                         } else {
-                            bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
-                        }
+                            // UNIT_DISCOUNT: Discount applies to each unit up to max_qty_per_sale
+                            const minQty = Math.max(1, Number(promo.min_qty) || 1);
+                            if (itemQty >= minQty) {
+                                let unitPromoPrice = regularPrice;
+                                if (promo.discount_type === 'PERCENT') {
+                                    unitPromoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
+                                } else {
+                                    unitPromoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                                }
 
-                        const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-                        const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
-                        const completedBundles = Math.floor(itemQty / bundleQty);
-                        const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
+                                const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+                                const promoQty = Math.min(itemQty, maxLimit);
+                                const regularQty = Math.max(0, itemQty - promoQty);
 
-                        if (applicableBundles > 0 && bundlePrice < (regularPrice * bundleQty)) {
-                            const promoItemsCount = applicableBundles * bundleQty;
-                            const regularItemsCount = itemQty - promoItemsCount;
-                            itemSellTotal = Math.round((applicableBundles * bundlePrice) + (regularItemsCount * regularPrice));
-                            effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : regularPrice;
-                        } else {
-                            itemSellTotal = Math.round(regularPrice * itemQty);
-                            effectivePriceAtSale = regularPrice;
+                                itemSellTotal = Math.round((promoQty * unitPromoPrice) + (regularQty * regularPrice));
+                                effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : unitPromoPrice;
+                            } else {
+                                itemSellTotal = Math.round(regularPrice * itemQty);
+                                effectivePriceAtSale = regularPrice;
+                            }
                         }
                     } else {
                         itemSellTotal = Math.round(regularPrice * itemQty);

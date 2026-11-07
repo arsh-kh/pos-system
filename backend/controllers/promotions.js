@@ -51,22 +51,45 @@ exports.getActivePromotions = async (req, res) => {
         rows.forEach(promo => {
             if (activeMap[promo.product_id]) return; // Newest id already recorded due to ORDER BY p.id DESC
             const orig = Number(promo.original_price);
-            const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
-            let bundlePrice = orig * bundleQty;
-            if (promo.discount_type === 'PERCENT') {
-                bundlePrice = Math.max(0, Math.round((orig * bundleQty) - ((orig * bundleQty * Number(promo.discount_value)) / 100)));
-            } else {
-                bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
-            }
+            const isBundle = promo.offer_type === 'BUNDLE_PACKAGE';
 
-            activeMap[promo.product_id] = {
-                ...promo,
-                min_qty: bundleQty,
-                bundle_qty: bundleQty,
-                bundle_price: bundlePrice,
-                promo_price: bundlePrice,
-                savings_per_bundle: Math.max(0, (orig * bundleQty) - bundlePrice)
-            };
+            if (isBundle) {
+                const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+                let bundlePrice = orig * bundleQty;
+                if (promo.discount_type === 'PERCENT') {
+                    bundlePrice = Math.max(0, Math.round((orig * bundleQty) - ((orig * bundleQty * Number(promo.discount_value)) / 100)));
+                } else {
+                    bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                }
+
+                activeMap[promo.product_id] = {
+                    ...promo,
+                    offer_type: 'BUNDLE_PACKAGE',
+                    min_qty: bundleQty,
+                    bundle_qty: bundleQty,
+                    bundle_price: bundlePrice,
+                    promo_price: bundlePrice,
+                    savings_per_bundle: Math.max(0, (orig * bundleQty) - bundlePrice)
+                };
+            } else {
+                // UNIT_DISCOUNT
+                const minQty = Math.max(1, Number(promo.min_qty) || 1);
+                let unitPromoPrice = orig;
+                if (promo.discount_type === 'PERCENT') {
+                    unitPromoPrice = Math.max(0, Math.round(orig - (orig * Number(promo.discount_value)) / 100));
+                } else {
+                    unitPromoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                }
+
+                activeMap[promo.product_id] = {
+                    ...promo,
+                    offer_type: 'UNIT_DISCOUNT',
+                    min_qty: minQty,
+                    unit_promo_price: unitPromoPrice,
+                    promo_price: unitPromoPrice,
+                    savings_per_unit: Math.max(0, orig - unitPromoPrice)
+                };
+            }
         });
 
         res.json({ status: 'SUCCESS', data: rows, activeMap });
@@ -80,6 +103,7 @@ exports.getActivePromotions = async (req, res) => {
 exports.createPromotion = async (req, res) => {
     const { 
         product_id, 
+        offer_type,
         discount_type, 
         discount_value, 
         min_qty,
@@ -98,6 +122,7 @@ exports.createPromotion = async (req, res) => {
             return res.status(400).json({ status: 'ERROR', message: 'بەرواری دەستپێک نابێت لە بەرواری کۆتایی درەنگتر بێت' });
         }
 
+        const offerType = offer_type === 'BUNDLE_PACKAGE' ? 'BUNDLE_PACKAGE' : 'UNIT_DISCOUNT';
         const discType = discount_type === 'PERCENT' ? 'PERCENT' : 'FIXED_PRICE';
         const discVal = Math.max(0, parseFloat(discount_value) || 0);
         const minQuantity = min_qty ? Math.max(0.001, parseFloat(min_qty)) : 1;
@@ -105,9 +130,9 @@ exports.createPromotion = async (req, res) => {
 
         const [result] = await db.query(`
             INSERT INTO Promotions 
-                (product_id, discount_type, discount_value, min_qty, max_qty_per_sale, start_date, end_date, is_active, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?)
-        `, [product_id, discType, discVal, minQuantity, maxQty, start_date, end_date, notes || null]);
+                (product_id, offer_type, discount_type, discount_value, min_qty, max_qty_per_sale, start_date, end_date, is_active, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?)
+        `, [product_id, offerType, discType, discVal, minQuantity, maxQty, start_date, end_date, notes || null]);
 
         res.status(201).json({
             status: 'SUCCESS',

@@ -191,12 +191,13 @@ const Promotions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form State: Bundle package pricing (e.g. 3 for 1250)
+  // Form State: Supports both UNIT_DISCOUNT and BUNDLE_PACKAGE
   const [formData, setFormData] = useState({
     product_id: '',
+    offer_type: 'UNIT_DISCOUNT', // 'UNIT_DISCOUNT' or 'BUNDLE_PACKAGE'
     discount_type: 'FIXED_PRICE', // 'FIXED_PRICE' or 'PERCENT'
     discount_value: '',
-    min_qty: '3',
+    min_qty: '1',
     max_qty_per_sale: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -244,16 +245,17 @@ const Promotions = () => {
         ...formData,
         discount_value: val,
         min_qty: formData.min_qty ? Math.max(1, parseFloat(formData.min_qty)) : 1,
-        max_qty_per_sale: formData.max_qty_per_sale ? Math.max(1, parseFloat(formData.max_qty_per_sale)) : null
+        max_qty_per_sale: formData.max_qty_per_sale ? Math.max(0.001, parseFloat(formData.max_qty_per_sale)) : null
       });
 
       if (res.data.status === 'SUCCESS') {
         setIsModalOpen(false);
         setFormData({
           product_id: '',
+          offer_type: 'UNIT_DISCOUNT',
           discount_type: 'FIXED_PRICE',
           discount_value: '',
-          min_qty: '3',
+          min_qty: '1',
           max_qty_per_sale: '',
           start_date: new Date().toISOString().split('T')[0],
           end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -394,12 +396,27 @@ const Promotions = () => {
             ) : (
               filteredPromotions.map((promo) => {
                 const orig = Number(promo.original_price);
-                const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
-                let bundlePrice = orig * bundleQty;
-                if (promo.discount_type === 'PERCENT') {
-                  bundlePrice = Math.max(0, Math.round((orig * bundleQty) - ((orig * bundleQty * Number(promo.discount_value)) / 100)));
+                const isBundle = promo.offer_type === 'BUNDLE_PACKAGE';
+                let offerDisplay = '';
+
+                if (isBundle) {
+                  const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+                  let bundlePrice = orig * bundleQty;
+                  if (promo.discount_type === 'PERCENT') {
+                    bundlePrice = Math.max(0, Math.round((orig * bundleQty) - ((orig * bundleQty * Number(promo.discount_value)) / 100)));
+                  } else {
+                    bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                  }
+                  offerDisplay = `پاکێج: ${bundleQty} ${promo.unit || 'دانە'} بە ${bundlePrice.toLocaleString()} د.ع`;
                 } else {
-                  bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                  let promoPrice = orig;
+                  if (promo.discount_type === 'PERCENT') {
+                    promoPrice = Math.max(0, Math.round(orig - (orig * Number(promo.discount_value)) / 100));
+                  } else {
+                    promoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                  }
+                  const minText = Number(promo.min_qty) > 1 ? ` (کەمترین: ${Number(promo.min_qty)})` : '';
+                  offerDisplay = `${promoPrice.toLocaleString()} د.ع بۆ هەر دانەیەک${minText}`;
                 }
 
                 return (
@@ -415,7 +432,7 @@ const Promotions = () => {
 
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.9rem' }}>
-                        {bundleQty} {promo.unit || 'دانە'} بە {bundlePrice.toLocaleString()} د.ع
+                        {offerDisplay}
                       </span>
                     </td>
 
@@ -502,12 +519,12 @@ const Promotions = () => {
               maxWidth: '480px', 
               width: '95%', 
               borderRadius: '12px', 
-              padding: '20px',
+              padding: '18px 20px',
               boxShadow: '0 16px 40px rgba(0,0,0,0.3)'
             }}
           >
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                 دروستکردنی ئۆفەر
               </div>
@@ -539,102 +556,208 @@ const Promotions = () => {
                 />
               </div>
 
-              {/* Discount Mode: Compact Segment Toggle */}
+              {/* Offer Type Selector */}
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  شێوازی داشکاندن
+                  جۆری ئۆفەر
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, discount_type: 'FIXED_PRICE' })}
+                    onClick={() => setFormData({ 
+                      ...formData, 
+                      offer_type: 'UNIT_DISCOUNT',
+                      min_qty: '1'
+                    })}
                     style={{
-                      padding: '7px',
+                      padding: '7px 10px',
                       borderRadius: '6px',
-                      border: '1.5px solid ' + (formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--border-color)'),
+                      border: '1.5px solid ' + (formData.offer_type === 'UNIT_DISCOUNT' ? '#2563eb' : 'var(--border-color)'),
                       cursor: 'pointer',
-                      background: formData.discount_type === 'FIXED_PRICE' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
-                      color: formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--text-primary)',
+                      background: formData.offer_type === 'UNIT_DISCOUNT' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
+                      color: formData.offer_type === 'UNIT_DISCOUNT' ? '#2563eb' : 'var(--text-primary)',
                       fontSize: '0.82rem',
                       fontWeight: 600
                     }}
                   >
-                    نرخی دیاریکراو (دینار)
+                    داشکاندنی نرخ (بۆ هەر دانەیەک)
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, discount_type: 'PERCENT' })}
+                    onClick={() => setFormData({ 
+                      ...formData, 
+                      offer_type: 'BUNDLE_PACKAGE',
+                      min_qty: '3',
+                      discount_type: 'FIXED_PRICE'
+                    })}
                     style={{
-                      padding: '7px',
+                      padding: '7px 10px',
                       borderRadius: '6px',
-                      border: '1.5px solid ' + (formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--border-color)'),
+                      border: '1.5px solid ' + (formData.offer_type === 'BUNDLE_PACKAGE' ? '#2563eb' : 'var(--border-color)'),
                       cursor: 'pointer',
-                      background: formData.discount_type === 'PERCENT' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
-                      color: formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--text-primary)',
+                      background: formData.offer_type === 'BUNDLE_PACKAGE' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
+                      color: formData.offer_type === 'BUNDLE_PACKAGE' ? '#2563eb' : 'var(--text-primary)',
                       fontSize: '0.82rem',
                       fontWeight: 600
                     }}
                   >
-                    ڕێژەی داشکاندن (%)
+                    ئۆفەری پاکێج (فرەدانە)
                   </button>
                 </div>
               </div>
 
-              {/* Quantity & Offer Price in 2 Clean Columns */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    بڕ (دانە)
-                  </label>
-                  <input 
-                    type="number" 
-                    min="1"
-                    step="any"
-                    value={formData.min_qty} 
-                    onChange={(e) => setFormData({ ...formData, min_qty: e.target.value })}
-                    placeholder="3"
-                    required
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
-                  />
-                </div>
+              {/* Conditional Inputs based on Offer Type */}
+              {formData.offer_type === 'UNIT_DISCOUNT' ? (
+                <>
+                  {/* Discount Method Toggle */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, discount_type: 'FIXED_PRICE' })}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: '1px solid ' + (formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--border-color)'),
+                          cursor: 'pointer',
+                          background: formData.discount_type === 'FIXED_PRICE' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
+                          color: formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--text-primary)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        نرخی دیاریکراو (دینار)
+                      </button>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {formData.discount_type === 'FIXED_PRICE' ? 'نرخی ئۆفەر (دینار)' : 'ڕێژەی داشکاندن (%)'}
-                  </label>
-                  <input 
-                    type="number" 
-                    min="0"
-                    max={formData.discount_type === 'PERCENT' ? 99 : undefined}
-                    step={formData.discount_type === 'FIXED_PRICE' ? "any" : "1"}
-                    value={formData.discount_value} 
-                    onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
-                    placeholder={formData.discount_type === 'FIXED_PRICE' ? '1250' : '20'}
-                    required
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
-                  />
-                </div>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, discount_type: 'PERCENT' })}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: '1px solid ' + (formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--border-color)'),
+                          cursor: 'pointer',
+                          background: formData.discount_type === 'PERCENT' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
+                          color: formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--text-primary)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        ڕێژەی داشکاندن (%)
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Optional Max Limit */}
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  سنووری بڕ (ئارەزوومەندانە)
-                </label>
-                <input 
-                  type="number" 
-                  min="0.1"
-                  step="any"
-                  value={formData.max_qty_per_sale} 
-                  onChange={(e) => setFormData({ ...formData, max_qty_per_sale: e.target.value })}
-                  placeholder="بێ سنوور"
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem' }}
-                />
-              </div>
+                  {/* Price & Min Qty */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {formData.discount_type === 'FIXED_PRICE' ? 'نرخی نوێ (دینار)' : 'ڕێژەی داشکاندن (%)'}
+                      </label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        max={formData.discount_type === 'PERCENT' ? 99 : undefined}
+                        step={formData.discount_type === 'FIXED_PRICE' ? "any" : "1"}
+                        value={formData.discount_value} 
+                        onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
+                        placeholder={formData.discount_type === 'FIXED_PRICE' ? '250' : '20'}
+                        required
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        کەمترین بڕی کڕین
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        step="any"
+                        value={formData.min_qty} 
+                        onChange={(e) => setFormData({ ...formData, min_qty: e.target.value })}
+                        placeholder="1"
+                        required
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Max Limit per invoice */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      ماکسیمەمی پسووڵە (ئارەزوومەندانە)
+                    </label>
+                    <input 
+                      type="number" 
+                      min="0.1"
+                      step="any"
+                      value={formData.max_qty_per_sale} 
+                      onChange={(e) => setFormData({ ...formData, max_qty_per_sale: e.target.value })}
+                      placeholder="بێ سنوور (نموونە: 2 دانە)"
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem' }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* BUNDLE_PACKAGE: Pack Qty & Pack Price */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        بڕی پاکێج (دانە)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        step="any"
+                        value={formData.min_qty} 
+                        onChange={(e) => setFormData({ ...formData, min_qty: e.target.value })}
+                        placeholder="3"
+                        required
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        نرخی کۆی پاکێج (دینار)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        step="any"
+                        value={formData.discount_value} 
+                        onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
+                        placeholder="1250"
+                        required
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Max Limit */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      ماکسیمەمی پسووڵە (ئارەزوومەندانە)
+                    </label>
+                    <input 
+                      type="number" 
+                      min="0.1"
+                      step="any"
+                      value={formData.max_qty_per_sale} 
+                      onChange={(e) => setFormData({ ...formData, max_qty_per_sale: e.target.value })}
+                      placeholder="بێ سنوور (نموونە: 6 دانە)"
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem' }}
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Dates */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     بەرواری دەستپێک

@@ -1497,49 +1497,101 @@ const Cashier = () => {
       };
     }
 
-    const bundleQty = Math.max(1, Number(promo.min_qty || promo.bundle_qty) || 1);
-    const bundlePrice = Number(promo.bundle_price ?? promo.promo_price ?? (promo.discount_value || regularPrice * bundleQty));
-    const normalBundleCost = regularPrice * bundleQty;
-    const savingsPerBundle = Math.max(0, normalBundleCost - bundlePrice);
+    const isBundle = promo.offer_type === 'BUNDLE_PACKAGE';
 
-    if (savingsPerBundle <= 0 || qty < bundleQty) {
+    if (isBundle) {
+      const bundleQty = Math.max(1, Number(promo.min_qty || promo.bundle_qty) || 1);
+      const bundlePrice = Number(promo.bundle_price ?? promo.promo_price ?? (promo.discount_value || regularPrice * bundleQty));
+      const normalBundleCost = regularPrice * bundleQty;
+      const savingsPerBundle = Math.max(0, normalBundleCost - bundlePrice);
+
+      if (savingsPerBundle <= 0 || qty < bundleQty) {
+        return {
+          hasPromo: false,
+          promoQty: 0,
+          regularQty: qty,
+          promoPrice: regularPrice,
+          regularPrice,
+          maxLimit: null,
+          minQty: bundleQty,
+          lineTotal: Math.round(regularPrice * qty),
+          totalSavings: 0
+        };
+      }
+
+      const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+      const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
+      const completedBundles = Math.floor(qty / bundleQty);
+      const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
+      const promoItemsCount = applicableBundles * bundleQty;
+      const regularItemsCount = qty - promoItemsCount;
+
+      const lineTotal = Math.round((applicableBundles * bundlePrice) + (regularItemsCount * regularPrice));
+      const totalSavings = Math.max(0, Math.round(qty * regularPrice) - lineTotal);
+      const effectiveUnitPrice = qty > 0 ? Math.round(lineTotal / qty) : regularPrice;
+
       return {
-        hasPromo: false,
-        promoQty: 0,
-        regularQty: qty,
-        promoPrice: regularPrice,
+        hasPromo: totalSavings > 0,
+        bundleQty,
+        bundlePrice,
+        applicableBundles,
+        promoItemsCount,
+        regularItemsCount,
+        lineTotal,
+        totalSavings,
         regularPrice,
-        maxLimit: null,
-        minQty: bundleQty,
-        lineTotal: Math.round(regularPrice * qty),
-        totalSavings: 0
+        promoPrice: effectiveUnitPrice,
+        minQty: bundleQty
+      };
+    } else {
+      // UNIT_DISCOUNT: Direct unit discount up to max_qty_per_sale
+      const minQty = Math.max(1, Number(promo.min_qty) || 1);
+      let unitPromoPrice = Number(promo.unit_promo_price ?? promo.promo_price);
+      if (isNaN(unitPromoPrice) || unitPromoPrice <= 0) {
+        if (promo.discount_type === 'PERCENT') {
+          unitPromoPrice = Math.max(0, Math.round(regularPrice - (regularPrice * Number(promo.discount_value)) / 100));
+        } else {
+          unitPromoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+        }
+      }
+
+      const savingsPerUnit = Math.max(0, regularPrice - unitPromoPrice);
+
+      if (savingsPerUnit <= 0 || qty < minQty) {
+        return {
+          hasPromo: false,
+          promoQty: 0,
+          regularQty: qty,
+          promoPrice: regularPrice,
+          regularPrice,
+          maxLimit: null,
+          minQty,
+          lineTotal: Math.round(regularPrice * qty),
+          totalSavings: 0
+        };
+      }
+
+      const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
+      const promoQty = Math.min(qty, maxLimit);
+      const regularQty = Math.max(0, qty - promoQty);
+
+      const lineTotal = Math.round((promoQty * unitPromoPrice) + (regularQty * regularPrice));
+      const totalSavings = Math.max(0, Math.round(qty * regularPrice) - lineTotal);
+      const effectiveUnitPrice = qty > 0 ? Math.round(lineTotal / qty) : regularPrice;
+
+      return {
+        hasPromo: totalSavings > 0,
+        promoQty,
+        regularQty,
+        lineTotal,
+        totalSavings,
+        regularPrice,
+        promoPrice: effectiveUnitPrice,
+        unitPromoPrice,
+        minQty,
+        maxLimit: promo.max_qty_per_sale
       };
     }
-
-    const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-    const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
-    const completedBundles = Math.floor(qty / bundleQty);
-    const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
-    const promoItemsCount = applicableBundles * bundleQty;
-    const regularItemsCount = qty - promoItemsCount;
-
-    const lineTotal = Math.round((applicableBundles * bundlePrice) + (regularItemsCount * regularPrice));
-    const totalSavings = Math.max(0, Math.round(qty * regularPrice) - lineTotal);
-    const effectiveUnitPrice = qty > 0 ? Math.round(lineTotal / qty) : regularPrice;
-
-    return {
-      hasPromo: totalSavings > 0,
-      bundleQty,
-      bundlePrice,
-      applicableBundles,
-      promoItemsCount,
-      regularItemsCount,
-      lineTotal,
-      totalSavings,
-      regularPrice,
-      promoPrice: effectiveUnitPrice,
-      minQty: bundleQty
-    };
   }, [activePromotions]);
 
   // Quick Return Calculations & Handlers (placed after getItemPricing)
