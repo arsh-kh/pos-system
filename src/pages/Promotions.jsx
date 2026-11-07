@@ -191,6 +191,10 @@ const Promotions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Delete Confirmation Modal State
+  const [promoToDelete, setPromoToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Form State: Supports both UNIT_DISCOUNT and BUNDLE_PACKAGE
   const [formData, setFormData] = useState({
     product_id: '',
@@ -279,14 +283,21 @@ const Promotions = () => {
     }
   };
 
-  const handleDeletePromotion = async (id) => {
-    if (window.confirm('دڵنیایت لە سڕینەوەی ئەم ئۆفەرە؟')) {
-      try {
-        await axios.delete(`http://localhost:3001/api/promotions/${id}`);
-        fetchData();
-      } catch {
-        alert('هەڵەیەک ڕوویدا لە کاتی سڕینەوە');
-      }
+  const handleDeletePromotion = (promo) => {
+    setPromoToDelete(promo);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!promoToDelete) return;
+    setIsDeleting(true);
+    try {
+      await axios.delete(`http://localhost:3001/api/promotions/${promoToDelete.id}`);
+      setPromoToDelete(null);
+      fetchData();
+    } catch {
+      alert('هەڵەیەک ڕوویدا لە کاتی سڕینەوەی ئۆفەر');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -486,7 +497,7 @@ const Promotions = () => {
                         </button>
 
                         <button
-                          onClick={() => handleDeletePromotion(promo.id)}
+                          onClick={() => handleDeletePromotion(promo)}
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
@@ -807,6 +818,96 @@ const Promotions = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal - Minimalist & Consistent with App Alerts */}
+      {promoToDelete && (
+        <div 
+          className="pos-modal-overlay" 
+          onClick={() => !isDeleting && setPromoToDelete(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            direction: 'rtl'
+          }}
+        >
+          <div 
+            className="pos-modal-card" 
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '22px',
+              width: '90%',
+              maxWidth: '380px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+              textAlign: 'center'
+            }}
+          >
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              دڵنیایت لە سڕینەوەی ئەم ئۆفەرە؟
+            </h3>
+
+            <div style={{ 
+              fontSize: '0.9rem', 
+              fontWeight: 700, 
+              color: 'var(--text-secondary)', 
+              background: 'var(--bg-tertiary)', 
+              padding: '8px 12px', 
+              borderRadius: '8px', 
+              marginBottom: '18px',
+              wordBreak: 'break-word'
+            }}>
+              «{promoToDelete.product_name}»
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '9px 14px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isDeleting ? 'دەسڕدرێتەوە...' : 'سڕینەوە'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPromoToDelete(null)}
+                disabled={isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '9px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                پاشگەزبوونەوە
+              </button>
+            </div>
           </div>
         </div>
       )}
