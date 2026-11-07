@@ -1482,8 +1482,9 @@ const Cashier = () => {
     const promo = activePromotions[item.id];
     const regularPrice = Number(item.price);
     const qty = Number(item.quantity);
+    const minQty = Math.max(1, Number(promo?.min_qty) || 1);
 
-    if (!promo || promo.savings_per_unit <= 0) {
+    if (!promo || promo.savings_per_unit <= 0 || qty < minQty) {
       return {
         hasPromo: false,
         promoQty: 0,
@@ -1491,6 +1492,7 @@ const Cashier = () => {
         promoPrice: regularPrice,
         regularPrice: regularPrice,
         maxLimit: null,
+        minQty: promo ? minQty : null,
         lineTotal: Math.round(regularPrice * qty),
         totalSavings: 0
       };
@@ -1510,6 +1512,7 @@ const Cashier = () => {
       promoPrice,
       regularPrice,
       maxLimit: promo.max_qty_per_sale,
+      minQty,
       lineTotal,
       totalSavings
     };
@@ -2537,8 +2540,8 @@ const Cashier = () => {
                         </div>
 
                         {/* نرخ */}
-                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
-                          {item.price.toLocaleString()} د.ع
+                        <div style={{ textAlign: 'center', fontSize: '0.82rem', color: pricing.hasPromo ? '#d97706' : 'var(--text-secondary)', fontWeight: 700 }}>
+                          {(pricing.hasPromo ? pricing.promoPrice : item.price).toLocaleString()} د.ع
                         </div>
 
                         {/* کۆ */}

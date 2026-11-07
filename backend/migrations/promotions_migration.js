@@ -9,6 +9,7 @@ async function migrate() {
         product_id INT NOT NULL,
         discount_type ENUM('FIXED_PRICE', 'PERCENT') DEFAULT 'FIXED_PRICE',
         discount_value DECIMAL(10,2) NOT NULL,
+        min_qty DECIMAL(10,3) NOT NULL DEFAULT 1.000,
         max_qty_per_sale DECIMAL(10,3) DEFAULT NULL,
         start_date DATE NOT NULL,
         end_date DATE NOT NULL,

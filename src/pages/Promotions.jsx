@@ -36,6 +36,7 @@ const Promotions = () => {
     product_id: '',
     discount_type: 'FIXED_PRICE', // 'FIXED_PRICE' or 'PERCENT'
     discount_value: '',
+    min_qty: '1',
     max_qty_per_sale: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -106,6 +107,7 @@ const Promotions = () => {
       const res = await axios.post('http://localhost:3001/api/promotions', {
         ...formData,
         discount_value: val,
+        min_qty: formData.min_qty ? parseFloat(formData.min_qty) : 1,
         max_qty_per_sale: formData.max_qty_per_sale ? parseFloat(formData.max_qty_per_sale) : null
       });
 
@@ -116,6 +118,7 @@ const Promotions = () => {
           product_id: '',
           discount_type: 'FIXED_PRICE',
           discount_value: '',
+          min_qty: '1',
           max_qty_per_sale: '',
           start_date: new Date().toISOString().split('T')[0],
           end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -285,6 +288,7 @@ const Promotions = () => {
               <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کاڵا و بارکۆد</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی ئاسایی</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>نرخی ئۆفەر</th>
+              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>کەمترین بڕ</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>سنووری بڕ (بۆ هەر کڕینێک)</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>ماوەی ئۆفەر</th>
               <th style={{ padding: '16px 20px', color: 'var(--text-secondary)', fontWeight: 500 }}>دۆخ</th>
@@ -294,7 +298,7 @@ const Promotions = () => {
           <tbody>
             {filteredPromotions.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                   هیچ ئۆفەرێک لەم بەشەدا نەدۆزرایەوە
                 </td>
               </tr>
@@ -337,6 +341,13 @@ const Promotions = () => {
                       <div style={{ color: '#10b981', fontSize: '0.8rem', marginTop: '2px' }}>
                         پاشەکەوت: {discountAmount.toLocaleString()} د.ع بۆ هەر {promo.unit || 'دانە'}
                       </div>
+                    </td>
+
+                    {/* Min Quantity */}
+                    <td style={{ padding: '16px 20px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        {Number(promo.min_qty || 1).toLocaleString()} {promo.unit || 'دانە'}
+                      </span>
                     </td>
 
                     {/* Max Limit Per Sale */}
@@ -598,6 +609,21 @@ const Promotions = () => {
                     <span>ئاگاداربە: ئەم نرخە ({calculatedPromoPrice.toLocaleString()} د.ع) لە نرخی کڕین ({Number(selectedProduct.cost_price || 0).toLocaleString()} د.ع) کەمترە و دەبێتە هۆی زیان!</span>
                   </div>
                 )}
+              </div>
+
+              {/* Minimum Quantity Required for Discount */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                  کەمترین بڕ
+                </label>
+                <input 
+                  type="number" 
+                  value={formData.min_qty} 
+                  onChange={(e) => setFormData({ ...formData, min_qty: e.target.value })}
+                  min="1"
+                  step="any"
+                  style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
+                />
               </div>
 
               {/* Max Quantity Limit per Sale */}

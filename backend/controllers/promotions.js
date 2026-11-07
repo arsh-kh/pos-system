@@ -60,6 +60,7 @@ exports.getActivePromotions = async (req, res) => {
 
             activeMap[promo.product_id] = {
                 ...promo,
+                min_qty: promo.min_qty ? Number(promo.min_qty) : 1,
                 promo_price: promoPrice,
                 savings_per_unit: Math.max(0, orig - promoPrice)
             };
@@ -78,6 +79,7 @@ exports.createPromotion = async (req, res) => {
         product_id, 
         discount_type, 
         discount_value, 
+        min_qty,
         max_qty_per_sale, 
         start_date, 
         end_date, 
@@ -95,13 +97,14 @@ exports.createPromotion = async (req, res) => {
 
         const discType = discount_type === 'PERCENT' ? 'PERCENT' : 'FIXED_PRICE';
         const discVal = Math.max(0, parseFloat(discount_value) || 0);
+        const minQuantity = min_qty ? Math.max(0.001, parseFloat(min_qty)) : 1;
         const maxQty = max_qty_per_sale ? Math.max(0.001, parseFloat(max_qty_per_sale)) : null;
 
         const [result] = await db.query(`
             INSERT INTO Promotions 
-                (product_id, discount_type, discount_value, max_qty_per_sale, start_date, end_date, is_active, notes)
-            VALUES (?, ?, ?, ?, ?, ?, TRUE, ?)
-        `, [product_id, discType, discVal, maxQty, start_date, end_date, notes || null]);
+                (product_id, discount_type, discount_value, min_qty, max_qty_per_sale, start_date, end_date, is_active, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?)
+        `, [product_id, discType, discVal, minQuantity, maxQty, start_date, end_date, notes || null]);
 
         res.status(201).json({
             status: 'SUCCESS',
@@ -120,6 +123,7 @@ exports.updatePromotion = async (req, res) => {
     const { 
         discount_type, 
         discount_value, 
+        min_qty,
         max_qty_per_sale, 
         start_date, 
         end_date, 
@@ -129,18 +133,20 @@ exports.updatePromotion = async (req, res) => {
     try {
         const discType = discount_type === 'PERCENT' ? 'PERCENT' : 'FIXED_PRICE';
         const discVal = Math.max(0, parseFloat(discount_value) || 0);
+        const minQuantity = min_qty ? Math.max(0.001, parseFloat(min_qty)) : 1;
         const maxQty = max_qty_per_sale ? Math.max(0.001, parseFloat(max_qty_per_sale)) : null;
 
         await db.query(`
             UPDATE Promotions SET
                 discount_type = ?,
                 discount_value = ?,
+                min_qty = ?,
                 max_qty_per_sale = ?,
                 start_date = ?,
                 end_date = ?,
                 notes = ?
             WHERE id = ?
-        `, [discType, discVal, maxQty, start_date, end_date, notes || null, id]);
+        `, [discType, discVal, minQuantity, maxQty, start_date, end_date, notes || null, id]);
 
         res.json({ status: 'SUCCESS', message: 'ئۆفەر بە سەرکەوتوویی نوێکرایەوە' });
     } catch (error) {
