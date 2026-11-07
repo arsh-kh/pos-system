@@ -4,7 +4,7 @@ import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { formatDate } from '../utils/dateFormatter';
 import './Dashboard.css';
 
-// 1 Single Beautiful Combobox for Product Search & Selection
+// Compact Clean Combobox for Product Search & Selection
 const ProductCombobox = ({ products, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -15,8 +15,8 @@ const ProductCombobox = ({ products, value, onChange }) => {
   }, [products, value]);
 
   const filtered = useMemo(() => {
-    if (!query) return products.slice(0, 50);
-    return products.filter(p => kurdishSearchMatch([p.name, p.barcode], query)).slice(0, 50);
+    if (!query) return products.slice(0, 40);
+    return products.filter(p => kurdishSearchMatch([p.name, p.barcode], query)).slice(0, 40);
   }, [products, query]);
 
   useEffect(() => {
@@ -38,45 +38,44 @@ const ProductCombobox = ({ products, value, onChange }) => {
             justifyContent: 'space-between',
             alignItems: 'center',
             background: 'rgba(37, 99, 235, 0.05)',
-            border: '2px solid #2563eb',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            gap: '12px'
+            border: '1.5px solid #2563eb',
+            borderRadius: '8px',
+            padding: '7px 12px',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            setIsOpen(true);
+            setQuery('');
           }}
         >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.82rem', color: '#2563eb', fontWeight: 800, marginBottom: '2px' }}>
-              کاڵای هەڵبژێردراو:
-            </div>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
               {selectedProduct.name}
-            </div>
-            <div style={{ display: 'flex', gap: '16px', marginTop: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-              <span>نرخی فرۆشتنی ئێستا: <strong style={{ color: '#2563eb', fontSize: '0.95rem' }}>{Number(selectedProduct.selling_price).toLocaleString()} د.ع</strong></span>
-              {selectedProduct.barcode && <span>بارکۆد: <strong>{selectedProduct.barcode}</strong></span>}
-              <span>مەوجودی کۆگا: <strong>{selectedProduct.stock} {selectedProduct.unit || 'دانە'}</strong></span>
-            </div>
+            </span>
+            <span style={{ fontSize: '0.82rem', color: '#2563eb', fontWeight: 600 }}>
+              ({Number(selectedProduct.selling_price).toLocaleString()} د.ع)
+            </span>
           </div>
           <button 
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               onChange('');
               setQuery('');
               setIsOpen(true);
             }}
             style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
+              padding: '3px 8px',
+              borderRadius: '6px',
               background: 'var(--bg-tertiary)',
-              border: '1.5px solid var(--border-color)',
+              border: '1px solid var(--border-color)',
               color: 'var(--text-primary)',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              cursor: 'pointer'
             }}
           >
-            گۆڕینی کاڵا
+            گۆڕین
           </button>
         </div>
       ) : (
@@ -86,16 +85,15 @@ const ProductCombobox = ({ products, value, onChange }) => {
               display: 'flex',
               alignItems: 'center',
               background: 'var(--bg-tertiary)',
-              border: '2px solid ' + (isOpen ? '#2563eb' : 'var(--border-color)'),
-              borderRadius: '10px',
-              padding: '10px 16px',
-              transition: 'border-color 0.15s ease'
+              border: '1.5px solid ' + (isOpen ? '#2563eb' : 'var(--border-color)'),
+              borderRadius: '8px',
+              padding: '6px 12px'
             }}
           >
             <input 
               type="text"
               value={query}
-              placeholder="ناوی کاڵا یان بارکۆد بنووسە بۆ گەڕان و هەڵبژاردن..."
+              placeholder="گەڕان بەپێی ناوی کاڵا یان بارکۆد..."
               onChange={(e) => {
                 setQuery(e.target.value);
                 if (!isOpen) setIsOpen(true);
@@ -107,15 +105,14 @@ const ProductCombobox = ({ products, value, onChange }) => {
                 border: 'none',
                 outline: 'none',
                 color: 'var(--text-primary)',
-                fontSize: '0.95rem',
-                fontWeight: 600
+                fontSize: '0.88rem'
               }}
             />
             {isOpen && (
               <button 
                 type="button" 
                 onClick={() => setIsOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 700 }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px 6px', fontSize: '0.78rem' }}
               >
                 داخستن
               </button>
@@ -125,20 +122,20 @@ const ProductCombobox = ({ products, value, onChange }) => {
           {isOpen && (
             <div style={{
               position: 'absolute',
-              top: 'calc(100% + 6px)',
+              top: 'calc(100% + 4px)',
               right: 0,
               left: 0,
-              maxHeight: '280px',
+              maxHeight: '200px',
               overflowY: 'auto',
               background: 'var(--bg-secondary)',
-              border: '1.5px solid var(--border-color)',
-              borderRadius: '12px',
-              boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
               zIndex: 9999,
-              padding: '6px'
+              padding: '4px'
             }}>
               {filtered.length === 0 ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                   هیچ کاڵایەک نەدۆزرایەوە
                 </div>
               ) : (
@@ -156,25 +153,19 @@ const ProductCombobox = ({ products, value, onChange }) => {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
                         cursor: 'pointer',
                         background: isSelected ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                        marginBottom: '3px',
-                        transition: 'background 0.15s ease'
+                        marginBottom: '2px'
                       }}
                       onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--bg-tertiary)'; }}
                       onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                     >
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.92rem', color: isSelected ? '#2563eb' : 'var(--text-primary)' }}>
-                          {p.name}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                          {p.barcode ? `بارکۆد: ${p.barcode}` : 'بێ بارکۆد'}
-                        </div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: isSelected ? '#2563eb' : 'var(--text-primary)' }}>
+                        {p.name}
                       </div>
-                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#2563eb' }}>
+                      <div style={{ fontSize: '0.82rem', color: '#2563eb', fontWeight: 700 }}>
                         {Number(p.selling_price).toLocaleString()} د.ع
                       </div>
                     </div>
@@ -200,12 +191,12 @@ const Promotions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form State
+  // Form State: Bundle package pricing (e.g. 3 for 1250)
   const [formData, setFormData] = useState({
     product_id: '',
     discount_type: 'FIXED_PRICE', // 'FIXED_PRICE' or 'PERCENT'
     discount_value: '',
-    min_qty: '1',
+    min_qty: '3',
     max_qty_per_sale: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -233,34 +224,6 @@ const Promotions = () => {
     fetchData();
   }, []);
 
-  const selectedProduct = useMemo(() => {
-    return products.find(p => String(p.id) === String(formData.product_id)) || null;
-  }, [products, formData.product_id]);
-
-  // Live Calculated Promotional Price per Unit
-  const calculatedPromoPrice = useMemo(() => {
-    if (!selectedProduct) return 0;
-    const orig = Number(selectedProduct.selling_price) || 0;
-    const val = parseFloat(formData.discount_value) || 0;
-
-    if (formData.discount_type === 'PERCENT') {
-      return Math.max(0, Math.round(orig - (orig * Math.min(100, val)) / 100));
-    }
-    return Math.max(0, Math.round(val));
-  }, [selectedProduct, formData.discount_type, formData.discount_value]);
-
-  const unitSavings = useMemo(() => {
-    if (!selectedProduct) return 0;
-    const orig = Number(selectedProduct.selling_price) || 0;
-    return Math.max(0, orig - calculatedPromoPrice);
-  }, [selectedProduct, calculatedPromoPrice]);
-
-  const isBelowCost = useMemo(() => {
-    if (!selectedProduct || !formData.discount_value) return false;
-    const cost = Number(selectedProduct.cost_price) || 0;
-    return calculatedPromoPrice < cost;
-  }, [selectedProduct, calculatedPromoPrice, formData.discount_value]);
-
   const handleCreatePromotion = async (e) => {
     e.preventDefault();
     if (!formData.product_id) {
@@ -268,7 +231,7 @@ const Promotions = () => {
     }
     const val = parseFloat(formData.discount_value);
     if (isNaN(val) || val <= 0) {
-      return alert('تکایە نرخی ئۆفەر یان بڕی داشکاندن بنووسە');
+      return alert('تکایە نرخی ئۆفەر یان ڕێژەی داشکاندن بنووسە');
     }
 
     if (new Date(formData.start_date) > new Date(formData.end_date)) {
@@ -280,8 +243,8 @@ const Promotions = () => {
       const res = await axios.post('http://localhost:3001/api/promotions', {
         ...formData,
         discount_value: val,
-        min_qty: formData.min_qty ? Math.max(0.001, parseFloat(formData.min_qty)) : 1,
-        max_qty_per_sale: formData.max_qty_per_sale ? Math.max(0.001, parseFloat(formData.max_qty_per_sale)) : null
+        min_qty: formData.min_qty ? Math.max(1, parseFloat(formData.min_qty)) : 1,
+        max_qty_per_sale: formData.max_qty_per_sale ? Math.max(1, parseFloat(formData.max_qty_per_sale)) : null
       });
 
       if (res.data.status === 'SUCCESS') {
@@ -290,7 +253,7 @@ const Promotions = () => {
           product_id: '',
           discount_type: 'FIXED_PRICE',
           discount_value: '',
-          min_qty: '1',
+          min_qty: '3',
           max_qty_per_sale: '',
           start_date: new Date().toISOString().split('T')[0],
           end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -335,19 +298,17 @@ const Promotions = () => {
   return (
     <div className="dashboard-page p-8" dir="rtl">
       {/* Top Header - Strictly No Orange and No Icons */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            بەڕێوەبردنی ئۆفەرەکان
-          </h1>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+        <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          بەڕێوەبردنی ئۆفەرەکان
+        </h1>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button 
             onClick={fetchData} 
             disabled={loading}
             className="btn-secondary"
-            style={{ padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}
+            style={{ padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
           >
             نوێکردنەوە
           </button>
@@ -355,14 +316,14 @@ const Promotions = () => {
           <button 
             onClick={() => setIsModalOpen(true)}
             style={{ 
-              padding: '10px 24px', 
-              borderRadius: '10px', 
+              padding: '8px 20px', 
+              borderRadius: '8px', 
               background: '#2563eb', 
               color: 'white', 
               border: 'none', 
               cursor: 'pointer', 
               fontWeight: 700, 
-              fontSize: '0.95rem'
+              fontSize: '0.88rem'
             }}
           >
             ئۆفەری نوێ
@@ -371,8 +332,8 @@ const Promotions = () => {
       </div>
 
       {/* Filter Tabs and Search Bar - Clean & Icon-free */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
           {[
             { id: 'ALL', label: 'هەموو' },
             { id: 'ACTIVE', label: 'چالاکەکان' },
@@ -383,13 +344,14 @@ const Promotions = () => {
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
               style={{
-                padding: '8px 18px',
-                borderRadius: '8px',
+                padding: '6px 14px',
+                borderRadius: '6px',
                 border: '1px solid ' + (statusFilter === tab.id ? 'transparent' : 'var(--border-color)'),
                 cursor: 'pointer',
-                fontWeight: statusFilter === tab.id ? 800 : 600,
+                fontWeight: statusFilter === tab.id ? 700 : 500,
                 background: statusFilter === tab.id ? '#2563eb' : 'var(--bg-tertiary)',
-                color: statusFilter === tab.id ? 'white' : 'var(--text-secondary)'
+                color: statusFilter === tab.id ? 'white' : 'var(--text-secondary)',
+                fontSize: '0.85rem'
               }}
             >
               {tab.label}
@@ -397,135 +359,110 @@ const Promotions = () => {
           ))}
         </div>
 
-        <div style={{ width: '280px' }}>
+        <div style={{ width: '240px' }}>
           <input 
             type="text" 
             placeholder="گەڕان..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '9px 14px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none' }}
+            style={{ width: '100%', padding: '7px 12px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.85rem' }}
           />
         </div>
       </div>
 
       {/* Clean Minimalist Offers Table */}
-      <div className="glass-panel" style={{ padding: '0', borderRadius: '12px', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
-        <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <div className="glass-panel" style={{ padding: '0', borderRadius: '10px', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
+        <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
           <thead style={{ background: 'var(--bg-tertiary)' }}>
             <tr>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>کاڵا و بارکۆد</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>نرخی ئاسایی</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>نرخی ئۆفەر</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>کەمترین بڕ</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>سنووری بڕ</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>ماوەی ئۆفەر</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>دۆخ</th>
-              <th style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontWeight: 600 }}>کردارەکان</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کاڵا</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>نرخی ئاسایی</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>ئۆفەر</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>سنووری بڕ</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>ماوەی ئۆفەر</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>دۆخ</th>
+              <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.85rem' }}>کردارەکان</th>
             </tr>
           </thead>
           <tbody>
             {filteredPromotions.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-secondary)' }}>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
                   هیچ ئۆفەرێک نەدۆزرایەوە
                 </td>
               </tr>
             ) : (
               filteredPromotions.map((promo) => {
                 const orig = Number(promo.original_price);
-                let promoPrice = orig;
+                const bundleQty = Math.max(1, Number(promo.min_qty) || 1);
+                let bundlePrice = orig * bundleQty;
                 if (promo.discount_type === 'PERCENT') {
-                  promoPrice = Math.max(0, Math.round(orig - (orig * Number(promo.discount_value)) / 100));
+                  bundlePrice = Math.max(0, Math.round((orig * bundleQty) - ((orig * bundleQty * Number(promo.discount_value)) / 100)));
                 } else {
-                  promoPrice = Math.max(0, Math.round(Number(promo.discount_value)));
+                  bundlePrice = Math.max(0, Math.round(Number(promo.discount_value)));
                 }
-
-                const discountAmount = Math.max(0, orig - promoPrice);
-                const discountPercent = orig > 0 ? Math.round((discountAmount / orig) * 100) : 0;
 
                 return (
                   <tr key={promo.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{promo.product_name}</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{promo.barcode || ''}</div>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem' }}>{promo.product_name}</div>
+                      {promo.barcode && <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{promo.barcode}</div>}
                     </td>
 
-                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>
-                      <span style={{ textDecoration: 'line-through' }}>{orig.toLocaleString()} د.ع</span>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                      {orig.toLocaleString()} د.ع
                     </td>
 
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: '#2563eb', fontWeight: 800, fontSize: '1rem' }}>
-                          {promoPrice.toLocaleString()} د.ع
-                        </span>
-                        {discountPercent > 0 && (
-                          <span style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-                            -{discountPercent}%
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ color: '#10b981', fontSize: '0.78rem', marginTop: '2px' }}>
-                        پاشەکەوت: {discountAmount.toLocaleString()} د.ع
-                      </div>
-                    </td>
-
-                    <td style={{ padding: '14px 18px' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {Number(promo.min_qty || 1).toLocaleString()} {promo.unit || 'دانە'}
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.9rem' }}>
+                        {bundleQty} {promo.unit || 'دانە'} بە {bundlePrice.toLocaleString()} د.ع
                       </span>
                     </td>
 
-                    <td style={{ padding: '14px 18px' }}>
-                      {promo.max_qty_per_sale ? (
-                        <span style={{ background: 'rgba(37, 99, 235, 0.08)', color: '#2563eb', padding: '3px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem' }}>
-                          زۆرترین {Number(promo.max_qty_per_sale).toLocaleString()} {promo.unit || 'دانە'}
-                        </span>
-                      ) : (
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>بێ سنوور</span>
-                      )}
+                    <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      {promo.max_qty_per_sale ? `زۆرترین ${promo.max_qty_per_sale}` : 'بێ سنوور'}
                     </td>
 
-                    <td style={{ padding: '14px 18px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                       {formatDate(promo.start_date)} تا {formatDate(promo.end_date)}
                     </td>
 
-                    <td style={{ padding: '14px 18px' }}>
+                    <td style={{ padding: '12px 16px' }}>
                       {promo.calculated_status === 'ACTIVE' && (
-                        <span style={{ padding: '3px 10px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 700, fontSize: '0.78rem' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600, fontSize: '0.75rem' }}>
                           چالاک
                         </span>
                       )}
                       {promo.calculated_status === 'SCHEDULED' && (
-                        <span style={{ padding: '3px 10px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', fontWeight: 700, fontSize: '0.78rem' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', fontWeight: 600, fontSize: '0.75rem' }}>
                           پلاندانراو
                         </span>
                       )}
                       {promo.calculated_status === 'EXPIRED' && (
-                        <span style={{ padding: '3px 10px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 700, fontSize: '0.78rem' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 600, fontSize: '0.75rem' }}>
                           بەسەرچوو
                         </span>
                       )}
                       {promo.calculated_status === 'INACTIVE' && (
-                        <span style={{ padding: '3px 10px', borderRadius: '12px', background: 'rgba(148, 163, 184, 0.15)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.78rem' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', background: 'rgba(148, 163, 184, 0.15)', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem' }}>
                           ناچالاک
                         </span>
                       )}
                     </td>
 
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         <button
                           onClick={() => handleToggleStatus(promo.id)}
                           style={{
-                            padding: '4px 10px',
-                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
                             border: '1px solid var(--border-color)',
                             background: promo.is_active ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-tertiary)',
                             color: promo.is_active ? '#10b981' : 'var(--text-secondary)',
                             cursor: 'pointer',
-                            fontSize: '0.78rem',
-                            fontWeight: 700
+                            fontSize: '0.75rem',
+                            fontWeight: 600
                           }}
                         >
                           {promo.is_active ? 'ناچالاککردن' : 'چالاککردن'}
@@ -534,12 +471,13 @@ const Promotions = () => {
                         <button
                           onClick={() => handleDeletePromotion(promo.id)}
                           style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
                             border: 'none',
                             background: 'rgba(239, 68, 68, 0.12)',
                             color: '#ef4444',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            fontSize: '0.75rem'
                           }}
                         >
                           سڕینەوە
@@ -554,40 +492,34 @@ const Promotions = () => {
         </table>
       </div>
 
-      {/* Modal: Create Promotion - Spacious (maxWidth: 780px), Crystal Clear & User-Friendly */}
+      {/* Modal: Ultra-Minimalist & Compact - Fits Screen with NO Scrolling */}
       {isModalOpen && (
         <div className="pos-modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div 
             className="pos-modal-card" 
             onClick={e => e.stopPropagation()} 
             style={{ 
-              maxWidth: '780px', 
+              maxWidth: '480px', 
               width: '95%', 
-              borderRadius: '16px', 
-              padding: '30px',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.35)'
+              borderRadius: '12px', 
+              padding: '20px',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.3)'
             }}
           >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-              <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text-primary)', fontWeight: 800 }}>
-                دروستکردنی ئۆفەری نوێ
-              </h2>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                دروستکردنی ئۆفەر
+              </div>
               <button 
                 onClick={() => setIsModalOpen(false)} 
                 style={{ 
-                  background: 'var(--bg-tertiary)', 
-                  border: '1px solid var(--border-color)', 
+                  background: 'none', 
+                  border: 'none', 
                   color: 'var(--text-secondary)', 
                   cursor: 'pointer', 
-                  width: '32px', 
-                  height: '32px', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
                   fontSize: '1.1rem',
-                  fontWeight: 700
+                  padding: '2px'
                 }}
               >
                 ✕
@@ -595,10 +527,10 @@ const Promotions = () => {
             </div>
 
             <form onSubmit={handleCreatePromotion}>
-              {/* Product Selector */}
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 800 }}>
-                  هەڵبژاردنی کاڵا *
+              {/* Product */}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  کاڵا
                 </label>
                 <ProductCombobox 
                   products={products}
@@ -607,95 +539,53 @@ const Promotions = () => {
                 />
               </div>
 
-              {/* Discount Mode Selector */}
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 800 }}>
-                  شێوازی داشکاندن *
+              {/* Discount Mode: Compact Segment Toggle */}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  شێوازی داشکاندن
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, discount_type: 'FIXED_PRICE' })}
                     style={{
-                      padding: '14px 18px',
-                      borderRadius: '12px',
-                      border: '2px solid ' + (formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--border-color)'),
+                      padding: '7px',
+                      borderRadius: '6px',
+                      border: '1.5px solid ' + (formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--border-color)'),
                       cursor: 'pointer',
                       background: formData.discount_type === 'FIXED_PRICE' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
                       color: formData.discount_type === 'FIXED_PRICE' ? '#2563eb' : 'var(--text-primary)',
-                      textAlign: 'right',
-                      transition: 'all 0.15s ease'
+                      fontSize: '0.82rem',
+                      fontWeight: 600
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '4px' }}>
-                      نرخی نوێی فرۆشتن بە دینار
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                      ڕاستەوخۆ نرخی نوێی داشکێنراو بنووسە (نموونە: ۲۵۰ دینار)
-                    </div>
+                    نرخی دیاریکراو (دینار)
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, discount_type: 'PERCENT' })}
                     style={{
-                      padding: '14px 18px',
-                      borderRadius: '12px',
-                      border: '2px solid ' + (formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--border-color)'),
+                      padding: '7px',
+                      borderRadius: '6px',
+                      border: '1.5px solid ' + (formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--border-color)'),
                       cursor: 'pointer',
                       background: formData.discount_type === 'PERCENT' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-tertiary)',
                       color: formData.discount_type === 'PERCENT' ? '#2563eb' : 'var(--text-primary)',
-                      textAlign: 'right',
-                      transition: 'all 0.15s ease'
+                      fontSize: '0.82rem',
+                      fontWeight: 600
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '4px' }}>
-                      داشکاندن بە ڕێژەی لەسەدا (%)
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                      داشکاندن بە ڕێژەی لەسەدا دیاری بکە (نموونە: %٥٠)
-                    </div>
+                    ڕێژەی داشکاندن (%)
                   </button>
                 </div>
               </div>
 
-              {/* Discount Value & Min Quantity in 2 Wide Columns */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              {/* Quantity & Offer Price in 2 Clean Columns */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 800 }}>
-                    {formData.discount_type === 'FIXED_PRICE' ? 'نرخی نوێی داشکێنراو بۆ هەر دانەیەک (بە دینار) *' : 'ڕێژەی داشکاندن (لەسەدا %) *'}
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input 
-                      type="number" 
-                      min="0"
-                      max={formData.discount_type === 'PERCENT' ? 99 : undefined}
-                      step={formData.discount_type === 'FIXED_PRICE' ? "any" : "1"}
-                      value={formData.discount_value} 
-                      onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
-                      placeholder={formData.discount_type === 'FIXED_PRICE' ? 'نموونە: 250' : 'نموونە: 50'}
-                      required
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px 16px', 
-                        borderRadius: '10px', 
-                        background: 'var(--bg-tertiary)', 
-                        border: '1.5px solid var(--border-color)', 
-                        color: 'var(--text-primary)', 
-                        outline: 'none', 
-                        fontSize: '1.05rem', 
-                        fontWeight: 800 
-                      }}
-                    />
-                    <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.85rem' }}>
-                      {formData.discount_type === 'FIXED_PRICE' ? 'دینار' : '%'}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 800 }}>
-                    کەمترین بڕی کڕین بۆ داشکاندن (دانە) *
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    بڕ (دانە)
                   </label>
                   <input 
                     type="number" 
@@ -703,30 +593,34 @@ const Promotions = () => {
                     step="any"
                     value={formData.min_qty} 
                     onChange={(e) => setFormData({ ...formData, min_qty: e.target.value })}
-                    placeholder="1"
+                    placeholder="3"
                     required
-                    style={{ 
-                      width: '100%', 
-                      padding: '12px 16px', 
-                      borderRadius: '10px', 
-                      background: 'var(--bg-tertiary)', 
-                      border: '1.5px solid var(--border-color)', 
-                      color: 'var(--text-primary)', 
-                      outline: 'none', 
-                      fontSize: '1.05rem', 
-                      fontWeight: 800 
-                    }}
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
                   />
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    ئەگەر کڕیار لەم ژمارەیە کەمتر بکڕێت، نرخەکەی ئاسایی حیساب دەبێت
-                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {formData.discount_type === 'FIXED_PRICE' ? 'نرخی ئۆفەر (دینار)' : 'ڕێژەی داشکاندن (%)'}
+                  </label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    max={formData.discount_type === 'PERCENT' ? 99 : undefined}
+                    step={formData.discount_type === 'FIXED_PRICE' ? "any" : "1"}
+                    value={formData.discount_value} 
+                    onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
+                    placeholder={formData.discount_type === 'FIXED_PRICE' ? '1250' : '20'}
+                    required
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem', fontWeight: 600 }}
+                  />
                 </div>
               </div>
 
-              {/* Max Limit (Optional) */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 800 }}>
-                  سنووری زۆرترین بڕ لە یەک پسووڵەدا (ئارەزوومەندانە)
+              {/* Optional Max Limit */}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  سنووری بڕ (ئارەزوومەندانە)
                 </label>
                 <input 
                   type="number" 
@@ -734,28 +628,16 @@ const Promotions = () => {
                   step="any"
                   value={formData.max_qty_per_sale} 
                   onChange={(e) => setFormData({ ...formData, max_qty_per_sale: e.target.value })}
-                  placeholder="بێ سنوور (هەموو بڕێک دەیگرێتەوە)"
-                  style={{ 
-                    width: '100%', 
-                    padding: '11px 16px', 
-                    borderRadius: '10px', 
-                    background: 'var(--bg-tertiary)', 
-                    border: '1.5px solid var(--border-color)', 
-                    color: 'var(--text-primary)', 
-                    outline: 'none', 
-                    fontSize: '0.95rem' 
-                  }}
+                  placeholder="بێ سنوور"
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.88rem' }}
                 />
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  ئەگەر دیاری نەکرێت، کڕیار دەتوانێت بەبێ سنوور بە نرخی ئۆفەرەکە بکڕێت
-                </div>
               </div>
 
-              {/* Dates in 2 Columns */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '22px' }}>
+              {/* Dates */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 800 }}>
-                    بەرواری دەستپێک *
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    بەرواری دەستپێک
                   </label>
                   <input 
                     type="date" 
@@ -763,21 +645,12 @@ const Promotions = () => {
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                     required
-                    style={{ 
-                      width: '100%', 
-                      padding: '11px 14px', 
-                      borderRadius: '10px', 
-                      background: 'var(--bg-tertiary)', 
-                      border: '1.5px solid var(--border-color)', 
-                      color: 'var(--text-primary)', 
-                      outline: 'none',
-                      fontSize: '0.95rem'
-                    }}
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.82rem' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 800 }}>
-                    بەرواری کۆتایی *
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    بەرواری کۆتایی
                   </label>
                   <input 
                     type="date" 
@@ -785,92 +658,35 @@ const Promotions = () => {
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     required
-                    style={{ 
-                      width: '100%', 
-                      padding: '11px 14px', 
-                      borderRadius: '10px', 
-                      background: 'var(--bg-tertiary)', 
-                      border: '1.5px solid var(--border-color)', 
-                      color: 'var(--text-primary)', 
-                      outline: 'none',
-                      fontSize: '0.95rem'
-                    }}
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1.5px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.82rem' }}
                   />
                 </div>
               </div>
 
-              {/* Crystal Clear Live Simulation of POS Behavior */}
-              {selectedProduct && formData.discount_value && (
-                <div style={{ 
-                  background: 'rgba(37, 99, 235, 0.06)', 
-                  border: '1.5px solid #2563eb', 
-                  borderRadius: '14px', 
-                  padding: '18px 20px', 
-                  marginBottom: '24px' 
-                }}>
-                  <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '1rem', marginBottom: '10px' }}>
-                    چۆنیەتی جێبەجێبوونی ئەم ئۆفەرە لە کاشێردا:
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>•</span>
-                      <span>نرخی ئاسایی ئەم کاڵایە: <strong>{Number(selectedProduct.selling_price).toLocaleString()} دینارە</strong>.</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>•</span>
-                      <span>
-                        ئەگەر کڕیار <strong>کەمتر لە {Number(formData.min_qty || 1)} دانە</strong> بکڕێت:
-                        نرخەکەی بە <strong>{Number(selectedProduct.selling_price).toLocaleString()} دینار</strong> دەمێنێتەوە.
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>•</span>
-                      <span>
-                        ئەگەر کڕیار <strong>{Number(formData.min_qty || 1)} دانە یان زیاتر</strong> بکڕێت:
-                        نرخی هەر دانەیەکی دەبێتە <strong style={{ color: '#2563eb', fontSize: '1rem' }}>{calculatedPromoPrice.toLocaleString()} دینار</strong>.
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: 800 }}>
-                      <span>•</span>
-                      <span>
-                        پاشەکەوت و سوودی کڕیار: {unitSavings.toLocaleString()} دینار بۆ هەر دانەیەک.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Cost Safeguard Alert */}
-              {isBelowCost && (
-                <div style={{ marginBottom: '20px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '0.85rem' }}>
-                  ئاگاداربە: ئەم نرخە لە تێچووی کڕین ({Number(selectedProduct.cost_price || 0).toLocaleString()} د.ع) کەمترە.
-                </div>
-              )}
-
               {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
                   style={{ 
                     flex: 1, 
-                    padding: '14px', 
-                    borderRadius: '10px', 
+                    padding: '9px', 
+                    borderRadius: '6px', 
                     background: '#2563eb', 
                     color: 'white', 
                     border: 'none', 
                     cursor: 'pointer', 
-                    fontWeight: 800, 
-                    fontSize: '1rem'
+                    fontWeight: 700, 
+                    fontSize: '0.88rem'
                   }}
                 >
-                  {isSubmitting ? 'تکایە بوەستە...' : 'تۆمارکردنی ئۆفەر'}
+                  {isSubmitting ? 'کەمێک بوەستە...' : 'تۆمارکردن'}
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
                   className="btn-secondary"
-                  style={{ padding: '14px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}
+                  style={{ padding: '9px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   داخستن
                 </button>

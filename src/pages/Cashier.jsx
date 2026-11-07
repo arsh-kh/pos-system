@@ -1482,39 +1482,52 @@ const Cashier = () => {
     const promo = activePromotions[item.id];
     const regularPrice = Number(item.price);
     const qty = Number(item.quantity);
-    const minQty = Math.max(1, Number(promo?.min_qty) || 1);
 
-    if (!promo || promo.savings_per_unit <= 0 || qty < minQty) {
+    if (!promo) {
       return {
         hasPromo: false,
-        promoQty: 0,
-        regularQty: qty,
-        promoPrice: regularPrice,
-        regularPrice: regularPrice,
-        maxLimit: null,
-        minQty: promo ? minQty : null,
         lineTotal: Math.round(regularPrice * qty),
-        totalSavings: 0
+        totalSavings: 0,
+        regularPrice
       };
     }
 
-    const promoPrice = promo.promo_price;
+    const bundleQty = Math.max(1, Number(promo.min_qty || promo.bundle_qty) || 1);
+    const bundlePrice = Number(promo.bundle_price ?? promo.promo_price ?? (promo.discount_value || regularPrice * bundleQty));
+    const normalBundleCost = regularPrice * bundleQty;
+    const savingsPerBundle = Math.max(0, normalBundleCost - bundlePrice);
+
+    if (savingsPerBundle <= 0 || qty < bundleQty) {
+      return {
+        hasPromo: false,
+        lineTotal: Math.round(regularPrice * qty),
+        totalSavings: 0,
+        regularPrice,
+        minQty: bundleQty
+      };
+    }
+
     const maxLimit = promo.max_qty_per_sale ? Number(promo.max_qty_per_sale) : Infinity;
-    const promoQty = Math.min(qty, maxLimit);
-    const regularQty = Math.max(0, qty - promoQty);
-    const lineTotal = Math.round((promoQty * promoPrice) + (regularQty * regularPrice));
+    const maxAllowedBundles = Math.floor(maxLimit / bundleQty);
+    const completedBundles = Math.floor(qty / bundleQty);
+    const applicableBundles = Math.min(completedBundles, maxAllowedBundles);
+    const promoItemsCount = applicableBundles * bundleQty;
+    const regularItemsCount = qty - promoItemsCount;
+
+    const lineTotal = Math.round((applicableBundles * bundlePrice) + (regularItemsCount * regularPrice));
     const totalSavings = Math.max(0, Math.round(qty * regularPrice) - lineTotal);
 
     return {
-      hasPromo: true,
-      promoQty,
-      regularQty,
-      promoPrice,
-      regularPrice,
-      maxLimit: promo.max_qty_per_sale,
-      minQty,
+      hasPromo: totalSavings > 0,
+      bundleQty,
+      bundlePrice,
+      applicableBundles,
+      promoItemsCount,
+      regularItemsCount,
       lineTotal,
-      totalSavings
+      totalSavings,
+      regularPrice,
+      minQty: bundleQty
     };
   }, [activePromotions]);
 
