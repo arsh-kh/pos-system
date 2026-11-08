@@ -5222,33 +5222,32 @@ const Cashier = () => {
 
       {/* Recent Sales Modal (دوایین فرۆشتنەکان) */}
       {isRecentSalesOpen && (
-        <div className="pos-modal-overlay" onClick={() => setIsRecentSalesOpen(false)}>
-          <div className="pos-modal-card no-scroll" onClick={e => e.stopPropagation()} style={{ maxWidth: '780px', width: '95%', padding: '1.25rem 1.4rem' }}>
+        <div className="pos-modal-overlay" onClick={() => setIsRecentSalesOpen(false)} style={{ overflow: 'hidden' }}>
+          <div className="pos-modal-card no-scroll" onClick={e => e.stopPropagation()} style={{ maxWidth: '780px', width: '95%', padding: '0.85rem 1.25rem', maxHeight: 'calc(100vh - 36px)', overflow: 'hidden' }}>
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem', paddingBottom: '0.45rem', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>دوایین فرۆشتنەکان</h3>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>١٠ وەسڵی کۆتایی ئەنجامدراو لە سیستەمدا</span>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>دوایین فرۆشتنەکان</h3>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>١٠ وەسڵی کۆتایی ئەنجامدراو لە سیستەمدا</span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   type="button"
                   onClick={handleOpenRecentSales}
                   title="نوێکردنەوە"
-                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>↻</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>↻</span>
                 </button>
                 <button 
                   type="button" 
                   onClick={() => setIsRecentSalesOpen(false)} 
-                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>✕</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>✕</span>
                 </button>
               </div>
             </div>
@@ -5264,15 +5263,15 @@ const Cashier = () => {
               </div>
             ) : (
               <div style={{ borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.82rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.78rem' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, width: '13%' }}># وەسڵ</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, width: '21%' }}>کات و بەروار</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, width: '23%' }}>کڕیار</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, width: '13%', textAlign: 'center' }}>شێواز</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, width: '18%' }}>کۆی گشتی</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, width: '12%', textAlign: 'center' }}>کردار</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '13%' }}># وەسڵ</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '21%' }}>کات و بەروار</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '23%' }}>کڕیار</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '13%', textAlign: 'center' }}>شێواز</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '18%' }}>کۆی گشتی</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '12%', textAlign: 'center' }}>کردار</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5309,8 +5308,8 @@ const Cashier = () => {
                             }}
                           >
                             {/* Sale ID & Toggle Arrow */}
-                            <td style={{ padding: '6px 12px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <td style={{ padding: '4px 10px', fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -5322,9 +5321,9 @@ const Cashier = () => {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    width: '24px',
-                                    height: '24px',
-                                    borderRadius: '6px',
+                                    width: '21px',
+                                    height: '21px',
+                                    borderRadius: '5px',
                                     border: isExpanded ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
                                     background: isExpanded ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-primary)',
                                     color: isExpanded ? 'var(--primary-color)' : 'var(--text-secondary)',
@@ -5334,7 +5333,7 @@ const Cashier = () => {
                                   }}
                                 >
                                   <ChevronDown 
-                                    size={15} 
+                                    size={13} 
                                     style={{ 
                                       transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', 
                                       transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)' 
@@ -5346,20 +5345,20 @@ const Cashier = () => {
                             </td>
 
                             {/* Date & Time */}
-                            <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '4px 10px', color: 'var(--text-secondary)', fontSize: '0.73rem', whiteSpace: 'nowrap' }}>
                               {formatDateTime(sale.created_at, { twelveHour: true })}
                             </td>
 
                             {/* Customer */}
-                            <td style={{ padding: '6px 12px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                            <td style={{ padding: '4px 10px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.78rem' }}>
                               {sale.customer_name || 'کڕیاری گشتی'}
                             </td>
 
                             {/* Payment Method */}
-                            <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                            <td style={{ padding: '4px 10px', textAlign: 'center' }}>
                               <span style={{ 
-                                fontSize: '0.72rem', 
-                                padding: '2px 8px', 
+                                fontSize: '0.69rem', 
+                                padding: '1.5px 7px', 
                                 borderRadius: '4px', 
                                 fontWeight: 700, 
                                 background: methodBg, 
@@ -5371,12 +5370,12 @@ const Cashier = () => {
                             </td>
 
                             {/* Total Amount */}
-                            <td style={{ padding: '6px 12px', fontWeight: 800, color: 'var(--primary-color)', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '4px 10px', fontWeight: 800, color: 'var(--primary-color)', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
                               {Number(sale.total_amount || 0).toLocaleString()} د.ع
                             </td>
 
                             {/* Action (Reprint) */}
-                            <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                            <td style={{ padding: '4px 10px', textAlign: 'center' }}>
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -5386,12 +5385,12 @@ const Cashier = () => {
                                 disabled={isReprinting}
                                 title="چاپکردنەوەی ئەم پسووڵەیە"
                                 style={{
-                                  padding: '3px 10px',
-                                  borderRadius: '5px',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
                                   background: 'rgba(2, 132, 199, 0.12)',
                                   color: '#0284c7',
                                   border: '1px solid rgba(2, 132, 199, 0.35)',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.72rem',
                                   fontWeight: 700,
                                   cursor: isReprinting ? 'wait' : 'pointer',
                                   display: 'inline-flex',
@@ -5421,30 +5420,31 @@ const Cashier = () => {
                           {/* Expandable Invoice Items Breakdown */}
                           {isExpanded && (
                             <tr style={{ background: 'rgba(2, 132, 199, 0.03)', borderBottom: index === recentSales.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                              <td colSpan={6} style={{ padding: '4px 14px 12px 14px' }}>
+                              <td colSpan={6} style={{ padding: '3px 10px 6px 10px' }}>
                                 {loadingSaleDetailsId === sale.id || !expandedSaleDetails[sale.id] ? (
-                                  <div style={{ textAlign: 'center', padding: '14px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                  <div style={{ textAlign: 'center', padding: '8px', color: 'var(--text-muted)', fontSize: '0.76rem' }}>
                                     چاوەڕوانبە، خەریکی هێنانی کاڵاکانە...
                                   </div>
                                 ) : expandedSaleDetails[sale.id].length === 0 ? (
-                                  <div style={{ textAlign: 'center', padding: '14px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                  <div style={{ textAlign: 'center', padding: '8px', color: 'var(--text-muted)', fontSize: '0.76rem' }}>
                                     هیچ کاڵایەک بۆ ئەم پسووڵەیە تۆمار نەکراوە
                                   </div>
                                 ) : (
                                   <div style={{
                                     background: 'var(--bg-primary)',
-                                    borderRadius: '8px',
+                                    borderRadius: '6px',
                                     border: '1px solid var(--border-color)',
                                     overflow: 'hidden',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                    maxHeight: '140px',
+                                    overflowY: 'auto'
                                   }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.78rem' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.75rem' }}>
                                       <thead>
                                         <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                                          <th style={{ padding: '6px 12px', fontWeight: 700 }}>ناوی کاڵا</th>
-                                          <th style={{ padding: '6px 12px', fontWeight: 700, width: '18%', textAlign: 'center' }}>ژمارە / کێش</th>
-                                          <th style={{ padding: '6px 12px', fontWeight: 700, width: '20%', textAlign: 'center' }}>نرخی یەکە</th>
-                                          <th style={{ padding: '6px 12px', fontWeight: 700, width: '20%', textAlign: 'left' }}>کۆی نرخ</th>
+                                          <th style={{ padding: '3px 8px', fontWeight: 700 }}>ناوی کاڵا</th>
+                                          <th style={{ padding: '3px 8px', fontWeight: 700, width: '18%', textAlign: 'center' }}>ژمارە / کێش</th>
+                                          <th style={{ padding: '3px 8px', fontWeight: 700, width: '20%', textAlign: 'center' }}>نرخی یەکە</th>
+                                          <th style={{ padding: '3px 8px', fontWeight: 700, width: '20%', textAlign: 'left' }}>کۆی نرخ</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -5463,21 +5463,21 @@ const Cashier = () => {
                                                 background: itemIdx % 2 === 0 ? 'transparent' : 'rgba(0, 0, 0, 0.015)'
                                               }}
                                             >
-                                              <td style={{ padding: '6px 12px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                              <td style={{ padding: '3.5px 8px', color: 'var(--text-primary)', fontWeight: 600 }}>
                                                 <span>{item.product_name}</span>
                                                 {item.barcode && (
-                                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginRight: '6px', fontFamily: 'monospace' }}>
+                                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginRight: '5px', fontFamily: 'monospace' }}>
                                                     [{item.barcode}]
                                                   </span>
                                                 )}
                                               </td>
-                                              <td style={{ padding: '6px 12px', textAlign: 'center', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                              <td style={{ padding: '3.5px 8px', textAlign: 'center', color: 'var(--text-primary)', fontWeight: 600 }}>
                                                 {qty.toLocaleString()} {unitStr}
                                               </td>
-                                              <td style={{ padding: '6px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                              <td style={{ padding: '3.5px 8px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                                 {unitPrice.toLocaleString()} د.ع
                                               </td>
-                                              <td style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--primary-color)' }}>
+                                              <td style={{ padding: '3.5px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--primary-color)' }}>
                                                 {lineTotal.toLocaleString()} د.ع
                                               </td>
                                             </tr>
