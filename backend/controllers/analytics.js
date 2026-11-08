@@ -460,14 +460,46 @@ exports.getPeriodReport = async (req, res) => {
             WHERE barcode != 'CUSTOM_ITEM'
         `);
         const inv = inventoryRows[0] || {};
+
+        // Calculate Cost of Goods Sold across store lifetime (کاڵا فرۆشراو و تەواوبووەکان)
+        const [lifetimeSalesRows] = await db.query(`
+            SELECT 
+                COALESCE(SUM(total_amount), 0) as lifetime_sales,
+                COALESCE(SUM(total_profit), 0) as lifetime_profit
+            FROM Sales
+        `);
+        const [lifetimeReturnsRows] = await db.query(`
+            SELECT 
+                COALESCE(SUM(r.refunded_amount), 0) as total_refunded,
+                COALESCE(SUM(r.refunded_amount - (r.quantity * r.units_multiplier * COALESCE(p.cost_price, 0))), 0) as returned_profit
+            FROM Returns r
+            LEFT JOIN Products p ON r.product_id = p.id
+        `);
+        const rawLifetimeSales = Number(lifetimeSalesRows[0]?.lifetime_sales) || 0;
+        const rawLifetimeProfit = Number(lifetimeSalesRows[0]?.lifetime_profit) || 0;
+        const lifetimeRefunded = Number(lifetimeReturnsRows[0]?.total_refunded) || 0;
+        const lifetimeReturnedProfit = Number(lifetimeReturnsRows[0]?.returned_profit) || 0;
+
+        const netLifetimeSales = Math.max(0, rawLifetimeSales - lifetimeRefunded);
+        const netLifetimeProfit = rawLifetimeProfit - lifetimeReturnedProfit;
+        const soldGoodsCost = Math.max(0, Math.round(netLifetimeSales - netLifetimeProfit));
+
+        const currentCostValue = Math.round(Number(inv.total_cost_value) || 0);
+        const currentSellValue = Math.round(Number(inv.total_sell_value) || 0);
+        const totalEverCost = currentCostValue + soldGoodsCost;
+        const totalEverSell = currentSellValue + netLifetimeSales;
+
         const inventoryValuation = {
             total_products: Number(inv.total_products) || 0,
             products_in_stock: Number(inv.products_in_stock) || 0,
             out_of_stock: Number(inv.out_of_stock) || 0,
-            total_cost_value: Math.round(Number(inv.total_cost_value) || 0),
-            total_sell_value: Math.round(Number(inv.total_sell_value) || 0),
+            total_cost_value: currentCostValue,
+            total_sell_value: currentSellValue,
             potential_profit: Math.round(Number(inv.potential_profit) || 0),
-            total_units_in_stock: Math.round(Number(inv.total_units_in_stock) || 0)
+            total_units_in_stock: Math.round(Number(inv.total_units_in_stock) || 0),
+            sold_goods_cost: soldGoodsCost,
+            total_ever_cost: totalEverCost,
+            total_ever_sell: totalEverSell
         };
 
         // 4c. Purchases in period & lifetime (کۆی وەسڵەکانی کڕین لە کۆمپانیاکان)

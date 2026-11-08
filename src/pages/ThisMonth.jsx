@@ -494,6 +494,14 @@ const ThisMonth = () => {
                   <span style={{ color: 'var(--text-secondary)' }}>قازانجی مەخزەن (چاوەڕوانکراو):</span>
                   <span style={{ fontWeight: 700, color: '#10b981' }}>+{inventoryValuation.potential_profit.toLocaleString()} د.ع</span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>تێچووی کاڵا فرۆشراوەکان (تەواوبوو):</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{(inventoryValuation.sold_goods_cost || 0).toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>کۆی گشتی کڕین لە سەرەتاوە:</span>
+                  <span style={{ fontWeight: 700, color: '#38bdf8' }}>{(inventoryValuation.total_ever_cost || 0).toLocaleString()} د.ع</span>
+                </div>
               </div>
             </div>
 
@@ -537,6 +545,14 @@ const ThisMonth = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>کۆی کڕینی گشتی (مێژووی دووکان):</span>
                   <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{lifetimePurchases.lifetime_purchases.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>کۆی قەرزی ماوە بۆ کۆمپانیاکان:</span>
+                  <span style={{ fontWeight: 700, color: '#ef4444' }}>{lifetimePurchases.debt_to_suppliers.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>کۆی وەسڵەکانی کڕین:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{lifetimePurchases.total_invoices} وەسڵ</span>
                 </div>
               </div>
             </div>
@@ -778,16 +794,20 @@ const ThisMonth = () => {
 
         <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-          <span>سەرمایەی کۆگا (بە کڕین):</span>
+          <span>سەرمایەی ئێستای مەخزەن:</span>
           <span>{inventoryValuation.total_cost_value.toLocaleString()} دینار</span>
         </div>
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-          <span>بەهای کۆگا (بە فرۆشتن):</span>
-          <span>{inventoryValuation.total_sell_value.toLocaleString()} دینار</span>
+          <span>تێچووی کاڵا فرۆشراوەکان:</span>
+          <span>{(inventoryValuation.sold_goods_cost || 0).toLocaleString()} دینار</span>
         </div>
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-          <span>کۆی کڕین لە کۆمپانیا:</span>
-          <span>{periodPurchases.total_purchases.toLocaleString()} دینار</span>
+          <span>کۆی گشتی کڕین لە سەرەتاوە:</span>
+          <span>{(inventoryValuation.total_ever_cost || 0).toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>کۆی کڕین لە کۆمپانیا (وەسڵەکان):</span>
+          <span>{lifetimePurchases.lifetime_purchases.toLocaleString()} دینار</span>
         </div>
 
         {/* Top 5 Products */}
