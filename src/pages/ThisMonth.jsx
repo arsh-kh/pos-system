@@ -139,6 +139,28 @@ const ThisMonth = () => {
   const topProducts = reportData?.top_products || [];
   const chartData = reportData?.chart_data || [];
 
+  const inventoryValuation = reportData?.inventory_valuation || {
+    total_cost_value: 0,
+    total_sell_value: 0,
+    potential_profit: 0,
+    products_in_stock: 0,
+    total_units_in_stock: 0
+  };
+
+  const periodPurchases = reportData?.period_purchases || {
+    total_purchases: 0,
+    total_invoices: 0,
+    paid_purchases: 0,
+    debt_to_suppliers: 0
+  };
+
+  const lifetimePurchases = reportData?.lifetime_purchases || {
+    lifetime_purchases: 0,
+    total_invoices: 0,
+    paid_purchases: 0,
+    debt_to_suppliers: 0
+  };
+
   // Print Report Handler (Thermal or Standard)
   const handlePrintReport = () => {
     setIsPrinting(true);
@@ -426,6 +448,100 @@ const ThisMonth = () => {
 
           </div>
 
+          {/* Section 1b: Capital & Inventory Asset Valuation (Admin Financial Overview) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
+            {/* Panel 1: Current Inventory Capital & Value */}
+            <div style={{
+              background: 'var(--bg-secondary, #1e293b)',
+              border: '1px solid var(--border-color, #334155)',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  سەرمایەی ئێستای مەخزەن (بە نرخی تێچوونی کڕین)
+                </div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                  {inventoryValuation.products_in_stock.toLocaleString()} جۆر کاڵا
+                </span>
+              </div>
+
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#38bdf8', marginBottom: '8px' }}>
+                {inventoryValuation.total_cost_value.toLocaleString()} <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>دینار</span>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '5px', 
+                paddingTop: '8px', 
+                borderTop: '1px solid var(--border-color, #334155)',
+                fontSize: '0.84rem' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>بەهای مەخزەن بە فرۆشتن:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{inventoryValuation.total_sell_value.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>قازانجی مەخزەن (چاوەڕوانکراو):</span>
+                  <span style={{ fontWeight: 700, color: '#10b981' }}>+{inventoryValuation.potential_profit.toLocaleString()} د.ع</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 2: Purchases from Companies */}
+            <div style={{
+              background: 'var(--bg-secondary, #1e293b)',
+              border: '1px solid var(--border-color, #334155)',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  کۆی کڕین لە کۆمپانیا ({reportData?.range_label || 'ماوەی دیاریکراو'})
+                </div>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                  {periodPurchases.total_invoices} وەسڵ
+                </span>
+              </div>
+
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                {periodPurchases.total_purchases.toLocaleString()} <span style={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-secondary)' }}>دینار</span>
+              </div>
+
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '5px', 
+                paddingTop: '8px', 
+                borderTop: '1px solid var(--border-color, #334155)',
+                fontSize: '0.84rem' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>نەقد دراو / قەرزی ماوە:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {periodPurchases.paid_purchases.toLocaleString()} ن / {periodPurchases.debt_to_suppliers.toLocaleString()} ق
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>کۆی کڕینی گشتی (مێژووی دووکان):</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{lifetimePurchases.lifetime_purchases.toLocaleString()} د.ع</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Section 2: Interactive Timeline Area Chart */}
           <div style={{
             background: 'var(--bg-secondary, #1e293b)',
@@ -658,6 +774,20 @@ const ThisMonth = () => {
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
           <span>ڕێژەی قازانج:</span>
           <span>{profitMargin}%</span>
+        </div>
+
+        <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>سەرمایەی کۆگا (بە کڕین):</span>
+          <span>{inventoryValuation.total_cost_value.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>بەهای کۆگا (بە فرۆشتن):</span>
+          <span>{inventoryValuation.total_sell_value.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>کۆی کڕین لە کۆمپانیا:</span>
+          <span>{periodPurchases.total_purchases.toLocaleString()} دینار</span>
         </div>
 
         {/* Top 5 Products */}

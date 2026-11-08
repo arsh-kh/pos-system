@@ -446,6 +446,64 @@ exports.getPeriodReport = async (req, res) => {
             WHERE created_at BETWEEN ? AND ?
         `, [startDateTime, endDateTime]);
 
+        // 4b. Inventory Asset Valuation (سەرمایەی ئێستای مەخزەن و کۆگا)
+        const [inventoryRows] = await db.query(`
+            SELECT 
+                COUNT(id) as total_products,
+                COALESCE(SUM(CASE WHEN stock > 0 AND barcode != 'CUSTOM_ITEM' THEN 1 ELSE 0 END), 0) as products_in_stock,
+                COALESCE(SUM(CASE WHEN stock <= 0 AND barcode != 'CUSTOM_ITEM' THEN 1 ELSE 0 END), 0) as out_of_stock,
+                COALESCE(SUM(CASE WHEN stock > 0 AND barcode != 'CUSTOM_ITEM' THEN stock * cost_price ELSE 0 END), 0) as total_cost_value,
+                COALESCE(SUM(CASE WHEN stock > 0 AND barcode != 'CUSTOM_ITEM' THEN stock * selling_price ELSE 0 END), 0) as total_sell_value,
+                COALESCE(SUM(CASE WHEN stock > 0 AND barcode != 'CUSTOM_ITEM' THEN stock * (selling_price - cost_price) ELSE 0 END), 0) as potential_profit,
+                COALESCE(SUM(CASE WHEN stock > 0 AND barcode != 'CUSTOM_ITEM' THEN stock ELSE 0 END), 0) as total_units_in_stock
+            FROM Products
+            WHERE barcode != 'CUSTOM_ITEM'
+        `);
+        const inv = inventoryRows[0] || {};
+        const inventoryValuation = {
+            total_products: Number(inv.total_products) || 0,
+            products_in_stock: Number(inv.products_in_stock) || 0,
+            out_of_stock: Number(inv.out_of_stock) || 0,
+            total_cost_value: Math.round(Number(inv.total_cost_value) || 0),
+            total_sell_value: Math.round(Number(inv.total_sell_value) || 0),
+            potential_profit: Math.round(Number(inv.potential_profit) || 0),
+            total_units_in_stock: Math.round(Number(inv.total_units_in_stock) || 0)
+        };
+
+        // 4c. Purchases in period & lifetime (کۆی وەسڵەکانی کڕین لە کۆمپانیاکان)
+        const [periodPurchasesRows] = await db.query(`
+            SELECT 
+                COUNT(id) as total_invoices,
+                COALESCE(SUM(total_amount), 0) as total_purchases,
+                COALESCE(SUM(paid_amount), 0) as paid_purchases,
+                COALESCE(SUM(remaining_amount), 0) as debt_to_suppliers
+            FROM Purchase_Invoices
+            WHERE created_at BETWEEN ? AND ?
+        `, [startDateTime, endDateTime]);
+        const pP = periodPurchasesRows[0] || {};
+        const periodPurchases = {
+            total_invoices: Number(pP.total_invoices) || 0,
+            total_purchases: Math.round(Number(pP.total_purchases) || 0),
+            paid_purchases: Math.round(Number(pP.paid_purchases) || 0),
+            debt_to_suppliers: Math.round(Number(pP.debt_to_suppliers) || 0)
+        };
+
+        const [lifetimePurchasesRows] = await db.query(`
+            SELECT 
+                COUNT(id) as total_invoices,
+                COALESCE(SUM(total_amount), 0) as lifetime_purchases,
+                COALESCE(SUM(paid_amount), 0) as paid_purchases,
+                COALESCE(SUM(remaining_amount), 0) as debt_to_suppliers
+            FROM Purchase_Invoices
+        `);
+        const lP = lifetimePurchasesRows[0] || {};
+        const lifetimePurchases = {
+            total_invoices: Number(lP.total_invoices) || 0,
+            lifetime_purchases: Math.round(Number(lP.lifetime_purchases) || 0),
+            paid_purchases: Math.round(Number(lP.paid_purchases) || 0),
+            debt_to_suppliers: Math.round(Number(lP.debt_to_suppliers) || 0)
+        };
+
         // 5. Timeline Chart Data
         let chartData = [];
         if (isHourly) {
@@ -563,6 +621,9 @@ exports.getPeriodReport = async (req, res) => {
                     net_profit: netProfit,
                     profit_margin: Number(profitMargin)
                 },
+                inventory_valuation: inventoryValuation,
+                period_purchases: periodPurchases,
+                lifetime_purchases: lifetimePurchases,
                 top_products: topProducts.map(p => ({
                     id: p.id,
                     name: p.name || 'کاڵا',
