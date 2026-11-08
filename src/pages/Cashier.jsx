@@ -779,6 +779,29 @@ const Cashier = () => {
       return;
     }
 
+    // Scale / Weighted item quantity update
+    if (targetItem.is_weighted) {
+      setCart(prevCart => prevCart.map(it => {
+        if (it.cartKey === key || (!it.cartKey && it.barcode === key)) {
+          const newWeightKg = qty;
+          const pricePerKg = Number(it.price || it.selling_price) || 0;
+          const newTotal = Math.round(Number(((newWeightKg * pricePerKg) + 0.00001).toFixed(2)));
+          const newGrams = Math.round(newWeightKg * 1000);
+          const baseCleanName = (it.baseName || it.name).replace(/\s*\(\d+\s*گم\)/g, '').trim();
+          return {
+            ...it,
+            quantity: newWeightKg,
+            original_quantity: newWeightKg,
+            name: `${baseCleanName} (${newGrams} گم)`,
+            line_total_override: newTotal,
+            fixed_total: newTotal
+          };
+        }
+        return it;
+      }));
+      return;
+    }
+
     // Stock Check: Non-blocking informative warning
     if (!targetItem.is_weighted) {
       const availableStock = prod ? (Number(prod.stock) || 0) : (Number(targetItem.stock) || 0);
@@ -906,8 +929,8 @@ const Cashier = () => {
     if (pKg > 0) {
       if (scaleWeight && parseFloat(scaleWeight) > 0) {
         const rawW = parseFloat(scaleWeight);
-        const wKg = rawW / 1000;
-        setScaleAmount(String(Math.round(wKg * pKg)));
+        const calculatedAmt = Math.round(Number((((rawW * pKg) / 1000) + 0.00001).toFixed(2)));
+        setScaleAmount(String(calculatedAmt));
       } else if (scaleAmount && parseFloat(scaleAmount) > 0) {
         const amt = parseFloat(scaleAmount);
         const wKg = amt / pKg;
@@ -942,8 +965,8 @@ const Cashier = () => {
       return;
     }
     if (pKg > 0) {
-      const wKg = w / 1000;
-      setScaleAmount(String(Math.round(wKg * pKg)));
+      const calculatedAmt = Math.round(Number((((w * pKg) / 1000) + 0.00001).toFixed(2)));
+      setScaleAmount(String(calculatedAmt));
     }
   };
 
@@ -957,7 +980,8 @@ const Cashier = () => {
     setScaleUnit('G');
     setScaleWeight(String(grams));
     if (pKg > 0) {
-      setScaleAmount(String(Math.round((grams / 1000) * pKg)));
+      const calculatedAmt = Math.round(Number((((grams * pKg) / 1000) + 0.00001).toFixed(2)));
+      setScaleAmount(String(calculatedAmt));
     }
     setIsScaleSearchOpen(false);
   };
@@ -989,21 +1013,38 @@ const Cashier = () => {
       return;
     }
 
+    // Determine target line total:
+    // If cashier explicitly entered or agreed on money amount (scaleAmount), preserve that exact total!
+    // Otherwise calculate from weight: round((grams * pricePerKg) / 1000)
+    let targetLineTotal = 0;
+    if (scaleAmount && parseFloat(scaleAmount) > 0) {
+      targetLineTotal = Math.round(parseFloat(scaleAmount));
+    } else {
+      targetLineTotal = Math.round(Number(((weightInKg * pricePerKg) + 0.00001).toFixed(2)));
+    }
+
     const name = scaleItemName.trim() || 'کاڵا بە کێش / تەرازوو';
     const selectedProd = scaleSelectedProductId ? products.find(p => String(p.id) === String(scaleSelectedProductId)) : null;
     const isCustomScale = !selectedProd;
 
     const weightLabel = `${Math.round(rawWeightInGrams)} گم`;
+    const uniqueCartKey = selectedProd 
+      ? `scale_${selectedProd.id}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}` 
+      : `scale_${Date.now()}`;
 
     const scaleItem = {
       id: selectedProd ? selectedProd.id : `scale_${Date.now()}`,
-      cartKey: selectedProd ? `${selectedProd.id}_PIECE` : `scale_${Date.now()}`,
+      cartKey: uniqueCartKey,
       name: selectedProd ? `${selectedProd.name} (${weightLabel})` : `${name} (${weightLabel})`,
+      baseName: selectedProd ? selectedProd.name : name,
       barcode: selectedProd ? selectedProd.barcode : `SCALE_${Date.now()}`,
       price: pricePerKg,
       selling_price: pricePerKg,
       stock: selectedProd ? selectedProd.stock : 999,
       quantity: weightInKg,
+      original_quantity: weightInKg,
+      line_total_override: targetLineTotal,
+      fixed_total: targetLineTotal,
       is_custom: isCustomScale,
       is_weighted: true,
       unit: 'گم',
@@ -1656,12 +1697,29 @@ const Cashier = () => {
     const itemPrice = Number(item.price) || 0;
     const regPrice = Number(item.single_price || item.regularPrice || item.price) || itemPrice;
 
+    // Scale / Weighted item with explicit line_total_override or fixed_total
+    if (item.line_total_override !== undefined && Number(item.line_total_override) > 0) {
+      const origQty = Number(item.original_quantity) || qty;
+      if (Math.abs(qty - origQty) < 0.0001) {
+        const lineTotal = Math.round(Number(item.line_total_override));
+        return {
+          hasPromo: false,
+          promoPrice: itemPrice,
+          regularPrice: itemPrice,
+          lineTotal,
+          totalSavings: 0,
+          promoQty: 0,
+          regularQty: qty
+        };
+      }
+    }
+
     // Dedicated promo row from buildProductCartRows
     if (item.is_promo_tier) {
       const lineTotal = item.line_total_override !== undefined 
         ? Number(item.line_total_override) 
-        : Math.round(itemPrice * qty);
-      const totalSavings = Math.max(0, Math.round(regPrice * qty) - lineTotal);
+        : Math.round(Number(((itemPrice * qty) + 0.00001).toFixed(2)));
+      const totalSavings = Math.max(0, Math.round(Number(((regPrice * qty) + 0.00001).toFixed(2))) - lineTotal);
       return {
         hasPromo: true,
         promoPrice: itemPrice,
@@ -1679,7 +1737,7 @@ const Cashier = () => {
         hasPromo: false,
         promoPrice: itemPrice,
         regularPrice: itemPrice,
-        lineTotal: Math.round(itemPrice * qty),
+        lineTotal: Math.round(Number(((itemPrice * qty) + 0.00001).toFixed(2))),
         totalSavings: 0,
         promoQty: 0,
         regularQty: qty
@@ -1699,7 +1757,7 @@ const Cashier = () => {
         regularPrice,
         maxLimit: null,
         minQty: null,
-        lineTotal: Math.round(regularPrice * qty),
+        lineTotal: Math.round(Number(((regularPrice * qty) + 0.00001).toFixed(2))),
         totalSavings: 0
       };
     }
@@ -1926,7 +1984,9 @@ const Cashier = () => {
           name: i.name,
           unit_type: i.unit_type || 'PIECE',
           units_per_box: i.units_per_box || 1,
-          force_regular: Boolean(i.force_regular)
+          force_regular: Boolean(i.force_regular),
+          fixed_total: i.fixed_total !== undefined ? i.fixed_total : (i.line_total_override !== undefined ? i.line_total_override : null),
+          is_weighted: Boolean(i.is_weighted)
         })),
         customer_id: selectedCustomerId || null,
         paid_amount: effectiveCashPaid,

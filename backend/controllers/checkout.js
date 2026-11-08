@@ -53,7 +53,12 @@ exports.processCheckout = async (req, res) => {
             const itemQty = Math.max(0.001, parseFloat(item.quantity) || 1);
             if (item.is_custom || (item.barcode && item.barcode.startsWith('CUSTOM'))) {
                 const customPrice = Math.max(0, Math.round(Number(item.price || item.selling_price) || 0));
-                const itemSellTotal = Math.round(customPrice * itemQty);
+                let itemSellTotal = 0;
+                if (item.fixed_total !== undefined && item.fixed_total !== null && Number(item.fixed_total) > 0) {
+                    itemSellTotal = Math.round(Number(item.fixed_total));
+                } else {
+                    itemSellTotal = Math.round(Number(((customPrice * itemQty) + 0.00001).toFixed(2)));
+                }
                 totalAmount += safeBigInt(itemSellTotal);
 
                 // Specific custom profit accounting:
@@ -128,17 +133,20 @@ exports.processCheckout = async (req, res) => {
                 let itemSellTotal = 0;
                 let effectivePriceAtSale = regularPrice;
 
-                if (item.has_custom_price && Number(item.price) >= 0) {
+                if (item.fixed_total !== undefined && item.fixed_total !== null && Number(item.fixed_total) > 0) {
+                    itemSellTotal = Math.round(Number(item.fixed_total));
+                    effectivePriceAtSale = regularPrice;
+                } else if (item.has_custom_price && Number(item.price) >= 0) {
                     // Cashier manual price override (requires allow_custom_price permission on frontend)
                     effectivePriceAtSale = Math.round(Number(item.price));
-                    itemSellTotal = Math.round(effectivePriceAtSale * itemQty);
+                    itemSellTotal = Math.round(Number(((effectivePriceAtSale * itemQty) + 0.00001).toFixed(2)));
                 } else if (isBox) {
                     // Carton / wholesale price calculation: MUST multiply by the specific units_per_box of the active FIFO batch
                     const cartonPrice = Number(product.wholesale_price) > 0 
                         ? Number(product.wholesale_price) 
                         : Math.round(regularPrice * unitsPerBox);
                     effectivePriceAtSale = cartonPrice;
-                    itemSellTotal = Math.round(cartonPrice * itemQty);
+                    itemSellTotal = Math.round(Number(((cartonPrice * itemQty) + 0.00001).toFixed(2)));
                 } else {
                     // Check for active promotion on this single unit product
                     const [promos] = await connection.query(`
@@ -203,12 +211,12 @@ exports.processCheckout = async (req, res) => {
                                 itemSellTotal = Math.round((promoQty * unitPromoPrice) + (regularQty * regularPrice));
                                 effectivePriceAtSale = itemQty > 0 ? Math.round(itemSellTotal / itemQty) : unitPromoPrice;
                             } else {
-                                itemSellTotal = Math.round(regularPrice * itemQty);
+                                itemSellTotal = Math.round(Number(((regularPrice * itemQty) + 0.00001).toFixed(2)));
                                 effectivePriceAtSale = regularPrice;
                             }
                         }
                     } else {
-                        itemSellTotal = Math.round(regularPrice * itemQty);
+                        itemSellTotal = Math.round(Number(((regularPrice * itemQty) + 0.00001).toFixed(2)));
                         effectivePriceAtSale = regularPrice;
                     }
                 }
