@@ -5437,12 +5437,12 @@ const Cashier = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.78rem' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '10%' }}># وەسڵ</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '11%' }}># وەسڵ</th>
                       <th style={{ padding: '5px 10px', fontWeight: 700, width: '21%' }}>کات و بەروار</th>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '24%' }}>کڕیار</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '23%' }}>کڕیار</th>
                       <th style={{ padding: '5px 10px', fontWeight: 700, width: '13%', textAlign: 'center' }}>شێواز</th>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '20%' }}>کۆی گشتی</th>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '12%', textAlign: 'center' }}>کردار</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '16%' }}>کۆی گشتی</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '16%', textAlign: 'center' }}>کردار</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5508,12 +5508,54 @@ const Cashier = () => {
                               </span>
                             </td>
 
-                            {/* Total Amount & Toggle Arrow on Left */}
-                            <td style={{ padding: '4px 10px', whiteSpace: 'nowrap' }}>
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontWeight: 800, color: 'var(--primary-color)', fontSize: '0.8rem' }}>
-                                  {Number(sale.total_amount || 0).toLocaleString()} د.ع
-                                </span>
+                            {/* Total Amount */}
+                            <td style={{ padding: '4px 10px', fontWeight: 800, color: 'var(--primary-color)', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                              {Number(sale.total_amount || 0).toLocaleString()} د.ع
+                            </td>
+
+                            {/* Action (Reprint + Toggle Arrow on Left) */}
+                            <td style={{ padding: '4px 10px', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReprintRecentSale(sale.id);
+                                  }}
+                                  disabled={isReprinting}
+                                  title="چاپکردنەوەی ئەم پسووڵەیە"
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(2, 132, 199, 0.12)',
+                                    color: '#0284c7',
+                                    border: '1px solid rgba(2, 132, 199, 0.35)',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    cursor: isReprinting ? 'wait' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 0.12s ease'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isReprinting) {
+                                      e.currentTarget.style.background = '#0284c7';
+                                      e.currentTarget.style.color = '#ffffff';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isReprinting) {
+                                      e.currentTarget.style.background = 'rgba(2, 132, 199, 0.12)';
+                                      e.currentTarget.style.color = '#0284c7';
+                                    }
+                                  }}
+                                >
+                                  {isReprinting ? '...' : 'چاپکردنەوە'}
+                                </button>
+
+                                {/* Downward Arrow on Left of Reprint Button */}
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -5525,8 +5567,8 @@ const Cashier = () => {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    width: '21px',
-                                    height: '21px',
+                                    width: '22px',
+                                    height: '22px',
                                     borderRadius: '5px',
                                     border: isExpanded ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
                                     background: isExpanded ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-primary)',
@@ -5545,48 +5587,6 @@ const Cashier = () => {
                                   />
                                 </button>
                               </div>
-                            </td>
-
-                            {/* Action (Reprint) */}
-                            <td style={{ padding: '4px 10px', textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleReprintRecentSale(sale.id);
-                                }}
-                                disabled={isReprinting}
-                                title="چاپکردنەوەی ئەم پسووڵەیە"
-                                style={{
-                                  padding: '2px 8px',
-                                  borderRadius: '4px',
-                                  background: 'rgba(2, 132, 199, 0.12)',
-                                  color: '#0284c7',
-                                  border: '1px solid rgba(2, 132, 199, 0.35)',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 700,
-                                  cursor: isReprinting ? 'wait' : 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  whiteSpace: 'nowrap',
-                                  transition: 'all 0.12s ease'
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isReprinting) {
-                                    e.currentTarget.style.background = '#0284c7';
-                                    e.currentTarget.style.color = '#ffffff';
-                                  }
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isReprinting) {
-                                    e.currentTarget.style.background = 'rgba(2, 132, 199, 0.12)';
-                                    e.currentTarget.style.color = '#0284c7';
-                                  }
-                                }}
-                              >
-                                {isReprinting ? '...' : 'چاپکردنەوە'}
-                              </button>
                             </td>
                           </tr>
 
