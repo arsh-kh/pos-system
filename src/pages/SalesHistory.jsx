@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Search, Printer, X, User, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { Search, Printer, X, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { formatDateTime } from '../utils/dateFormatter';
 import BarcodeSVG from '../components/BarcodeSVG';
@@ -135,7 +135,7 @@ const SalesHistory = () => {
   }, [filteredSales, currentPage, pageSize]);
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-[1600px] mx-auto" style={{ direction: 'rtl' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '1440px', margin: '0 auto', direction: 'rtl', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* Thermal Print Receipt Style */}
       <style>{`
@@ -209,44 +209,51 @@ const SalesHistory = () => {
         }
       `}</style>
 
-      {/* Header and Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-slate-800">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">
-            مێژووی فرۆشتن
-          </h1>
-        </div>
+      {/* Header & Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border-color)' }}>
+        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          مێژووی فرۆشتن
+        </h1>
 
-        {/* Filters Bar */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Filter Controls Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
           {/* Search Input */}
-          <div className="relative min-w-[220px]">
-            <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '6px 12px', minWidth: '230px' }}>
+            <Search size={16} color="var(--text-muted)" />
             <input 
               type="text" 
               placeholder="گەڕان بە پسووڵە، کاشێر، کڕیار..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-3 pr-9 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-shadow"
+              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary)', width: '100%', fontFamily: 'inherit' }}
             />
           </div>
 
           {/* Cashier Filter Dropdown */}
-          <div className="relative">
-            <select
-              value={cashierFilter}
-              onChange={(e) => setCashierFilter(e.target.value)}
-              className="py-1.5 px-3 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="ALL">هەموو کاشێرەکان</option>
-              {cashiersList.map((cashier) => (
-                <option key={cashier} value={cashier}>{cashier}</option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={cashierFilter}
+            onChange={(e) => setCashierFilter(e.target.value)}
+            style={{
+              padding: '7px 12px',
+              borderRadius: '10px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              outline: 'none',
+              cursor: 'pointer',
+              fontFamily: 'inherit'
+            }}
+          >
+            <option value="ALL">هەموو کاشێرەکان</option>
+            {cashiersList.map((cashier) => (
+              <option key={cashier} value={cashier}>{cashier}</option>
+            ))}
+          </select>
 
           {/* Date Filter Tabs */}
-          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-lg border border-slate-200/80 dark:border-slate-700/60">
+          <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '3px' }}>
             {[
               { id: 'ALL', label: 'هەموو کات' },
               { id: 'TODAY', label: 'ئەمڕۆ' },
@@ -256,11 +263,18 @@ const SalesHistory = () => {
               <button
                 key={tab.id}
                 onClick={() => setDateFilter(tab.id)}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                  dateFilter === tab.id 
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs' 
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '7px',
+                  background: dateFilter === tab.id ? 'var(--accent-color)' : 'transparent',
+                  color: dateFilter === tab.id ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '0.82rem',
+                  fontWeight: dateFilter === tab.id ? 700 : 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  fontFamily: 'inherit'
+                }}
               >
                 {tab.label}
               </button>
@@ -269,57 +283,57 @@ const SalesHistory = () => {
         </div>
       </div>
 
-      {/* Summary Cards (Strictly Clean & Minimalist: No Helper Text) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">کۆی داهاتی پسووڵەکان</span>
-          <span className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-            {totalRevenue.toLocaleString()} <span className="text-xs font-normal text-slate-500">د.ع</span>
-          </span>
+      {/* Summary Cards (Clean Minimalist, NO helper text) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem 1.25rem', boxShadow: 'var(--card-shadow)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>کۆی داهاتی پسووڵەکان</div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
+            {totalRevenue.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>د.ع</span>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">کۆی قازانجی سافی</span>
-          <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-            {totalProfit.toLocaleString()} <span className="text-xs font-normal text-slate-500">د.ع</span>
-          </span>
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem 1.25rem', boxShadow: 'var(--card-shadow)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>کۆی قازانجی سافی</div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success-color)', marginTop: '4px' }}>
+            {totalProfit.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>د.ع</span>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-center">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">ژمارەی پسووڵەکان</span>
-          <span className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-            {filteredSales.length} <span className="text-xs font-normal text-slate-500">پسووڵە</span>
-          </span>
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1rem 1.25rem', boxShadow: 'var(--card-shadow)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>ژمارەی پسووڵەکان</div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--accent-color)', marginTop: '4px' }}>
+            {filteredSales.length} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>پسووڵە</span>
+          </div>
         </div>
       </div>
 
       {/* Sales Table Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/70 dark:border-slate-800 text-slate-600 dark:text-slate-400">
-                <th className="py-2.5 px-3.5 font-semibold"># وەسڵ</th>
-                <th className="py-2.5 px-3.5 font-semibold">کاشێر</th>
-                <th className="py-2.5 px-3.5 font-semibold">کڕیار</th>
-                <th className="py-2.5 px-3.5 font-semibold">شێواز</th>
-                <th className="py-2.5 px-3.5 font-semibold">کاڵا</th>
-                <th className="py-2.5 px-3.5 font-semibold">کۆی فرۆشتن</th>
-                <th className="py-2.5 px-3.5 font-semibold">قازانجی سافی</th>
-                <th className="py-2.5 px-3.5 font-semibold">کات و بەروار</th>
-                <th className="py-2.5 px-3.5 font-semibold text-center w-28">کردار</th>
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '14px', overflow: 'hidden', boxShadow: 'var(--card-shadow)' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.85rem' }}>
+            <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
+              <tr>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}># وەسڵ</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>کاشێر</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>کڕیار</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>شێواز</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>کاڵا</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>کۆی فرۆشتن</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>قازانجی سافی</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)' }}>کات و بەروار</th>
+                <th style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'center', width: '120px' }}>کردار</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400">
+                  <td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     چاوەڕوان بە، باردەکرێت...
                   </td>
                 </tr>
               ) : paginatedSales.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400">
+                  <td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     هیچ پسووڵەیەک نەدۆزرایەوە
                   </td>
                 </tr>
@@ -327,78 +341,80 @@ const SalesHistory = () => {
                 paginatedSales.map((s) => (
                   <tr 
                     key={s.id} 
-                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                    style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.12s ease' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     {/* Invoice ID */}
-                    <td className="py-2 px-3.5 font-mono font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                    <td style={{ padding: '9px 14px', fontWeight: 700, color: 'var(--accent-color)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                       #{s.id}
                     </td>
 
                     {/* Cashier */}
-                    <td className="py-2 px-3.5 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-[11px]">
-                        <User size={11} className="text-slate-400" />
+                    <td style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600, border: '1px solid var(--border-color)' }}>
+                        <User size={12} color="var(--text-muted)" />
                         {s.cashier_name || 'کاشێر'}
                       </span>
                     </td>
 
                     {/* Customer */}
-                    <td className="py-2 px-3.5 text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap">
+                    <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {s.customer_name}
                     </td>
 
                     {/* Payment Method */}
-                    <td className="py-2 px-3.5 whitespace-nowrap">
+                    <td style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}>
                       {s.payment_method === 'DEBT' ? (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40">
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700 }}>
                           قەرز
                         </span>
                       ) : s.payment_method === 'SPLIT' ? (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40">
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(217, 119, 6, 0.1)', color: '#d97706', fontSize: '0.78rem', fontWeight: 700 }}>
                           تێکەڵ
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40">
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(5, 150, 105, 0.1)', color: '#059669', fontSize: '0.78rem', fontWeight: 700 }}>
                           نەقد
                         </span>
                       )}
                     </td>
 
                     {/* Item Count */}
-                    <td className="py-2 px-3.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    <td style={{ padding: '9px 14px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                       {s.item_count} دانە
                     </td>
 
                     {/* Total Amount */}
-                    <td className="py-2 px-3.5 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                      {Number(s.total_amount).toLocaleString()} <span className="font-normal text-[10px] text-slate-500">د.ع</span>
+                    <td style={{ padding: '9px 14px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                      {Number(s.total_amount).toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>د.ع</span>
                     </td>
 
                     {/* Net Profit */}
-                    <td className="py-2 px-3.5 font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                      {Number(s.total_profit).toLocaleString()} <span className="font-normal text-[10px] text-slate-500">د.ع</span>
+                    <td style={{ padding: '9px 14px', fontWeight: 700, color: 'var(--success-color)', whiteSpace: 'nowrap' }}>
+                      {Number(s.total_profit).toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>د.ع</span>
                     </td>
 
                     {/* Date and Time */}
-                    <td className="py-2 px-3.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
+                    <td style={{ padding: '9px 14px', color: 'var(--text-muted)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                       {formatDateTime(s.created_at)}
                     </td>
 
                     {/* Actions */}
-                    <td className="py-2 px-3.5 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td style={{ padding: '9px 14px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                         <button 
                           onClick={() => openSaleDetails(s.id, false)}
-                          className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                          style={{ padding: '4px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit' }}
                         >
                           وردەکاری
                         </button>
                         <button 
                           onClick={() => openSaleDetails(s.id, true)}
                           title="چاپکردنەوەی خێرای وەسڵ"
-                          className="p-1 rounded-md text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                          style={{ padding: '4px 8px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         >
-                          <Printer size={14} />
+                          <Printer size={13} />
                         </button>
                       </div>
                     </td>
@@ -411,13 +427,13 @@ const SalesHistory = () => {
 
         {/* Clean Footer Pagination Controls */}
         {filteredSales.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 text-xs text-slate-600 dark:text-slate-400">
-            <div className="flex items-center gap-2">
-              <span>پیشاندانی</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', background: 'var(--bg-tertiary)', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>پیشاندان:</span>
               <select
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}
-                className="py-0.5 px-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 cursor-pointer"
+                style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 <option value={15}>15</option>
                 <option value={25}>25</option>
@@ -427,21 +443,21 @@ const SalesHistory = () => {
               <span>لە کۆی {filteredSales.length} پسووڵە</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <button
                 disabled={currentPage <= 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                className="p-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                style={{ padding: '3px 6px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: currentPage <= 1 ? 'not-allowed' : 'pointer', opacity: currentPage <= 1 ? 0.35 : 1, display: 'flex', alignItems: 'center' }}
               >
                 <ChevronRight size={14} />
               </button>
-              <span className="px-2 text-xs font-medium">
+              <span style={{ fontWeight: 600 }}>
                 پەڕەی {currentPage} لە {totalPages}
               </span>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                className="p-1 rounded border border-slate-200 dark:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                style={{ padding: '3px 6px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer', opacity: currentPage >= totalPages ? 0.35 : 1, display: 'flex', alignItems: 'center' }}
               >
                 <ChevronLeft size={14} />
               </button>
@@ -454,82 +470,82 @@ const SalesHistory = () => {
       {selectedSale && (
         <div className="pos-modal-overlay" onClick={() => setSelectedSale(null)}>
           <div 
-            className="pos-modal-card pos-modal-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden p-5" 
+            className="pos-modal-card" 
             onClick={e => e.stopPropagation()}
-            style={{ maxWidth: '750px', width: '92vw' }}
+            style={{ maxWidth: '720px', width: '92vw', background: 'var(--bg-secondary)', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)', border: '1px solid var(--border-color)', maxHeight: '90vh', overflowY: 'auto' }}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200/80 dark:border-slate-800">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
               <div>
-                <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                   وردەکاری پسووڵەی #{selectedSale.id}
                 </h2>
-                <div className="text-xs text-slate-400 mt-0.5">
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                   {formatDateTime(selectedSale.created_at)}
                 </div>
               </div>
               <button 
                 onClick={() => setSelectedSale(null)} 
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '9999px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Clean Metadata Overview Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-xs">
-              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800">
-                <span className="text-[11px] text-slate-500 block">کاشێر</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
+            {/* Overview Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: '1rem' }}>
+              <div style={{ padding: '0.6rem 0.8rem', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>کاشێر</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                   {selectedSale.cashier_name || 'کاشێر'}
-                </span>
+                </div>
               </div>
 
-              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800">
-                <span className="text-[11px] text-slate-500 block">کڕیار</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
+              <div style={{ padding: '0.6rem 0.8rem', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>کڕیار</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                   {selectedSale.customer_name}
-                </span>
+                </div>
               </div>
 
-              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800">
-                <span className="text-[11px] text-slate-500 block">کۆی فرۆشتن</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100 mt-0.5 block">
+              <div style={{ padding: '0.6rem 0.8rem', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>کۆی فرۆشتن</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
                   {Number(selectedSale.total_amount).toLocaleString()} د.ع
-                </span>
+                </div>
               </div>
 
-              <div className="p-2.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block">قازانجی سافی</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+              <div style={{ padding: '0.6rem 0.8rem', borderRadius: '10px', background: 'rgba(5, 150, 105, 0.08)', border: '1px solid rgba(5, 150, 105, 0.2)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--success-color)' }}>قازانجی سافی</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--success-color)', marginTop: '2px' }}>
                   {Number(selectedSale.total_profit).toLocaleString()} د.ع
-                </span>
+                </div>
               </div>
             </div>
 
             {/* Items Table */}
-            <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden mb-4">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200/70 dark:border-slate-800 text-slate-500">
-                    <th className="py-2 px-3 font-semibold">ناوی کاڵا</th>
-                    <th className="py-2 px-3 font-semibold">بارکۆد</th>
-                    <th className="py-2 px-3 font-semibold text-center">دانە</th>
-                    <th className="py-2 px-3 font-semibold">نرخ</th>
-                    <th className="py-2 px-3 font-semibold">کۆ</th>
+            <div style={{ border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.82rem' }}>
+                <thead style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
+                  <tr>
+                    <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 700 }}>ناوی کاڵا</th>
+                    <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 700 }}>بارکۆد</th>
+                    <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 700, textAlign: 'center' }}>دانە</th>
+                    <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 700 }}>نرخ</th>
+                    <th style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontWeight: 700 }}>کۆ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                <tbody>
                   {selectedSale.items?.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/30">
-                      <td className="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">
+                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>
                         <div>{item.product_name}</div>
                         {item.batches && item.batches.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
+                          <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {item.batches.map((b, bIdx) => (
                               <span 
                                 key={bIdx}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-900/50"
+                                style={{ fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(5, 150, 105, 0.08)', color: 'var(--success-color)', border: '1px solid rgba(5, 150, 105, 0.2)' }}
                               >
                                 {b.batch_number || ('#' + b.batch_id)}: {Number(b.quantity_deducted)} دانە ({Number(b.unit_cost_price).toLocaleString()} د.ع)
                               </span>
@@ -537,10 +553,10 @@ const SalesHistory = () => {
                           </div>
                         )}
                       </td>
-                      <td className="py-2 px-3 text-slate-400 font-mono text-[11px]">{item.barcode}</td>
-                      <td className="py-2 px-3 text-center text-slate-700 dark:text-slate-300 font-medium">{item.quantity}</td>
-                      <td className="py-2 px-3 text-slate-700 dark:text-slate-300">{Number(item.price_at_sale).toLocaleString()}</td>
-                      <td className="py-2 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                      <td style={{ padding: '8px 12px', color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: '0.78rem' }}>{item.barcode}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-primary)' }}>{item.quantity}</td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{Number(item.price_at_sale).toLocaleString()}</td>
+                      <td style={{ padding: '8px 12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {(Number(item.price_at_sale) * Number(item.quantity)).toLocaleString()} د.ع
                       </td>
                     </tr>
@@ -549,17 +565,17 @@ const SalesHistory = () => {
               </table>
             </div>
 
-            {/* Modal Bottom Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
               <button 
                 onClick={() => setSelectedSale(null)} 
-                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-colors"
+                style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit' }}
               >
                 داخستن
               </button>
               <button 
                 onClick={() => handleReprintReceipt(selectedSale)}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: 'var(--accent-color)', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit' }}
               >
                 <Printer size={14} /> چاپکردنەوەی پسووڵە
               </button>
