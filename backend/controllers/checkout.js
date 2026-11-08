@@ -15,7 +15,25 @@ const ensureBatchesSchema = async () => {
 ensureBatchesSchema();
 
 exports.processCheckout = async (req, res) => {
-    const { items, customer_id, discount_id, pay_later_amount, discount_amount, paid_amount, payment_method } = req.body;
+    const { 
+        items, 
+        customer_id, 
+        discount_id, 
+        pay_later_amount, 
+        discount_amount, 
+        paid_amount, 
+        payment_method,
+        user_id,
+        cashier_name
+    } = req.body;
+    
+    let effectiveCashierName = (cashier_name && String(cashier_name).trim()) 
+        || req.headers['x-user-name'] 
+        || 'کاشێر';
+    if (effectiveCashierName === 'admin') {
+        effectiveCashierName = 'بەڕێوەبەری سەرەکی';
+    }
+    const effectiveUserId = user_id ? Number(user_id) : null;
     
     if (!items || items.length === 0) {
         return res.status(400).json({ status: 'ERROR', message: 'Cart is empty' });
@@ -303,15 +321,17 @@ exports.processCheckout = async (req, res) => {
             }
         }
 
-        // Insert Sale with discount and split payment tracking
+        // Insert Sale with discount, split payment, and cashier tracking
         const [saleResult] = await connection.query(
-            'INSERT INTO Sales (total_amount, total_profit, subtotal_amount, discount_amount, customer_id, discount_id, paid_amount, debt_amount, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Sales (total_amount, total_profit, subtotal_amount, discount_amount, customer_id, user_id, cashier_name, discount_id, paid_amount, debt_amount, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 finalTotal.toString(), 
                 finalProfit.toString(), 
                 subtotal.toString(), 
                 discountVal.toString(), 
                 customer_id || null, 
+                effectiveUserId,
+                effectiveCashierName,
                 discount_id || null,
                 finalPaidAmount.toString(),
                 finalDebtAmount.toString(),
@@ -431,10 +451,12 @@ exports.getAllSales = async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT s.*, 
+                   COALESCE(s.cashier_name, u.full_name, u.username, 'کاشێر') as cashier_name,
                    COALESCE(c.name, 'کڕیاری گشتی') as customer_name, 
                    c.phone as customer_phone,
                    COUNT(si.id) as item_count
             FROM Sales s
+            LEFT JOIN Users u ON s.user_id = u.id
             LEFT JOIN Customers c ON s.customer_id = c.id
             INNER JOIN Sale_Items si ON s.id = si.sale_id
             GROUP BY s.id
@@ -452,9 +474,11 @@ exports.getSaleDetails = async (req, res) => {
         const { id } = req.params;
         const [sale] = await db.query(`
             SELECT s.*, 
+                   COALESCE(s.cashier_name, u.full_name, u.username, 'کاشێر') as cashier_name,
                    COALESCE(c.name, 'کڕیاری گشتی') as customer_name, 
                    c.phone as customer_phone
             FROM Sales s
+            LEFT JOIN Users u ON s.user_id = u.id
             LEFT JOIN Customers c ON s.customer_id = c.id
             WHERE s.id = ?
         `, [id]);

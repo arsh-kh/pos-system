@@ -16,6 +16,7 @@ exports.getSaleForReturn = async (req, res) => {
                        WHERE cd.customer_id = s.customer_id
                    ), 0) as customer_total_debt
             FROM Sales s
+            LEFT JOIN Users u ON s.user_id = u.id
             LEFT JOIN Customers c ON s.customer_id = c.id
             WHERE s.id = ?
         `, [id]);
@@ -580,6 +581,7 @@ exports.getRecentSalesForReturn = async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT s.id,
+                   COALESCE(s.cashier_name, u.full_name, u.username, 'کاشێر') as cashier_name,
                    s.total_amount,
                    s.paid_amount,
                    s.debt_amount,
@@ -595,6 +597,7 @@ exports.getRecentSalesForReturn = async (req, res) => {
                        WHERE r.sale_id = s.id
                    ), 0) as total_returned_qty
             FROM Sales s
+            LEFT JOIN Users u ON s.user_id = u.id
             LEFT JOIN Customers c ON s.customer_id = c.id
             INNER JOIN Sale_Items si ON s.id = si.sale_id
             GROUP BY s.id

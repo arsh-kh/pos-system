@@ -1934,7 +1934,9 @@ const Cashier = () => {
         payment_method: paymentMode,
         subtotal_amount: subtotal,
         discount_amount: calculatedDiscount,
-        preventNegativeStock: true
+        preventNegativeStock: true,
+        user_id: currentUser?.id || null,
+        cashier_name: currentUser?.full_name || (currentUser?.username === 'admin' ? 'بەڕێوەبەری سەرەکی' : currentUser?.username) || 'کاشێر'
       };
 
       const res = await axios.post('http://localhost:3001/api/checkout', payload);
@@ -1945,7 +1947,7 @@ const Cashier = () => {
         const receiptData = {
           saleId,
           date: formatDateTime(new Date(), { twelveHour: true }),
-          cashierName: currentUser?.full_name || currentUser?.username || 'کاشێر',
+          cashierName: currentUser?.full_name || (currentUser?.username === 'admin' ? 'بەڕێوەبەری سەرەکی' : currentUser?.username) || 'کاشێر',
           customerName: selectedCustomer ? selectedCustomer.name : 'کڕیاری گشتی',
           customerPhone: selectedCustomer ? selectedCustomer.phone : '',
           paymentMethod: paymentMode,
