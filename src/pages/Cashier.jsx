@@ -237,6 +237,7 @@ const Cashier = () => {
   const [expandedSaleId, setExpandedSaleId] = useState(null);
   const [expandedSaleDetails, setExpandedSaleDetails] = useState({});
   const [loadingSaleDetailsId, setLoadingSaleDetailsId] = useState(null);
+  const [expandedReturnSaleId, setExpandedReturnSaleId] = useState(null);
   const [isReprintingSaleId, setIsReprintingSaleId] = useState(null);
 
   // Quick Return in Cashier State
@@ -416,6 +417,28 @@ const Cashier = () => {
       return;
     }
     setExpandedSaleId(saleId);
+    if (!expandedSaleDetails[saleId]) {
+      setLoadingSaleDetailsId(saleId);
+      try {
+        const res = await axios.get(`http://localhost:3001/api/sales/${saleId}`);
+        if (res.data.status === 'SUCCESS') {
+          setExpandedSaleDetails(prev => ({ ...prev, [saleId]: res.data.data.items || [] }));
+        }
+      } catch (err) {
+        console.error('Failed to load sale items:', err);
+      } finally {
+        setLoadingSaleDetailsId(null);
+      }
+    }
+  };
+
+  // Toggle Sale Items Breakdown in Return Modal
+  const handleToggleReturnSaleDetails = async (saleId) => {
+    if (expandedReturnSaleId === saleId) {
+      setExpandedReturnSaleId(null);
+      return;
+    }
+    setExpandedReturnSaleId(saleId);
     if (!expandedSaleDetails[saleId]) {
       setLoadingSaleDetailsId(saleId);
       try {
@@ -1013,6 +1036,7 @@ const Cashier = () => {
     setReturnSaleIdInput('');
     setReturnSearchedSale(null);
     setReturnSelectedSaleItem(null);
+    setExpandedReturnSaleId(null);
     setReturnQtyInput(1);
     setReturnModalNotice(null);
     setIsInvoiceDropdownOpen(false);
@@ -3838,6 +3862,7 @@ const Cashier = () => {
                   onClick={() => {
                     setReturnModalTab('BARCODE');
                     setReturnModalNotice(null);
+                    setExpandedReturnSaleId(null);
                     setTimeout(() => directReturnBarcodeInputRef.current?.focus(), 60);
                   }}
                   style={{
@@ -3860,6 +3885,7 @@ const Cashier = () => {
                   onClick={() => {
                     setReturnModalTab('INVOICE');
                     setReturnModalNotice(null);
+                    setExpandedReturnSaleId(null);
                     setTimeout(() => returnInputRef.current?.focus(), 60);
                   }}
                   style={{
@@ -4369,43 +4395,188 @@ const Cashier = () => {
                               const nameMatch = (s.customer_name || '').toLowerCase().includes(q);
                               return idMatch || nameMatch;
                             })
-                            .map(s => (
-                              <div
-                                key={s.id}
-                                onClick={() => handleSearchSaleForReturn(s.id)}
-                                style={{
-                                  padding: '12px 16px',
-                                  cursor: 'pointer',
-                                  borderRadius: '10px',
-                                  background: 'var(--bg-tertiary)',
-                                  border: '1px solid var(--border-color)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.borderColor = 'var(--primary-color)';
-                                  e.currentTarget.style.background = 'var(--bg-secondary)';
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.borderColor = 'var(--border-color)';
-                                  e.currentTarget.style.background = 'var(--bg-tertiary)';
-                                }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-                                    پسووڵەی #{s.id}
-                                  </span>
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
-                                    • {s.customer_name || 'کڕیاری گشتی'}
-                                  </span>
+                            .map(s => {
+                              const isExpanded = expandedReturnSaleId === s.id;
+                              return (
+                                <div
+                                  key={s.id}
+                                  style={{
+                                    borderRadius: '10px',
+                                    background: 'var(--bg-tertiary)',
+                                    border: isExpanded ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  {/* Card Row Header */}
+                                  <div
+                                    onClick={() => handleSearchSaleForReturn(s.id)}
+                                    style={{
+                                      padding: '10px 14px',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      background: isExpanded ? 'rgba(2, 132, 199, 0.05)' : 'transparent',
+                                      borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
+                                      transition: 'background 0.12s ease'
+                                    }}
+                                    onMouseEnter={e => {
+                                      if (!isExpanded) e.currentTarget.style.background = 'var(--bg-secondary)';
+                                    }}
+                                    onMouseLeave={e => {
+                                      if (!isExpanded) e.currentTarget.style.background = 'transparent';
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.94rem' }}>
+                                        پسووڵەی #{s.id}
+                                      </span>
+                                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                                        • {s.customer_name || 'کڕیاری گشتی'}
+                                      </span>
+                                    </div>
+
+                                    {/* Left side: Price and Downward Arrow */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontWeight: 800, color: 'var(--success-color)', fontSize: '0.9rem' }}>
+                                        {Number(s.total_amount).toLocaleString()} د.ع
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleToggleReturnSaleDetails(s.id);
+                                        }}
+                                        title={isExpanded ? "داخستنی کاڵاکان" : "پیشاندانی کاڵاکان"}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          width: '26px',
+                                          height: '26px',
+                                          borderRadius: '6px',
+                                          border: isExpanded ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                          background: isExpanded ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-secondary)',
+                                          color: isExpanded ? 'var(--primary-color)' : 'var(--text-secondary)',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.18s ease',
+                                          padding: 0
+                                        }}
+                                      >
+                                        <ChevronDown 
+                                          size={15} 
+                                          style={{ 
+                                            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', 
+                                            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)' 
+                                          }} 
+                                        />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Expandable Invoice Items Breakdown */}
+                                  {isExpanded && (
+                                    <div style={{ padding: '8px 12px', background: 'var(--bg-secondary)' }}>
+                                      {loadingSaleDetailsId === s.id || !expandedSaleDetails[s.id] ? (
+                                        <div style={{ textAlign: 'center', padding: '10px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                                          چاوەڕوانبە، خەریکی هێنانی کاڵاکانە...
+                                        </div>
+                                      ) : expandedSaleDetails[s.id].length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '10px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                                          هیچ کاڵایەک لەم پسووڵەیەدا نییە
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                          <div style={{
+                                            background: 'var(--bg-primary)',
+                                            borderRadius: '6px',
+                                            border: '1px solid var(--border-color)',
+                                            overflow: 'hidden',
+                                            maxHeight: '160px',
+                                            overflowY: 'auto'
+                                          }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.75rem' }}>
+                                              <thead>
+                                                <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                                                  <th style={{ padding: '4px 8px', fontWeight: 700 }}>ناوی کاڵا</th>
+                                                  <th style={{ padding: '4px 8px', fontWeight: 700, width: '20%', textAlign: 'center' }}>ژمارە / کێش</th>
+                                                  <th style={{ padding: '4px 8px', fontWeight: 700, width: '22%', textAlign: 'center' }}>نرخی یەکە</th>
+                                                  <th style={{ padding: '4px 8px', fontWeight: 700, width: '22%', textAlign: 'left' }}>کۆی نرخ</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {expandedSaleDetails[s.id].map((item, itemIdx) => {
+                                                  const qty = parseFloat(item.quantity) || 0;
+                                                  const unitStr = item.unit_type === 'BOX' ? 'کارتۆن' : (item.unit || 'دانە');
+                                                  const unitPrice = Number(item.price_at_sale || item.price_per_unit || 0);
+                                                  const lineTotal = Number(item.total_price || (qty * unitPrice));
+                                                  const isLast = itemIdx === expandedSaleDetails[s.id].length - 1;
+
+                                                  return (
+                                                    <tr 
+                                                      key={item.id || itemIdx}
+                                                      style={{ 
+                                                        borderBottom: isLast ? 'none' : '1px solid var(--border-color)',
+                                                        background: itemIdx % 2 === 0 ? 'transparent' : 'rgba(0, 0, 0, 0.015)'
+                                                      }}
+                                                    >
+                                                      <td style={{ padding: '4px 8px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                        <span>{item.product_name}</span>
+                                                        {item.barcode && (
+                                                          <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', marginRight: '5px', fontFamily: 'monospace' }}>
+                                                            [{item.barcode}]
+                                                          </span>
+                                                        )}
+                                                      </td>
+                                                      <td style={{ padding: '4px 8px', textAlign: 'center', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                        {qty.toLocaleString()} {unitStr}
+                                                      </td>
+                                                      <td style={{ padding: '4px 8px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                                        {unitPrice.toLocaleString()} د.ع
+                                                      </td>
+                                                      <td style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--primary-color)' }}>
+                                                        {lineTotal.toLocaleString()} د.ع
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+
+                                          {/* Action button to select this invoice for return */}
+                                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSearchSaleForReturn(s.id)}
+                                              style={{
+                                                padding: '4px 14px',
+                                                borderRadius: '6px',
+                                                background: 'var(--primary-color)',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                fontSize: '0.78rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                              }}
+                                            >
+                                              <span>گەڕاندنەوەی ئەم پسووڵەیە</span>
+                                              <span>←</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                                <span style={{ fontWeight: 800, color: 'var(--success-color)', fontSize: '0.9rem' }}>
-                                  {Number(s.total_amount).toLocaleString()} د.ع
-                                </span>
-                              </div>
-                          ))
+                              );
+                            })
                         ) : (
                           <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
                             هیچ پسووڵەیەک نەدۆزرایەوە
@@ -5266,11 +5437,11 @@ const Cashier = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '0.78rem' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '13%' }}># وەسڵ</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '10%' }}># وەسڵ</th>
                       <th style={{ padding: '5px 10px', fontWeight: 700, width: '21%' }}>کات و بەروار</th>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '23%' }}>کڕیار</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '24%' }}>کڕیار</th>
                       <th style={{ padding: '5px 10px', fontWeight: 700, width: '13%', textAlign: 'center' }}>شێواز</th>
-                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '18%' }}>کۆی گشتی</th>
+                      <th style={{ padding: '5px 10px', fontWeight: 700, width: '20%' }}>کۆی گشتی</th>
                       <th style={{ padding: '5px 10px', fontWeight: 700, width: '12%', textAlign: 'center' }}>کردار</th>
                     </tr>
                   </thead>
@@ -5307,9 +5478,42 @@ const Cashier = () => {
                               if (!isExpanded) e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'var(--bg-secondary)';
                             }}
                           >
-                            {/* Sale ID & Toggle Arrow */}
+                            {/* Sale ID */}
                             <td style={{ padding: '4px 10px', fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.8rem' }}>
+                              #{sale.id}
+                            </td>
+
+                            {/* Date & Time */}
+                            <td style={{ padding: '4px 10px', color: 'var(--text-secondary)', fontSize: '0.73rem', whiteSpace: 'nowrap' }}>
+                              {formatDateTime(sale.created_at, { twelveHour: true })}
+                            </td>
+
+                            {/* Customer */}
+                            <td style={{ padding: '4px 10px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.78rem' }}>
+                              {sale.customer_name || 'کڕیاری گشتی'}
+                            </td>
+
+                            {/* Payment Method */}
+                            <td style={{ padding: '4px 10px', textAlign: 'center' }}>
+                              <span style={{ 
+                                fontSize: '0.69rem', 
+                                padding: '1.5px 7px', 
+                                borderRadius: '4px', 
+                                fontWeight: 700, 
+                                background: methodBg, 
+                                color: methodColor,
+                                display: 'inline-block'
+                              }}>
+                                {methodLabel}
+                              </span>
+                            </td>
+
+                            {/* Total Amount & Toggle Arrow on Left */}
+                            <td style={{ padding: '4px 10px', whiteSpace: 'nowrap' }}>
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontWeight: 800, color: 'var(--primary-color)', fontSize: '0.8rem' }}>
+                                  {Number(sale.total_amount || 0).toLocaleString()} د.ع
+                                </span>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -5340,38 +5544,7 @@ const Cashier = () => {
                                     }} 
                                   />
                                 </button>
-                                <span>#{sale.id}</span>
                               </div>
-                            </td>
-
-                            {/* Date & Time */}
-                            <td style={{ padding: '4px 10px', color: 'var(--text-secondary)', fontSize: '0.73rem', whiteSpace: 'nowrap' }}>
-                              {formatDateTime(sale.created_at, { twelveHour: true })}
-                            </td>
-
-                            {/* Customer */}
-                            <td style={{ padding: '4px 10px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.78rem' }}>
-                              {sale.customer_name || 'کڕیاری گشتی'}
-                            </td>
-
-                            {/* Payment Method */}
-                            <td style={{ padding: '4px 10px', textAlign: 'center' }}>
-                              <span style={{ 
-                                fontSize: '0.69rem', 
-                                padding: '1.5px 7px', 
-                                borderRadius: '4px', 
-                                fontWeight: 700, 
-                                background: methodBg, 
-                                color: methodColor,
-                                display: 'inline-block'
-                              }}>
-                                {methodLabel}
-                              </span>
-                            </td>
-
-                            {/* Total Amount */}
-                            <td style={{ padding: '4px 10px', fontWeight: 800, color: 'var(--primary-color)', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
-                              {Number(sale.total_amount || 0).toLocaleString()} د.ع
                             </td>
 
                             {/* Action (Reprint) */}
