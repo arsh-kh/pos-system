@@ -4401,6 +4401,7 @@ const Cashier = () => {
                                 <div
                                   key={s.id}
                                   style={{
+                                    flexShrink: 0,
                                     borderRadius: '10px',
                                     background: 'var(--bg-tertiary)',
                                     border: isExpanded ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
