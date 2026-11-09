@@ -2175,9 +2175,9 @@ const Cashier = () => {
             visibility: visible !important;
             position: static !important;
             width: 100% !important;
-            max-width: 72mm !important;
-            margin: 0 auto 0 1.5mm !important;
-            padding: 2px 6.5mm 30px 2.5mm !important;
+            max-width: 76mm !important;
+            margin: 0 auto !important;
+            padding: 2px 2mm 30px 2mm !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #ffffff !important;
@@ -3893,9 +3893,9 @@ const Cashier = () => {
       {printedReceipt && (
         <div id="cashier-thermal-receipt" style={{
           width: '100%',
-          maxWidth: '72mm',
-          margin: '0 auto 0 1.5mm',
-          padding: '0 6.5mm 0 2.5mm',
+          maxWidth: '76mm',
+          margin: '0 auto',
+          padding: '0 2mm',
           boxSizing: 'border-box',
           overflow: 'hidden',
           direction: 'rtl',
@@ -3935,7 +3935,7 @@ const Cashier = () => {
               <tr style={{ borderBottom: '1px solid #000000', background: '#f5f5f5', color: '#000000' }}>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '20px', color: '#000000', fontWeight: 'bold' }}>#</th>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold' }}>کاڵا</th>
-                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '38px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
+                <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '54px', color: '#000000', fontWeight: 'bold' }}>دانە</th>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '48px', color: '#000000', fontWeight: 'bold' }}>نرخ</th>
                 <th style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', width: '52px', color: '#000000', fontWeight: 'bold' }}>کۆ</th>
               </tr>
@@ -3952,7 +3952,7 @@ const Cashier = () => {
                   <tr key={idx} style={{ borderBottom: '1px solid #000000', color: '#000000' }}>
                     <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold' }}>{idx + 1}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', color: '#000000', fontWeight: 'bold', overflow: 'hidden', wordBreak: 'break-word' }}>{it.name}</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{displayQty}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', wordBreak: 'break-word', lineHeight: '1.15' }}>{displayQty}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{Number(it.price).toLocaleString()}</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', color: '#000000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{Number(it.total).toLocaleString()}</td>
                   </tr>

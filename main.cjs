@@ -226,13 +226,19 @@ const formatInvoiceReceiptHtml = (receiptData) => {
   if (Array.isArray(receiptData.items)) {
     receiptData.items.forEach((item, idx) => {
       const lineTotal = Number(item.total || item.total_price || (item.price * item.quantity)).toLocaleString();
+      const isGramOrWeight = item.unit === 'گم' || item.unit === 'کگم' || item.unit === 'گرام' || item.unit === 'کیلۆ' || item.unit_type === 'WEIGHT' || String(item.unit || '').includes('گم') || String(item.unit || '').includes('کێش');
+      const isBox = item.unit_type === 'BOX' || item.unit === 'کارتۆن' || item.unit === 'گونیە';
+      const boxUnitName = (item.is_weighted || item.unit === 'گونیە') ? 'گونیە' : 'کارتۆن';
+      const cleanQty = Number.isInteger(Number(item.quantity)) ? item.quantity : parseFloat(Number(item.quantity).toFixed(3));
+      const displayQty = (isGramOrWeight && !isBox) ? (cleanQty + ' کگم') : (isBox ? (cleanQty + ' ' + boxUnitName) : cleanQty);
+
       itemsHtml += `
         <tr>
           <td style="text-align: center; width: 20px;">${idx + 1}</td>
-          <td style="text-align: right;">${item.name || 'کاڵا'}</td>
-          <td style="text-align: center; width: 35px;">${item.quantity}</td>
-          <td style="text-align: left; width: 55px;">${Number(item.price || 0).toLocaleString()}</td>
-          <td style="text-align: left; width: 55px;">${lineTotal}</td>
+          <td style="text-align: right; word-break: break-word;">${item.name || 'کاڵا'}</td>
+          <td style="text-align: center; width: 54px; word-break: break-word; line-height: 1.15;">${displayQty}</td>
+          <td style="text-align: left; width: 48px; white-space: nowrap;">${Number(item.price || 0).toLocaleString()}</td>
+          <td style="text-align: left; width: 52px; white-space: nowrap;">${lineTotal}</td>
         </tr>
       `;
     });
@@ -252,9 +258,9 @@ const formatInvoiceReceiptHtml = (receiptData) => {
         <tr style="background: #f0f0f0;">
           <th style="width: 20px;">#</th>
           <th>کاڵا</th>
-          <th style="width: 35px;">دانە</th>
-          <th style="width: 55px;">نرخ</th>
-          <th style="width: 55px;">کۆ</th>
+          <th style="width: 54px;">دانە</th>
+          <th style="width: 48px;">نرخ</th>
+          <th style="width: 52px;">کۆ</th>
         </tr>
       </thead>
       <tbody>
