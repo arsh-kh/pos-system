@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { Trash2 } from 'lucide-react';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch, fixBidiProductName } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
@@ -65,6 +66,8 @@ const ProductModal = ({
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categoryList, setCategoryList] = useState(Array.isArray(categories) ? categories : []);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const categoryContainerRef = useRef(null);
 
   const getAuthConfig = () => {
@@ -89,33 +92,41 @@ const ProductModal = ({
     }
   }, []);
 
-  const handleDeleteCategory = async (e, cat) => {
+  const handleRequestDeleteCategory = (e, cat) => {
     e.stopPropagation();
-    if (!window.confirm(`دڵنیایت لە سڕینەوەی جۆری "${cat.name}"؟`)) {
-      return;
-    }
+    setCategoryToDelete(cat);
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setIsDeletingCategory(true);
     try {
       const config = getAuthConfig();
       let res = null;
       try {
-        res = await axios.delete(`http://localhost:3001/api/categories/${cat.id}`, config);
+        res = await axios.delete(`http://localhost:3001/api/categories/${categoryToDelete.id}`, config);
       } catch (_) {
-        res = await axios.delete(`http://localhost:3001/api/categories/${cat.id}`);
+        res = await axios.delete(`http://localhost:3001/api/categories/${categoryToDelete.id}`);
       }
       if (res?.data?.status === 'SUCCESS') {
-        setCategoryList(prev => prev.filter(c => c.id !== cat.id));
-        if (String(formData.category_id) === String(cat.id)) {
+        const deletedId = categoryToDelete.id;
+        const deletedName = categoryToDelete.name;
+        setCategoryList(prev => prev.filter(c => c.id !== deletedId));
+        if (String(formData.category_id) === String(deletedId)) {
           setFormData(prev => ({ ...prev, category_id: '' }));
           setCategoryInput('');
         }
         if (onCategoryDelete) {
-          onCategoryDelete(cat.id);
+          onCategoryDelete(deletedId);
         }
-        toast.success(`جۆری "${cat.name}" بە سەرکەوتوویی سڕایەوە`);
+        toast.success(`جۆری "${deletedName}" بە سەرکەوتوویی سڕایەوە`);
       }
     } catch (err) {
       console.error('Failed to delete category:', err);
       toast.error('نەتوانرا جۆرەکە بسڕدرێتەوە');
+    } finally {
+      setIsDeletingCategory(false);
+      setCategoryToDelete(null);
     }
   };
 
@@ -661,7 +672,7 @@ const ProductModal = ({
                         <button
                           type="button"
                           title={`سڕینەوەی جۆری ${c.name}`}
-                          onClick={(e) => handleDeleteCategory(e, c)}
+                          onClick={(e) => handleRequestDeleteCategory(e, c)}
                           style={{
                             background: 'transparent',
                             border: 'none',
@@ -1005,6 +1016,17 @@ const ProductModal = ({
           </div>
         </form>
       </div>
+
+      {/* Delete Category Confirmation Modal (DRY Architecture) */}
+      <ConfirmDeleteModal
+        isOpen={!!categoryToDelete}
+        onClose={() => !isDeletingCategory && setCategoryToDelete(null)}
+        onConfirm={handleConfirmDeleteCategory}
+        title="دڵنیایت لە سڕینەوەی ئەم جۆرە؟"
+        itemName={categoryToDelete?.name}
+        isDeleting={isDeletingCategory}
+        zIndex={1300}
+      />
     </div>
   );
 };

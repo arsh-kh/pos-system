@@ -8,6 +8,7 @@ import { normalizeBarcode } from '../utils/barcodeNormalizer';
 import { formatDate } from '../utils/dateFormatter';
 import BarcodeSVG from '../components/BarcodeSVG';
 import ProductModal from '../components/ProductModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import './Dashboard.css';
 
 const cleanQty = (val, isWeighted = false) => {
@@ -1020,111 +1021,15 @@ const Products = () => {
         );
       })()}
 
-      {/* Custom Delete Confirmation Modal */}
-      {productToDelete && (
-        <div 
-          className="pos-modal-overlay" 
-          onClick={() => !isDeleting && setProductToDelete(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100,
-            direction: 'rtl'
-          }}
-        >
-          <div 
-            className="pos-modal-card" 
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '90%',
-              maxWidth: '420px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '50%',
-              background: 'rgba(239, 68, 68, 0.12)',
-              color: '#ef4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto'
-            }}>
-              <Trash2 size={26} />
-            </div>
-
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              دڵنیایت لە سڕینەوەی ئەم کاڵایە؟
-            </h3>
-
-            <div style={{ 
-              fontSize: '0.95rem', 
-              fontWeight: 700, 
-              color: 'var(--text-secondary)', 
-              background: 'var(--bg-tertiary)', 
-              padding: '10px 14px', 
-              borderRadius: '10px', 
-              marginBottom: '20px',
-              wordBreak: 'break-word'
-            }}>
-              «{productToDelete.name}»
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: '#ef4444',
-                  color: '#ffffff',
-                  fontWeight: 800,
-                  fontSize: '0.9rem',
-                  cursor: isDeleting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {isDeleting ? 'دەسڕدرێتەوە...' : 'سڕینەوە'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setProductToDelete(null)}
-                disabled={isDeleting}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
-                  cursor: isDeleting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                پاشگەزبوونەوە
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Custom Delete Confirmation Modal (DRY Architecture) */}
+      <ConfirmDeleteModal
+        isOpen={!!productToDelete}
+        onClose={() => !isDeleting && setProductToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="دڵنیایت لە سڕینەوەی ئەم کاڵایە؟"
+        itemName={productToDelete?.name}
+        isDeleting={isDeleting}
+      />
 
     </div>
   );
