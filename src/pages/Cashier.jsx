@@ -87,6 +87,44 @@ const Cashier = () => {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [draggedCatId, setDraggedCatId] = useState(null);
+  const [dragOverCatId, setDragOverCatId] = useState(null);
+  const isDraggingCatRef = useRef(false);
+  const touchStartPosRef = useRef({ x: 0, y: 0, catId: null, isMoved: false });
+
+  const sortCategoriesBySavedOrder = (cats) => {
+    try {
+      const raw = localStorage.getItem('pos_cashier_categories_order');
+      if (!raw) return cats;
+      const savedOrder = JSON.parse(raw);
+      if (!Array.isArray(savedOrder) || savedOrder.length === 0) return cats;
+      const orderMap = new Map();
+      savedOrder.forEach((id, idx) => orderMap.set(String(id), idx));
+      return [...cats].sort((a, b) => {
+        const orderA = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : 9999;
+        const orderB = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : 9999;
+        return orderA - orderB;
+      });
+    } catch (_) {
+      return cats;
+    }
+  };
+
+  const handleReorderCategories = (sourceId, targetId) => {
+    if (!sourceId || !targetId || String(sourceId) === String(targetId)) return;
+    setCategories(prevCats => {
+      const sourceIdx = prevCats.findIndex(c => String(c.id) === String(sourceId));
+      const targetIdx = prevCats.findIndex(c => String(c.id) === String(targetId));
+      if (sourceIdx < 0 || targetIdx < 0) return prevCats;
+      const newCats = [...prevCats];
+      const [movedCat] = newCats.splice(sourceIdx, 1);
+      newCats.splice(targetIdx, 0, movedCat);
+      try {
+        localStorage.setItem('pos_cashier_categories_order', JSON.stringify(newCats.map(c => c.id)));
+      } catch (_) {}
+      return newCats;
+    });
+  };
   const [activePromotions, setActivePromotions] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -259,7 +297,7 @@ const Cashier = () => {
 
       if (prodRes.data.status === 'SUCCESS') setProducts(prodRes.data.data);
       if (custRes.data.status === 'SUCCESS') setCustomers(custRes.data.data);
-      if (catRes.data.status === 'SUCCESS') setCategories(catRes.data.data);
+      if (catRes.data.status === 'SUCCESS') setCategories(sortCategoriesBySavedOrder(catRes.data.data));
       if (promoRes.data.status === 'SUCCESS') setActivePromotions(promoRes.data.activeMap || {});
     } catch (err) {
       console.error('Failed to load cashier resources:', err);
@@ -2491,15 +2529,103 @@ const Cashier = () => {
                 {/* Individual Categories */}
                 {categories.map(cat => {
                   const count = products.filter(p => String(p.category_id) === String(cat.id)).length;
+                  const isCurrentDragged = String(draggedCatId) === String(cat.id);
+                  const isCurrentOver = String(dragOverCatId) === String(cat.id) && !isCurrentDragged;
+
                   return (
                     <div
                       key={cat.id}
-                      onClick={() => setSelectedCategoryId(cat.id)}
+                      data-category-id={cat.id}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', String(cat.id));
+                        e.dataTransfer.effectAllowed = 'move';
+                        setDraggedCatId(cat.id);
+                        isDraggingCatRef.current = true;
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverCatId !== cat.id) {
+                          setDragOverCatId(cat.id);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverCatId === cat.id) {
+                          setDragOverCatId(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const sourceId = e.dataTransfer.getData('text/plain') || draggedCatId;
+                        handleReorderCategories(sourceId, cat.id);
+                        setDraggedCatId(null);
+                        setDragOverCatId(null);
+                        setTimeout(() => {
+                          isDraggingCatRef.current = false;
+                        }, 100);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedCatId(null);
+                        setDragOverCatId(null);
+                        setTimeout(() => {
+                          isDraggingCatRef.current = false;
+                        }, 100);
+                      }}
+                      onTouchStart={(e) => {
+                        const touch = e.touches[0];
+                        touchStartPosRef.current = {
+                          x: touch.clientX,
+                          y: touch.clientY,
+                          catId: cat.id,
+                          isMoved: false
+                        };
+                      }}
+                      onTouchMove={(e) => {
+                        const touch = e.touches[0];
+                        const start = touchStartPosRef.current;
+                        if (!start.catId) return;
+                        const dx = Math.abs(touch.clientX - start.x);
+                        const dy = Math.abs(touch.clientY - start.y);
+                        if (dx > 8 || dy > 8) {
+                          start.isMoved = true;
+                          isDraggingCatRef.current = true;
+                          setDraggedCatId(start.catId);
+                          const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+                          const catElem = elem?.closest('[data-category-id]');
+                          const overId = catElem?.getAttribute('data-category-id');
+                          if (overId && overId !== String(dragOverCatId)) {
+                            setDragOverCatId(overId);
+                          }
+                        }
+                      }}
+                      onTouchEnd={(e) => {
+                        const start = touchStartPosRef.current;
+                        if (start.isMoved && start.catId) {
+                          const lastTouch = e.changedTouches[0];
+                          const elem = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY);
+                          const catElem = elem?.closest('[data-category-id]');
+                          const targetId = catElem?.getAttribute('data-category-id');
+                          if (targetId && targetId !== String(start.catId)) {
+                            handleReorderCategories(start.catId, targetId);
+                          }
+                        }
+                        touchStartPosRef.current = { x: 0, y: 0, catId: null, isMoved: false };
+                        setDraggedCatId(null);
+                        setDragOverCatId(null);
+                        setTimeout(() => {
+                          isDraggingCatRef.current = false;
+                        }, 100);
+                      }}
+                      onClick={() => {
+                        if (isDraggingCatRef.current) return;
+                        setSelectedCategoryId(cat.id);
+                      }}
                       style={{
                         padding: '6px 8px',
                         borderRadius: '10px',
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-secondary)',
+                        border: isCurrentOver ? '2px dashed var(--accent-color, #2563eb)' : (isCurrentDragged ? '1px dashed var(--border-color)' : '1px solid var(--border-color)'),
+                        background: isCurrentOver ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-secondary)',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -2507,10 +2633,14 @@ const Cashier = () => {
                         gap: '2px',
                         height: '60px',
                         boxSizing: 'border-box',
-                        cursor: 'pointer',
+                        cursor: isCurrentDragged ? 'grabbing' : 'grab',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
                         textAlign: 'center',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                        transition: 'all 0.15s ease'
+                        opacity: isCurrentDragged ? 0.4 : 1,
+                        transform: isCurrentOver ? 'scale(1.03)' : (isCurrentDragged ? 'scale(0.97)' : 'none'),
+                        boxShadow: isCurrentOver ? '0 4px 12px rgba(37, 99, 235, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.04)',
+                        transition: 'transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease'
                       }}
                     >
                       <span style={{ 
@@ -2521,11 +2651,12 @@ const Cashier = () => {
                         display: '-webkit-box',
                         WebkitLineClamp: 1,
                         WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        pointerEvents: 'none'
                       }}>
                         {cat.name}
                       </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, lineHeight: '1' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, lineHeight: '1', pointerEvents: 'none' }}>
                         ({count})
                       </span>
                     </div>
