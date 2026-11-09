@@ -399,8 +399,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       const shouldUseSilent = Boolean(silent) && isThermal && !isVirtual;
 
       const is58 = paperWidth === '58mm';
-      const bodyWidth = is58 ? '48mm' : '72mm';
-      const wrapperWidth = is58 ? '46mm' : '72mm';
+      const bodyWidth = is58 ? '48mm' : '80mm';
 
       const standaloneHtml = `<!DOCTYPE html>
 <html dir="rtl" lang="ckb">
@@ -409,7 +408,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
   <style>
     @page {
       size: 80mm auto;
-      margin: 0;
+      margin: 0mm !important;
     }
     * {
       box-sizing: border-box !important;
@@ -432,9 +431,9 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
     }
     .thermal-receipt-wrapper {
       width: 100% !important;
-      max-width: ${wrapperWidth} !important;
-      margin: 0 auto 0 1.5mm !important;
-      padding: 2px 6.5mm 25mm 2.5mm !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 1.5mm 15mm 1.5mm !important;
       box-sizing: border-box !important;
       overflow: hidden !important;
       color: #000000 !important;
@@ -485,7 +484,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
 
       printWin = new BrowserWindow({
         show: false,
-        width: 400,
+        width: 302,
         height: 900,
         webPreferences: {
           nodeIntegration: false,
@@ -519,7 +518,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
           const heightPx = await printWin.webContents.executeJavaScript(`
             Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 260)
           `);
-          const widthInches = is58 ? 1.89 : 2.835; // 48mm or 76mm in inches
+          const widthInches = is58 ? 1.89 : 3.149; // 48mm or 80mm in inches
           const heightInches = Math.max(3.2, (heightPx / 96) + 0.3);
 
           const pdfBuffer = await printWin.webContents.printToPDF({
@@ -528,7 +527,8 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
               width: widthInches,
               height: heightInches
             },
-            margins: { marginType: 'none' }
+            margins: { marginType: 'none' },
+            scaleFactor: 100
           });
 
           tempPdfPath = path.join(app.getPath('temp'), `receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.pdf`);
@@ -566,7 +566,8 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       const primaryOpts = {
         silent: false, // If we reached here, open system dialog for user
         printBackground: true,
-        margins: { marginType: 'none' }
+        margins: { marginType: 'none' },
+        scaleFactor: 100
       };
       if (targetPrinter) {
         primaryOpts.deviceName = targetPrinter;

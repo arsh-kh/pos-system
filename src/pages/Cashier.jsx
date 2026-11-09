@@ -2144,8 +2144,14 @@ const Cashier = () => {
         }
         @media print {
           @page {
+            size: 80mm auto;
+            margin: 0mm !important;
+          }
+          html, body {
+            width: 100% !important;
             margin: 0 !important;
-            size: auto;
+            padding: 0 !important;
+            direction: rtl;
           }
           html, body, #root, #cashier-page-root {
             margin: 0 !important;
@@ -2175,9 +2181,9 @@ const Cashier = () => {
             visibility: visible !important;
             position: static !important;
             width: 100% !important;
-            max-width: 76mm !important;
-            margin: 0 auto !important;
-            padding: 2px 2mm 30px 2mm !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 1.5mm 30px 1.5mm !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #ffffff !important;
@@ -2196,6 +2202,7 @@ const Cashier = () => {
           }
           #cashier-thermal-receipt table {
             width: 100% !important;
+            max-width: 100% !important;
             border-collapse: collapse !important;
             border: 1px solid #000000 !important;
             margin: 5px 0 !important;
@@ -3893,9 +3900,9 @@ const Cashier = () => {
       {printedReceipt && (
         <div id="cashier-thermal-receipt" style={{
           width: '100%',
-          maxWidth: '76mm',
-          margin: '0 auto',
-          padding: '0 2mm',
+          maxWidth: '100%',
+          margin: '0',
+          padding: '0 1.5mm',
           boxSizing: 'border-box',
           overflow: 'hidden',
           direction: 'rtl',
@@ -3905,7 +3912,7 @@ const Cashier = () => {
 
           {/* Unique Barcode directly below store name */}
           <div style={{ textAlign: 'center', margin: '4px 0 6px 0', width: '100%' }}>
-            <BarcodeSVG value={'shrm/2026/' + String(printedReceipt.saleId).padStart(4, '0')} maxWidth="60mm" barHeight={50} />
+            <BarcodeSVG value={'shrm/2026/' + String(printedReceipt.saleId).padStart(4, '0')} maxWidth="100%" barHeight={50} />
           </div>
 
           <div className="receipt-divider" style={{ width: '100%', borderBottom: '1px dashed #000000', margin: '6px 0' }}></div>
