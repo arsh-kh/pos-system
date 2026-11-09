@@ -402,7 +402,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       const bodyWidth = is58 ? '48mm' : '80mm';
 
       const standaloneHtml = `<!DOCTYPE html>
-<html dir="rtl" lang="ckb">
+<html dir="ltr" lang="ckb">
 <head>
   <meta charset="utf-8">
   <style>
@@ -418,22 +418,25 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
     html, body {
       margin: 0 !important;
       padding: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
+      width: 80mm !important;
       background: #ffffff !important;
       color: #000000 !important;
       font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
       font-size: 11px !important;
-      direction: rtl !important;
+      direction: ltr !important;
       text-align: right !important;
       overflow: hidden !important;
       height: auto !important;
     }
     .thermal-receipt-wrapper {
-      width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 !important;
-      padding: 0 1.5mm 15mm 1.5mm !important;
+      direction: rtl !important;
+      width: 68mm !important;
+      max-width: 68mm !important;
+      margin-left: 0mm !important;
+      margin-right: auto !important;
+      padding-right: 3mm !important;
+      padding-left: 1mm !important;
+      padding-bottom: 15mm !important;
       box-sizing: border-box !important;
       overflow: hidden !important;
       color: #000000 !important;
@@ -443,6 +446,7 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
       border-bottom: 1px dashed #000000 !important;
       margin: 6px 0 !important;
       width: 100% !important;
+      box-sizing: border-box !important;
     }
     table {
       width: 100% !important;
@@ -467,7 +471,9 @@ async function printHtmlReceipt({ htmlContent, deviceName, paperWidth = '80mm', 
     svg {
       display: block !important;
       margin: 0 auto !important;
+      width: 100% !important;
       max-width: 100% !important;
+      box-sizing: border-box !important;
       height: auto !important;
     }
   </style>

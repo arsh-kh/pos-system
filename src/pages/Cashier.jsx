@@ -2148,19 +2148,21 @@ const Cashier = () => {
             margin: 0mm !important;
           }
           html, body {
-            width: 100% !important;
+            width: 80mm !important;
             margin: 0 !important;
             padding: 0 !important;
-            direction: rtl;
+            direction: ltr !important;
+            background: #ffffff !important;
           }
           html, body, #root, #cashier-page-root {
             margin: 0 !important;
             padding: 0 !important;
-            width: 100% !important;
+            width: 80mm !important;
             height: auto !important;
             min-height: 0 !important;
             overflow: visible !important;
             background: #ffffff !important;
+            direction: ltr !important;
           }
           /* Completely hide the interactive UI in print */
           #cashier-main-ui,
@@ -2180,17 +2182,20 @@ const Cashier = () => {
             display: block !important;
             visibility: visible !important;
             position: static !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 1.5mm 30px 1.5mm !important;
+            direction: rtl !important;
+            width: 68mm !important;
+            max-width: 68mm !important;
+            margin-left: 0mm !important;
+            margin-right: auto !important;
+            padding-right: 3mm !important;
+            padding-left: 1mm !important;
+            padding-bottom: 30mm !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #ffffff !important;
             color: #000000 !important;
             font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
             font-size: 12px !important;
-            direction: rtl !important;
             text-align: right !important;
             page-break-after: avoid !important;
             page-break-inside: avoid !important;
@@ -2206,6 +2211,7 @@ const Cashier = () => {
             border-collapse: collapse !important;
             border: 1px solid #000000 !important;
             margin: 5px 0 !important;
+            box-sizing: border-box !important;
             page-break-inside: avoid !important;
           }
           #cashier-thermal-receipt table th,
@@ -2220,6 +2226,7 @@ const Cashier = () => {
             border-bottom: 1px dashed #000000 !important;
             margin: 6px 0 !important;
             width: 100% !important;
+            box-sizing: border-box !important;
           }
         }
       `}</style>
@@ -3899,13 +3906,15 @@ const Cashier = () => {
                         {/* Hidden Thermal Receipt Container (Targeted by @media print) */}
       {printedReceipt && (
         <div id="cashier-thermal-receipt" style={{
-          width: '100%',
-          maxWidth: '100%',
-          margin: '0',
-          padding: '0 1.5mm',
+          direction: 'rtl',
+          width: '68mm',
+          maxWidth: '68mm',
+          marginLeft: '0mm',
+          marginRight: 'auto',
+          paddingRight: '3mm',
+          paddingLeft: '1mm',
           boxSizing: 'border-box',
           overflow: 'hidden',
-          direction: 'rtl',
           textAlign: 'right'
         }}>
           <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '19px' }}>مارکێتی شارەکەم</div>
