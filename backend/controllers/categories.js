@@ -26,3 +26,23 @@ exports.addCategory = async (req, res) => {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };
+
+exports.deleteCategory = async (req, res) => {
+    const { id } = req.params;
+    try {
+        if (!id) {
+            return res.status(400).json({ status: 'ERROR', message: 'ناسنامەی جۆر دیاری نەکراوە' });
+        }
+        const [existing] = await db.query('SELECT * FROM Categories WHERE id = ?', [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ status: 'ERROR', message: 'ئەم جۆرە نەدۆزرایەوە' });
+        }
+        // Detach products safely
+        await db.query('UPDATE products SET category_id = NULL WHERE category_id = ?', [id]);
+        // Delete category
+        await db.query('DELETE FROM Categories WHERE id = ?', [id]);
+        res.json({ status: 'SUCCESS', message: 'جۆر بە سەرکەوتوویی سڕایەوە', id: Number(id) });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};

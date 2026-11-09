@@ -635,6 +635,10 @@ const Products = () => {
             return [...prev, newCat];
           });
         }}
+        onCategoryDelete={(deletedId) => {
+          setCategories(prev => prev.filter(x => x.id !== deletedId));
+          fetchData();
+        }}
       />
 
       {/* Barcode Sticker Label Print Modal */}

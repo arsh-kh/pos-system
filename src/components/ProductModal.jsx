@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import { Trash2 } from 'lucide-react';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 import { kurdishSearchMatch, fixBidiProductName } from '../utils/kurdishSearch';
 import { normalizeBarcode } from '../utils/barcodeNormalizer';
@@ -36,6 +37,7 @@ const ProductModal = ({
   presetBarcode = '',
   categories = [],
   onCategoriesUpdate,
+  onCategoryDelete,
   title,
   submitText
 }) => {
@@ -86,6 +88,36 @@ const ProductModal = ({
       console.error('Failed to load fresh categories in ProductModal:', err);
     }
   }, []);
+
+  const handleDeleteCategory = async (e, cat) => {
+    e.stopPropagation();
+    if (!window.confirm(`دڵنیایت لە سڕینەوەی جۆری "${cat.name}"؟`)) {
+      return;
+    }
+    try {
+      const config = getAuthConfig();
+      let res = null;
+      try {
+        res = await axios.delete(`http://localhost:3001/api/categories/${cat.id}`, config);
+      } catch (_) {
+        res = await axios.delete(`http://localhost:3001/api/categories/${cat.id}`);
+      }
+      if (res?.data?.status === 'SUCCESS') {
+        setCategoryList(prev => prev.filter(c => c.id !== cat.id));
+        if (String(formData.category_id) === String(cat.id)) {
+          setFormData(prev => ({ ...prev, category_id: '' }));
+          setCategoryInput('');
+        }
+        if (onCategoryDelete) {
+          onCategoryDelete(cat.id);
+        }
+        toast.success(`جۆری "${cat.name}" بە سەرکەوتوویی سڕایەوە`);
+      }
+    } catch (err) {
+      console.error('Failed to delete category:', err);
+      toast.error('نەتوانرا جۆرەکە بسڕدرێتەوە');
+    }
+  };
 
   // Sync categoryList with categories prop whenever provided
   useEffect(() => {
@@ -608,18 +640,52 @@ const ProductModal = ({
                           setIsCategoryOpen(false);
                         }}
                         style={{ 
-                          padding: '8px 12px', 
+                          padding: '6px 10px', 
                           borderRadius: '6px', 
                           cursor: 'pointer', 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
                           fontWeight: isSelected ? 'bold' : 'normal',
                           background: isSelected ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
                           color: isSelected ? '#2563eb' : '#1e293b',
-                          fontSize: '0.88rem'
+                          fontSize: '0.88rem',
+                          transition: 'background 0.15s ease'
                         }}
                         onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
                         onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
                       >
-                        <span>{c.name}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.name}
+                        </span>
+                        <button
+                          type="button"
+                          title={`سڕینەوەی جۆری ${c.name}`}
+                          onClick={(e) => handleDeleteCategory(e, c)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '3px 6px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#94a3b8',
+                            transition: 'color 0.15s ease, background 0.15s ease',
+                            flexShrink: 0
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.color = '#ef4444';
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.color = '#94a3b8';
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     );
                   })}

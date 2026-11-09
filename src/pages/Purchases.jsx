@@ -1644,6 +1644,9 @@ const Purchases = () => {
             return [...prev, newCat];
           });
         }}
+        onCategoryDelete={(deletedId) => {
+          setCategories(prev => prev.filter(x => x.id !== deletedId));
+        }}
         title="تۆمارکردنی کاڵای نوێ بۆ کۆگا"
         submitText="زیادکردن"
       />
