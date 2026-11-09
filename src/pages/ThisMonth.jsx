@@ -131,11 +131,11 @@ const ThisMonth = () => {
   const totalDiscounts = Number(metrics.total_discounts || 0);
   const cashCollected = Number(metrics.cash_collected || 0);
   const debtIssued = Number(metrics.debt_issued || 0);
+  const totalRefunded = Number(metrics.total_refunded || 0);
   const debtCollected = Number(metrics.debt_collected || 0);
   const debtRepaymentsCount = Number(metrics.debt_repayments_count || 0);
-  const totalCashInflow = Number(metrics.total_cash_inflow || (cashCollected + debtCollected - totalRefunded));
-  const debtRepayments = reportData?.debt_repayments || [];
-  const totalRefunded = Number(metrics.total_refunded || 0);
+  const totalCashInflow = Number(metrics.total_cash_inflow || Math.max(0, cashCollected + debtCollected - totalRefunded));
+  const debtRepayments = Array.isArray(reportData?.debt_repayments) ? reportData.debt_repayments : [];
   const returnsCount = Number(metrics.returns_count || 0);
   const totalExpenses = Number(metrics.total_expenses || 0);
   const expensesCount = Number(metrics.expenses_count || 0);
