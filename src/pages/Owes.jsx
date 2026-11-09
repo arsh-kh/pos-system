@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { Printer } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { formatDate, formatDateTime } from '../utils/dateFormatter';
 import BarcodeSVG from '../components/BarcodeSVG';
@@ -16,6 +17,14 @@ const Owes = () => {
   const [totalDebt, setTotalDebt] = useState(0);
   const [debtorsCount, setDebtorsCount] = useState(0);
   const [highestDebtor, setHighestDebtor] = useState(null);
+  const [todayRepaymentsTotal, setTodayRepaymentsTotal] = useState(0);
+  const [todayRepaymentsCount, setTodayRepaymentsCount] = useState(0);
+
+  // Active View & Repayments Log
+  const [activeView, setActiveView] = useState('debtors'); // 'debtors' | 'repayments'
+  const [repayments, setRepayments] = useState([]);
+  const [repaymentsLoading, setRepaymentsLoading] = useState(false);
+  const [repaymentsFilter, setRepaymentsFilter] = useState('today'); // 'today' | 'week' | 'month' | 'all'
 
   // Modals
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
@@ -33,6 +42,24 @@ const Owes = () => {
   const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی شارەکەم';
   const storePhone = localStorage.getItem('pos_store_phone') || '0750 000 0000';
 
+  const fetchRepayments = async (range = repaymentsFilter) => {
+    setRepaymentsLoading(true);
+    try {
+      const res = await axios.get(`http://localhost:3001/api/customers/repayments?range=${range}`);
+      if (res.data?.status === 'SUCCESS') {
+        setRepayments(res.data.data || []);
+        if (range === 'today' && res.data.summary) {
+          setTodayRepaymentsTotal(Number(res.data.summary.total_amount) || 0);
+          setTodayRepaymentsCount(Number(res.data.summary.count) || 0);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching debt repayments:', err);
+    } finally {
+      setRepaymentsLoading(false);
+    }
+  };
+
   const fetchCustomers = async () => {
     try {
       const res = await axios.get('http://localhost:3001/api/customers');
@@ -40,6 +67,11 @@ const Owes = () => {
         const data = res.data.data;
         setCustomers(data);
         
+        if (res.data.today_repayments) {
+          setTodayRepaymentsTotal(Number(res.data.today_repayments.today_total) || 0);
+          setTodayRepaymentsCount(Number(res.data.today_repayments.today_count) || 0);
+        }
+
         let total = 0;
         let count = 0;
         let highest = null;
@@ -201,6 +233,7 @@ const Owes = () => {
       // Refresh profile and global list
       openProfile(selectedProfile.id);
       fetchCustomers();
+      fetchRepayments(repaymentsFilter);
     } catch {
       alert('هەڵەیەک ڕوویدا لە کاتی تۆمارکردنی مامەڵە');
     }
@@ -219,6 +252,23 @@ const Owes = () => {
     setTimeout(() => {
       window.print();
     }, 100);
+  };
+
+  const handlePrintRepayment = (r) => {
+    setPrintVoucher({
+      isSale: false,
+      transactionType: 'PAY',
+      customerName: r.customer_name,
+      customerPhone: r.customer_phone && r.customer_phone !== '-' ? r.customer_phone : '',
+      amountPaid: Number(r.amount),
+      remainingDebt: 0,
+      note: r.note,
+      isStatement: false,
+      date: formatDateTime(r.created_at, { twelveHour: true })
+    });
+    setTimeout(() => {
+      window.print();
+    }, 150);
   };
 
   const handlePrintVoucher = (voucherData) => {
@@ -247,6 +297,16 @@ const Owes = () => {
       kurdishSearchMatch([c.name, c.phone, c.notes], cleanSearch)
     );
   }, [customers, searchTerm]);
+
+  const filteredRepayments = useMemo(() => {
+    if (!searchTerm.trim()) return repayments;
+    const term = searchTerm.trim().toLowerCase();
+    return repayments.filter(r => 
+      (r.customer_name && kurdishSearchMatch(r.customer_name, term)) ||
+      (r.customer_phone && r.customer_phone.includes(term)) ||
+      (r.note && kurdishSearchMatch(r.note, term))
+    );
+  }, [repayments, searchTerm]);
 
   // Clean WhatsApp Number Formatter for Iraq (e.g. 0750... -> 964750...)
   const getWhatsAppLink = (phone, name, debt) => {
@@ -533,6 +593,32 @@ const Owes = () => {
             کڕیارە قەرزدارەکان: {debtorsCount}
           </div>
 
+          <div 
+            onClick={() => {
+              setActiveView('repayments');
+              setRepaymentsFilter('today');
+              fetchRepayments('today');
+            }}
+            title="کلیک بکە بۆ بینینی قەرزە هاتۆتەوەکانی ئەمڕۆ"
+            style={{ 
+              height: '38px', 
+              padding: '0 14px', 
+              borderRadius: '8px', 
+              background: activeView === 'repayments' && repaymentsFilter === 'today' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.08)', 
+              border: activeView === 'repayments' && repaymentsFilter === 'today' ? '1.5px solid #10b981' : '1px solid rgba(16, 185, 129, 0.3)', 
+              color: '#10b981', 
+              fontWeight: 800, 
+              fontSize: '0.86rem', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            قەرزی هاتۆتەوەی ئەمڕۆ: {todayRepaymentsTotal.toLocaleString('en-US')} د.ع
+          </div>
+
           <button 
             type="button"
             className="btn-primary" 
@@ -557,7 +643,85 @@ const Owes = () => {
         </div>
       </div>
 
-      {/* Bordered Compact Customer List Table (7 Columns, 38px Row Height) */}
+      {/* View Switcher: Debtors vs. Repayments History */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setActiveView('debtors')}
+            style={{
+              padding: '6px 16px',
+              borderRadius: '8px',
+              border: activeView === 'debtors' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeView === 'debtors' ? 'rgba(37, 99, 235, 0.1)' : '#ffffff',
+              color: activeView === 'debtors' ? '#2563eb' : '#475569',
+              fontWeight: activeView === 'debtors' ? 700 : 500,
+              fontSize: '0.86rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            کڕیارە قەرزدارەکان ({debtorsCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView('repayments');
+              fetchRepayments(repaymentsFilter);
+            }}
+            style={{
+              padding: '6px 16px',
+              borderRadius: '8px',
+              border: activeView === 'repayments' ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+              background: activeView === 'repayments' ? 'rgba(16, 185, 129, 0.1)' : '#ffffff',
+              color: activeView === 'repayments' ? '#10b981' : '#475569',
+              fontWeight: activeView === 'repayments' ? 700 : 500,
+              fontSize: '0.86rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            قەرزە هاتۆتەوەکان ({repaymentsFilter === 'today' ? todayRepaymentsCount : repayments.length})
+          </button>
+        </div>
+
+        {activeView === 'repayments' && (
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {[
+              { id: 'today', label: 'ئەمڕۆ' },
+              { id: 'week', label: '٧ ڕۆژ' },
+              { id: 'month', label: 'ئەم مانگە' },
+              { id: 'all', label: 'هەمووی' }
+            ].map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setRepaymentsFilter(f.id);
+                  fetchRepayments(f.id);
+                }}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: repaymentsFilter === f.id ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+                  background: repaymentsFilter === f.id ? 'rgba(16, 185, 129, 0.12)' : '#ffffff',
+                  color: repaymentsFilter === f.id ? '#10b981' : '#64748b',
+                  fontWeight: repaymentsFilter === f.id ? 700 : 500,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* View 1: Bordered Compact Customer List Table (7 Columns, 38px Row Height) */}
+      {activeView === 'debtors' && (
       <div style={{ borderRadius: '10px', border: '1px solid #e2e8f0', overflow: 'hidden', background: '#ffffff' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e2e8f0', direction: 'rtl' }}>
           <thead>
@@ -709,6 +873,156 @@ const Owes = () => {
           </tbody>
         </table>
       </div>
+      )}
+
+      {/* View 2: Bordered Compact Repayments List Table (7 Columns, 38px Row Height) */}
+      {activeView === 'repayments' && (
+      <div style={{ borderRadius: '10px', border: '1px solid #e2e8f0', overflow: 'hidden', background: '#ffffff' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e2e8f0', direction: 'rtl' }}>
+          <thead>
+            <tr style={{ background: '#f8fafc', height: '38px' }}>
+              <th style={{ border: '1px solid #e2e8f0', width: '50px', padding: '6px 10px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>#</th>
+              <th style={{ border: '1px solid #e2e8f0', width: '150px', padding: '6px 12px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>بەروار و کات</th>
+              <th style={{ border: '1px solid #e2e8f0', width: '220px', padding: '6px 14px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'right', whiteSpace: 'nowrap' }}>ناوی کڕیار</th>
+              <th style={{ border: '1px solid #e2e8f0', width: '140px', padding: '6px 12px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>ژمارەی مۆبایل</th>
+              <th style={{ border: '1px solid #e2e8f0', width: '140px', padding: '6px 12px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>بڕی پارە</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '6px 14px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'right', whiteSpace: 'nowrap' }}>تێبینی</th>
+              <th style={{ border: '1px solid #e2e8f0', width: '140px', padding: '6px 12px', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>کردارەکان</th>
+            </tr>
+          </thead>
+          <tbody>
+            {repaymentsLoading ? (
+              <tr><td colSpan="7" style={{ border: '1px solid #e2e8f0', padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>باردەکرێت...</td></tr>
+            ) : filteredRepayments.length === 0 ? (
+              <tr><td colSpan="7" style={{ border: '1px solid #e2e8f0', padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>هیچ قەرزێک لەم ماوەیەدا نەهاتووەتەوە</td></tr>
+            ) : (
+              filteredRepayments.map((r, index) => (
+                <tr 
+                  key={r.id} 
+                  style={{ height: '38px', transition: 'background 0.12s ease' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  {/* 1. # */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '6px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', fontWeight: 600 }}>
+                    #{index + 1}
+                  </td>
+
+                  {/* 2. بەروار و کات */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                    {formatDateTime(r.created_at, { twelveHour: true })}
+                  </td>
+
+                  {/* 3. ناوی کڕیار (Clickable to open profile) */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '6px 14px', textAlign: 'right' }}>
+                    <span 
+                      onClick={() => openProfile(r.customer_id)} 
+                      style={{ fontWeight: 800, color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.88rem' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                    >
+                      {r.customer_name}
+                    </span>
+                  </td>
+
+                  {/* 4. ژمارەی مۆبایل */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>
+                    <span 
+                      dir="ltr"
+                      style={{ 
+                        fontFamily: 'monospace', 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: r.customer_phone && r.customer_phone !== '-' ? 'var(--text-primary)' : '#94a3b8',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {r.customer_phone && r.customer_phone !== '-' ? formatPhoneNumber(r.customer_phone) : '-'}
+                    </span>
+                  </td>
+
+                  {/* 5. بڕی پارە */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '6px 12px', textAlign: 'center' }}>
+                    <span style={{ fontWeight: 800, fontFamily: 'monospace', fontSize: '0.9rem', color: '#10b981' }}>
+                      {Number(r.amount).toLocaleString('en-US')}
+                    </span>
+                  </td>
+
+                  {/* 6. تێبینی */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '6px 14px', textAlign: 'right', color: r.note ? 'var(--text-primary)' : '#94a3b8', fontSize: '0.84rem' }}>
+                    {r.note || '-'}
+                  </td>
+
+                  {/* 7. کردارەکان: پڕۆفایل و چاپ */}
+                  <td style={{ border: '1px solid #e2e8f0', padding: '4px 8px', textAlign: 'center' }}>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '62px 62px', 
+                      gap: '6px', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      margin: '0 auto',
+                      width: '130px'
+                    }}>
+                      <button 
+                        type="button"
+                        onClick={() => openProfile(r.customer_id)} 
+                        style={{ 
+                          width: '62px', 
+                          height: '28px', 
+                          padding: '0', 
+                          borderRadius: '6px', 
+                          border: '1px solid #cbd5e1', 
+                          background: '#f8fafc', 
+                          color: '#2563eb', 
+                          cursor: 'pointer', 
+                          fontWeight: 700, 
+                          fontSize: '0.78rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        پرۆفایل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrintRepayment(r);
+                        }}
+                        style={{ 
+                          width: '62px', 
+                          height: '28px', 
+                          padding: '0', 
+                          borderRadius: '6px', 
+                          border: '1px solid #bbf7d0', 
+                          background: '#f0fdf4', 
+                          color: '#16a34a', 
+                          cursor: 'pointer', 
+                          fontWeight: 700, 
+                          fontSize: '0.78rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxSizing: 'border-box',
+                          gap: '3px'
+                        }}
+                        title="چاپکردنی پسووڵەی واسڵ"
+                      >
+                        <Printer size={12} />
+                        <span>چاپ</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      )}
 
       {/* Add Customer Modal */}
       {isAddCustomerOpen && (

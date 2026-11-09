@@ -131,6 +131,10 @@ const ThisMonth = () => {
   const totalDiscounts = Number(metrics.total_discounts || 0);
   const cashCollected = Number(metrics.cash_collected || 0);
   const debtIssued = Number(metrics.debt_issued || 0);
+  const debtCollected = Number(metrics.debt_collected || 0);
+  const debtRepaymentsCount = Number(metrics.debt_repayments_count || 0);
+  const totalCashInflow = Number(metrics.total_cash_inflow || (cashCollected + debtCollected - totalRefunded));
+  const debtRepayments = reportData?.debt_repayments || [];
   const totalRefunded = Number(metrics.total_refunded || 0);
   const returnsCount = Number(metrics.returns_count || 0);
   const totalExpenses = Number(metrics.total_expenses || 0);
@@ -409,14 +413,22 @@ const ThisMonth = () => {
               <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>
                 نەقد و قەرز
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.88rem', color: 'var(--text-primary)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>نەقد:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>فرۆشی نەقد:</span>
                   <span style={{ fontWeight: 700 }}>{cashCollected.toLocaleString()} د.ع</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>قەرز:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>فرۆشی قەرز:</span>
                   <span style={{ fontWeight: 700 }}>{debtIssued.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px dashed var(--border-color, #334155)' }}>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>قەرزی هاتۆتەوە:</span>
+                  <span style={{ fontWeight: 800, color: '#10b981' }}>+{debtCollected.toLocaleString()} د.ع</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '2px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>کۆی کاشی هاتوو:</span>
+                  <span style={{ fontWeight: 800, color: '#38bdf8' }}>{totalCashInflow.toLocaleString()} د.ع</span>
                 </div>
               </div>
             </div>
@@ -707,6 +719,76 @@ const ThisMonth = () => {
               </div>
             )}
           </div>
+
+          {/* Section 4: Repayments Log in This Period */}
+          <div style={{
+            background: 'var(--bg-secondary, #1e293b)',
+            border: '1px solid var(--border-color, #334155)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginTop: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                قەرزە هاتۆتەوەکان لەم ماوەیەدا
+              </h2>
+              <span style={{ 
+                fontSize: '0.82rem', 
+                fontWeight: 700, 
+                color: '#10b981', 
+                background: 'rgba(16, 185, 129, 0.1)', 
+                padding: '4px 10px', 
+                borderRadius: '6px' 
+              }}>
+                کۆی هاتۆتەوە: {debtCollected.toLocaleString()} د.ع ({debtRepayments.length})
+              </span>
+            </div>
+
+            {debtRepayments.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                هیچ قەرزێک لەم ماوەیەدا نەهاتووەتەوە.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                      <th style={{ width: '50px', padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>#</th>
+                      <th style={{ width: '150px', padding: '10px 14px', fontWeight: 600 }}>بەروار و کات</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600 }}>ناوی کڕیار</th>
+                      <th style={{ width: '130px', padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>ژمارەی مۆبایل</th>
+                      <th style={{ width: '150px', padding: '10px 14px', textAlign: 'center', fontWeight: 600 }}>بڕی پارە</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600 }}>تێبینی</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {debtRepayments.map((r, idx) => (
+                      <tr key={r.id || idx} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.88rem' }}>
+                        <td style={{ padding: '11px 14px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          {idx + 1}
+                        </td>
+                        <td style={{ padding: '11px 14px', color: 'var(--text-secondary)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                          {formatDateTime(r.created_at, { twelveHour: true })}
+                        </td>
+                        <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {r.customer_name}
+                        </td>
+                        <td style={{ padding: '11px 14px', textAlign: 'center', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                          {r.customer_phone && r.customer_phone !== '-' ? r.customer_phone : '—'}
+                        </td>
+                        <td style={{ padding: '11px 14px', textAlign: 'center', fontWeight: 800, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
+                          {Number(r.amount).toLocaleString('en-US')} د.ع
+                        </td>
+                        <td style={{ padding: '11px 14px', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                          {r.note || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -754,12 +836,20 @@ const ThisMonth = () => {
 
         {/* Payment Methods */}
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-          <span>نەقد (کاش):</span>
+          <span>فرۆشی نەقد (کاش):</span>
           <span>{cashCollected.toLocaleString()} دینار</span>
         </div>
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
           <span>فرۆش بە قەرز:</span>
           <span>{debtIssued.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>قەرزی هاتۆتەوە (وەرگیراو):</span>
+          <span>{debtCollected.toLocaleString()} دینار</span>
+        </div>
+        <div style={{ fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+          <span>کۆی گشتی کاشی هاتوو:</span>
+          <span>{totalCashInflow.toLocaleString()} دینار</span>
         </div>
 
         <div className="receipt-divider" style={{ borderBottom: '1px dashed #000', margin: '6px 0' }}></div>

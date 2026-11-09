@@ -5,6 +5,7 @@ const customersController = require('../controllers/customers');
 // router.use(authenticateToken); // Temporarily disabled for UI testing
 
 router.get('/', customersController.getAllCustomers);
+router.get('/repayments', customersController.getDebtRepayments);
 router.post('/', customersController.addCustomer);
 router.get('/:id', customersController.getCustomerProfile);
 router.post('/:id/debts', customersController.addDebtTransaction);

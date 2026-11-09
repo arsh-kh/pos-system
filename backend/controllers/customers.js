@@ -11,7 +11,66 @@ exports.getAllCustomers = async (req, res) => {
             GROUP BY c.id
             ORDER BY total_debt DESC
         `);
-        res.json({ status: 'SUCCESS', data: rows });
+
+        // Fetch today's debt repayments summary for instant display (قەرزی هاتۆتەوەی ئەمڕۆ)
+        const [todayRepaymentsRows] = await db.query(`
+            SELECT COALESCE(SUM(amount), 0) AS today_total, COUNT(id) AS today_count
+            FROM Customer_Debts
+            WHERE transaction_type = 'PAY' AND DATE(created_at) = CURRENT_DATE()
+        `);
+        const todayRepayments = {
+            today_total: Number(todayRepaymentsRows[0]?.today_total) || 0,
+            today_count: Number(todayRepaymentsRows[0]?.today_count) || 0
+        };
+
+        res.json({ status: 'SUCCESS', data: rows, today_repayments: todayRepayments });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+exports.getDebtRepayments = async (req, res) => {
+    try {
+        const { range = 'today', startDate, endDate } = req.query;
+        let whereClause = "cd.transaction_type = 'PAY'";
+        let params = [];
+
+        if (range === 'today') {
+            whereClause += " AND DATE(cd.created_at) = CURRENT_DATE()";
+        } else if (range === 'week') {
+            whereClause += " AND cd.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+        } else if (range === 'month') {
+            whereClause += " AND MONTH(cd.created_at) = MONTH(CURRENT_DATE()) AND YEAR(cd.created_at) = YEAR(CURRENT_DATE())";
+        } else if (range === 'custom' && startDate && endDate) {
+            whereClause += " AND cd.created_at BETWEEN ? AND ?";
+            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
+
+        const [rows] = await db.query(`
+            SELECT 
+                cd.id,
+                cd.customer_id,
+                c.name AS customer_name,
+                c.phone AS customer_phone,
+                cd.amount,
+                cd.note,
+                cd.created_at
+            FROM Customer_Debts cd
+            JOIN Customers c ON cd.customer_id = c.id
+            WHERE ${whereClause}
+            ORDER BY cd.created_at DESC
+        `, params);
+
+        const totalAmount = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+        res.json({
+            status: 'SUCCESS',
+            data: rows,
+            summary: {
+                total_amount: totalAmount,
+                count: rows.length
+            }
+        });
     } catch (error) {
         res.status(500).json({ status: 'ERROR', message: error.message });
     }

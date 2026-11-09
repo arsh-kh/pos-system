@@ -446,6 +446,30 @@ exports.getPeriodReport = async (req, res) => {
             WHERE created_at BETWEEN ? AND ?
         `, [startDateTime, endDateTime]);
 
+        // 4a. Customer Debt Repayments in period (قەرزی هاتۆتەوە)
+        const [debtRepayRows] = await db.query(`
+            SELECT 
+                COALESCE(SUM(amount), 0) as total_debt_collected,
+                COUNT(id) as debt_repayments_count
+            FROM Customer_Debts
+            WHERE transaction_type = 'PAY' AND created_at BETWEEN ? AND ?
+        `, [startDateTime, endDateTime]);
+
+        const [debtRepaymentsList] = await db.query(`
+            SELECT 
+                cd.id,
+                cd.customer_id,
+                c.name as customer_name,
+                c.phone as customer_phone,
+                cd.amount,
+                cd.note,
+                cd.created_at
+            FROM Customer_Debts cd
+            JOIN Customers c ON cd.customer_id = c.id
+            WHERE cd.transaction_type = 'PAY' AND cd.created_at BETWEEN ? AND ?
+            ORDER BY cd.created_at DESC
+        `, [startDateTime, endDateTime]);
+
         // 4b. Inventory Asset Valuation (سەرمایەی ئێستای مەخزەن و کۆگا)
         const [inventoryRows] = await db.query(`
             SELECT 
@@ -628,6 +652,10 @@ exports.getPeriodReport = async (req, res) => {
         const profitMargin = netSales > 0 ? ((netProfit / netSales) * 100).toFixed(1) : 0;
         const avgInvoice = totalInvoices > 0 ? Math.round(netSales / totalInvoices) : 0;
 
+        const totalDebtCollected = Number(debtRepayRows[0]?.total_debt_collected) || 0;
+        const debtRepaymentsCount = Number(debtRepayRows[0]?.debt_repayments_count) || 0;
+        const totalCashInflow = Math.max(0, cashCollected + totalDebtCollected - totalRefunded);
+
         res.json({
             status: 'SUCCESS',
             data: {
@@ -643,6 +671,9 @@ exports.getPeriodReport = async (req, res) => {
                     total_discounts: totalDiscounts,
                     cash_collected: cashCollected,
                     debt_issued: debtIssued,
+                    debt_collected: totalDebtCollected,
+                    debt_repayments_count: debtRepaymentsCount,
+                    total_cash_inflow: totalCashInflow,
                     gross_profit: adjustedGrossProfit,
                     total_refunded: totalRefunded,
                     returns_count: returnsCount,
@@ -653,6 +684,15 @@ exports.getPeriodReport = async (req, res) => {
                     net_profit: netProfit,
                     profit_margin: Number(profitMargin)
                 },
+                debt_repayments: debtRepaymentsList.map(d => ({
+                    id: d.id,
+                    customer_id: d.customer_id,
+                    customer_name: d.customer_name,
+                    customer_phone: d.customer_phone || '-',
+                    amount: Number(d.amount) || 0,
+                    note: d.note || '',
+                    created_at: d.created_at
+                })),
                 inventory_valuation: inventoryValuation,
                 period_purchases: periodPurchases,
                 lifetime_purchases: lifetimePurchases,
