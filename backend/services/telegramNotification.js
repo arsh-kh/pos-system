@@ -71,7 +71,7 @@ async function sendShiftZReportTelegram(zData) {
 
 📥 *گەڕاوەی نەقد:* -${Number(zData.cash_refunds || 0).toLocaleString()} دینار
 📉 *خەرجییەکان:* -${Number(zData.expenses_paid || 0).toLocaleString()} دینار
-🪙 *سەرمایەی سەرەتا:* ${Number(zData.opening_cash || 0).toLocaleString()} دینار
+${Number(zData.goods_purchased_cash || 0) > 0 ? `📦 *دراو بە کاڵا لە قاسە:* -${Number(zData.goods_purchased_cash).toLocaleString()} دینار\n` : ''}🪙 *سەرمایەی سەرەتا:* ${Number(zData.opening_cash || 0).toLocaleString()} دینار
 
 📊 *پێشبینیکراو لە قاسە:* ${Number(zData.expected_cash || 0).toLocaleString()} دینار
 💵 *ژمێردراوی دەستی:* ${Number(zData.actual_cash || zData.expected_cash || 0).toLocaleString()} دینار

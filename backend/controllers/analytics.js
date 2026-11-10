@@ -455,6 +455,17 @@ exports.getPeriodReport = async (req, res) => {
             WHERE transaction_type = 'PAY' AND created_at BETWEEN ? AND ?
         `, [startDateTime, endDateTime]);
 
+        // 4a2. Drawer Purchases for goods in period (پارەی دراو بە کاڵا لە قاسە)
+        const [drawerPurchasesRows] = await db.query(`
+            SELECT 
+                COALESCE(SUM(amount), 0) as total_drawer_purchases,
+                COUNT(id) as drawer_purchases_count
+            FROM drawer_purchases
+            WHERE created_at BETWEEN ? AND ?
+        `, [startDateTime, endDateTime]);
+        const totalDrawerPurchases = Number(drawerPurchasesRows[0]?.total_drawer_purchases) || 0;
+        const drawerPurchasesCount = Number(drawerPurchasesRows[0]?.drawer_purchases_count) || 0;
+
         const [debtRepaymentsList] = await db.query(`
             SELECT 
                 cd.id,
@@ -679,6 +690,8 @@ exports.getPeriodReport = async (req, res) => {
                     returns_count: returnsCount,
                     total_expenses: totalExpenses,
                     expenses_count: expensesCount,
+                    total_drawer_purchases: totalDrawerPurchases,
+                    drawer_purchases_count: drawerPurchasesCount,
                     total_damages_loss: totalDamagesLoss,
                     total_damages_units: totalDamagesUnits,
                     net_profit: netProfit,

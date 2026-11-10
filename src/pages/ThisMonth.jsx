@@ -139,6 +139,8 @@ const ThisMonth = () => {
   const returnsCount = Number(metrics.returns_count || 0);
   const totalExpenses = Number(metrics.total_expenses || 0);
   const expensesCount = Number(metrics.expenses_count || 0);
+  const totalDrawerPurchases = Number(metrics.total_drawer_purchases || 0);
+  const drawerPurchasesCount = Number(metrics.drawer_purchases_count || 0);
   const totalDamagesLoss = Number(metrics.total_damages_loss || 0);
   const topProducts = reportData?.top_products || [];
   const chartData = reportData?.chart_data || [];
@@ -455,6 +457,12 @@ const ThisMonth = () => {
                   <span style={{ color: 'var(--text-secondary)' }}>زیان:</span>
                   <span style={{ fontWeight: 700 }}>{totalDamagesLoss > 0 ? `${totalDamagesLoss.toLocaleString()} د.ع` : '0'}</span>
                 </div>
+                {totalDrawerPurchases > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px dashed var(--border-color, #334155)' }}>
+                    <span style={{ color: '#f43f5e', fontWeight: 600 }}>دراو بە کاڵا لە قاسە:</span>
+                    <span style={{ fontWeight: 700, color: '#f43f5e' }}>-{totalDrawerPurchases.toLocaleString()} د.ع</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -863,6 +871,12 @@ const ThisMonth = () => {
           <span>زیان و فەوتانی کاڵا:</span>
           <span>-{totalDamagesLoss.toLocaleString()} دینار</span>
         </div>
+        {totalDrawerPurchases > 0 && (
+          <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+            <span>دراو بە کاڵا (لە قاسە):</span>
+            <span>-{totalDrawerPurchases.toLocaleString()} دینار</span>
+          </div>
+        )}
         {totalRefunded > 0 && (
           <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
             <span>گەڕاوەی کڕیاران:</span>

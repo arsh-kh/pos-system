@@ -57,9 +57,22 @@ exports.getCurrentShift = async (req, res) => {
         );
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
 
-        // 5. Expected cash in register (Opening Cash + Cash Sales + Debtor Cash Payments - Expenses - Cash Refunds)
+        // 4a. Goods purchased from drawer cash during this shift (دەرکردنی پارە بۆ کڕینی کاڵا)
+        const [drawerPurchasesRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as goods_purchased_cash, COUNT(id) as goods_purchased_count FROM drawer_purchases WHERE created_at >= ?",
+            [openedAt]
+        );
+        const goodsPurchasedCash = Number(drawerPurchasesRows[0]?.goods_purchased_cash) || 0;
+        const goodsPurchasedCount = Number(drawerPurchasesRows[0]?.goods_purchased_count) || 0;
+
+        const [drawerPurchasesList] = await db.query(
+            "SELECT * FROM drawer_purchases WHERE created_at >= ? ORDER BY created_at DESC",
+            [openedAt]
+        );
+
+        // 5. Expected cash in register (Opening Cash + Cash Sales + Debtor Cash Payments - Expenses - Cash Refunds - Goods Purchased)
         const openingCash = Number(shift.opening_cash) || 0;
-        const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
+        const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds - goodsPurchasedCash;
 
         res.json({
             status: 'SUCCESS',
@@ -73,6 +86,9 @@ exports.getCurrentShift = async (req, res) => {
                     debt_repaid_cash: debtRepaidCash,
                     cash_refunds: cashRefunds,
                     expenses_paid: expensesPaid,
+                    goods_purchased_cash: goodsPurchasedCash,
+                    goods_purchased_count: goodsPurchasedCount,
+                    goods_purchased_list: drawerPurchasesList,
                     expected_cash: expectedCash,
                     sale_count: saleCount,
                     refund_count: refundCount
@@ -207,8 +223,14 @@ exports.closeShift = async (req, res) => {
         );
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
 
+        const [drawerPurchasesRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as goods_purchased_cash FROM drawer_purchases WHERE created_at >= ?",
+            [openedAt]
+        );
+        const goodsPurchasedCash = Number(drawerPurchasesRows[0]?.goods_purchased_cash) || 0;
+
         const openingCash = Number(shift.opening_cash) || 0;
-        const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
+        const expectedCash = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds - goodsPurchasedCash;
         const countedCash = (actual_cash !== undefined && actual_cash !== '' && actual_cash !== null)
             ? Math.max(0, Math.round(Number(actual_cash) || 0))
             : expectedCash;
@@ -222,13 +244,14 @@ exports.closeShift = async (req, res) => {
                 debt_repaid_cash = ?,
                 cash_refunds = ?,
                 expenses_paid = ?,
+                goods_purchased_cash = ?,
                 expected_cash = ?,
                 actual_cash = ?,
                 difference = ?,
                 status = 'CLOSED',
                 notes = ?
             WHERE id = ?
-        `, [cashSales, debtSales, debtRepaidCash, cashRefunds, expensesPaid, expectedCash, countedCash, diff, notes || null, id]);
+        `, [cashSales, debtSales, debtRepaidCash, cashRefunds, expensesPaid, goodsPurchasedCash, expectedCash, countedCash, diff, notes || null, id]);
 
         const [updatedRows] = await db.query("SELECT * FROM Shifts WHERE id = ?", [id]);
         const closedShift = updatedRows[0];
@@ -256,6 +279,7 @@ exports.closeShift = async (req, res) => {
             debt_repaid_cash: debtRepaidCash,
             cash_refunds: cashRefunds,
             expenses_paid: expensesPaid,
+            goods_purchased_cash: goodsPurchasedCash,
             expected_cash: expectedCash,
             actual_cash: countedCash,
             difference: diff,
@@ -318,6 +342,20 @@ exports.getZReport = async (req, res) => {
             [openedAt, closedAt]
         );
 
+        const [drawerPurchasesRows] = await db.query(
+            "SELECT COALESCE(SUM(amount), 0) as goods_purchased_cash, COUNT(id) as goods_purchased_count FROM drawer_purchases WHERE created_at >= ? AND created_at <= ?",
+            [openedAt, closedAt]
+        );
+        const goodsPurchasedCash = (shift.goods_purchased_cash !== null && shift.goods_purchased_cash !== undefined && Number(shift.goods_purchased_cash) > 0)
+            ? Number(shift.goods_purchased_cash)
+            : Number(drawerPurchasesRows[0]?.goods_purchased_cash) || 0;
+        const goodsPurchasedCount = Number(drawerPurchasesRows[0]?.goods_purchased_count) || 0;
+
+        const [drawerPurchasesList] = await db.query(
+            "SELECT * FROM drawer_purchases WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC",
+            [openedAt, closedAt]
+        );
+
         const [profitRows] = await db.query(
             "SELECT COALESCE(SUM(total_profit), 0) as total_profit FROM Sales WHERE created_at >= ? AND created_at <= ?",
             [openedAt, closedAt]
@@ -331,7 +369,7 @@ exports.getZReport = async (req, res) => {
         const expensesPaid = Number(expenseRows[0].expenses_paid) || 0;
         const grossProfit = Number(profitRows[0].total_profit) || 0;
         const netProfit = grossProfit - expensesPaid;
-        const calculatedExpected = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds;
+        const calculatedExpected = openingCash + cashSales + debtRepaidCash - expensesPaid - cashRefunds - goodsPurchasedCash;
         const expectedCash = (shift.expected_cash !== null && shift.expected_cash !== undefined) ? Number(shift.expected_cash) : calculatedExpected;
         const actualCash = (shift.actual_cash !== null && shift.actual_cash !== undefined) ? Number(shift.actual_cash) : expectedCash;
         const difference = (shift.difference !== null && shift.difference !== undefined) ? Number(shift.difference) : (actualCash - expectedCash);
@@ -349,6 +387,9 @@ exports.getZReport = async (req, res) => {
             debt_repaid_cash: debtRepaidCash,
             cash_refunds: cashRefunds,
             expenses_paid: expensesPaid,
+            goods_purchased_cash: goodsPurchasedCash,
+            goods_purchased_count: goodsPurchasedCount,
+            goods_purchased_list: drawerPurchasesList,
             expected_cash: expectedCash,
             actual_cash: actualCash,
             difference: difference,
@@ -390,6 +431,7 @@ exports.sendZReportTelegram = async (req, res) => {
             debt_repaid_cash: shift.debt_repaid_cash || 0,
             cash_refunds: shift.cash_refunds || 0,
             expenses_paid: shift.expenses_paid,
+            goods_purchased_cash: shift.goods_purchased_cash || 0,
             expected_cash: shift.expected_cash,
             actual_cash: shift.actual_cash,
             difference: shift.difference,
@@ -414,6 +456,71 @@ exports.getAllShifts = async (req, res) => {
         res.json({ status: 'SUCCESS', data: rows });
     } catch (error) {
         console.error('Get All Shifts Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+exports.addDrawerPurchase = async (req, res) => {
+    const { item_name, amount, notes } = req.body;
+    try {
+        const parsedAmount = Math.max(0, Math.round(Number(amount) || 0));
+        if (!item_name || !item_name.trim()) {
+            return res.status(400).json({ status: 'ERROR', message: 'تکایە ناوی کاڵا بنووسە' });
+        }
+        if (parsedAmount <= 0) {
+            return res.status(400).json({ status: 'ERROR', message: 'بڕی پارە دەبێت زیاتر لە سفر بێت' });
+        }
+
+        const [rows] = await db.query("SELECT id FROM Shifts WHERE status = 'OPEN' ORDER BY id DESC LIMIT 1");
+        const shiftId = rows[0]?.id || 'TODAY';
+
+        const [result] = await db.query(
+            "INSERT INTO drawer_purchases (shift_id, item_name, amount, notes) VALUES (?, ?, ?, ?)",
+            [shiftId, item_name.trim(), parsedAmount, notes?.trim() || null]
+        );
+
+        await logAuditAction({
+            req,
+            action_type: 'DRAWER_PURCHASE_ADD',
+            entity_name: 'drawer_purchases',
+            entity_id: result.insertId,
+            new_value: { shift_id: shiftId, item_name: item_name.trim(), amount: parsedAmount, notes },
+            details: `دەرکردنی پارە لە قاسە بۆ کڕینی کاڵا: "${item_name.trim()}"، بڕ: ${parsedAmount.toLocaleString()} دینار`
+        });
+
+        res.status(201).json({
+            status: 'SUCCESS',
+            message: 'پارەی دراو بە کاڵا بە سەرکەوتوویی تۆمارکرا',
+            data: { id: result.insertId, shift_id: shiftId, item_name: item_name.trim(), amount: parsedAmount, notes, created_at: new Date() }
+        });
+    } catch (error) {
+        console.error('Add Drawer Purchase Error:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+exports.deleteDrawerPurchase = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await db.query("SELECT * FROM drawer_purchases WHERE id = ?", [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ status: 'ERROR', message: 'تۆمارەکە نەدۆزرایەوە' });
+        }
+
+        await db.query("DELETE FROM drawer_purchases WHERE id = ?", [id]);
+
+        await logAuditAction({
+            req,
+            action_type: 'DRAWER_PURCHASE_DELETE',
+            entity_name: 'drawer_purchases',
+            entity_id: id,
+            old_value: rows[0],
+            details: `سڕینەوەی دەرکردنی پارەی کاڵا: "${rows[0].item_name}"، بڕ: ${Number(rows[0].amount).toLocaleString()} دینار`
+        });
+
+        res.json({ status: 'SUCCESS', message: 'تۆمارەکە بە سەرکەوتوویی سڕایەوە' });
+    } catch (error) {
+        console.error('Delete Drawer Purchase Error:', error);
         res.status(500).json({ status: 'ERROR', message: error.message });
     }
 };

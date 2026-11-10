@@ -6,7 +6,9 @@ import {
   Printer, 
   CheckCircle2, 
   X,
-  Send
+  Send,
+  ShoppingBag,
+  Trash2
 } from 'lucide-react';
 import { kurdishSearchMatch } from '../utils/kurdishSearch';
 import { formatDateTime } from '../utils/dateFormatter';
@@ -27,6 +29,61 @@ const CashDrawer = () => {
   const [isOpeningCashModalOpen, setIsOpeningCashModalOpen] = useState(false);
   const [openingCashInput, setOpeningCashInput] = useState('');
   const [isSubmittingOpeningCash, setIsSubmittingOpeningCash] = useState(false);
+
+  // Drawer Purchase (دەرکردنی پارە بۆ کڕینی کاڵا) Modal State
+  const [isDrawerPurchaseModalOpen, setIsDrawerPurchaseModalOpen] = useState(false);
+  const [drawerPurchaseItem, setDrawerPurchaseItem] = useState('');
+  const [drawerPurchaseAmount, setDrawerPurchaseAmount] = useState('');
+  const [drawerPurchaseNotes, setDrawerPurchaseNotes] = useState('');
+  const [isSubmittingDrawerPurchase, setIsSubmittingDrawerPurchase] = useState(false);
+
+  const handleSaveDrawerPurchase = async (e) => {
+    e.preventDefault();
+    const amt = Math.max(0, Math.round(Number(drawerPurchaseAmount) || 0));
+    if (!drawerPurchaseItem.trim()) {
+      alert('تکایە ناوی کاڵا بنووسە');
+      return;
+    }
+    if (amt <= 0) {
+      alert('تکایە بڕی پارە دیاری بکە');
+      return;
+    }
+    setIsSubmittingDrawerPurchase(true);
+    try {
+      const res = await axios.post('http://localhost:3001/api/shifts/drawer-purchases', {
+        item_name: drawerPurchaseItem.trim(),
+        amount: amt,
+        notes: drawerPurchaseNotes.trim() || undefined
+      });
+      if (res.data?.status === 'SUCCESS') {
+        setIsDrawerPurchaseModalOpen(false);
+        setDrawerPurchaseItem('');
+        setDrawerPurchaseAmount('');
+        setDrawerPurchaseNotes('');
+        fetchShiftData();
+      } else {
+        alert(res.data?.message || 'هەڵەیەک ڕوویدا');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'شکستی هێنا لە تۆمارکردنی کڕینی کاڵا');
+    } finally {
+      setIsSubmittingDrawerPurchase(false);
+    }
+  };
+
+  const handleDeleteDrawerPurchase = async (id) => {
+    if (!window.confirm('ئایا دڵنیایت لە سڕینەوەی ئەم کڕینە؟ بڕی پارەکە دەگەڕێتەوە ناو قاسە.')) return;
+    try {
+      const res = await axios.delete(`http://localhost:3001/api/shifts/drawer-purchases/${id}`);
+      if (res.data?.status === 'SUCCESS') {
+        fetchShiftData();
+      } else {
+        alert(res.data?.message || 'هەڵەیەک ڕوویدا');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'شکستی هێنا لە سڕینەوە');
+    }
+  };
 
   const handleSaveOpeningCash = async (e) => {
     e.preventDefault();
@@ -180,6 +237,34 @@ const CashDrawer = () => {
             + پارەی ناو داخیلە
           </button>
 
+          {/* Button to Payout Drawer Cash for Goods (دەرکردنی پارە بۆ کڕینی کاڵا) */}
+          <button 
+            type="button"
+            onClick={() => {
+              setDrawerPurchaseItem('');
+              setDrawerPurchaseAmount('');
+              setDrawerPurchaseNotes('');
+              setIsDrawerPurchaseModalOpen(true);
+            }}
+            style={{
+              height: '36px',
+              padding: '0 16px',
+              borderRadius: '6px',
+              background: '#fff1f2',
+              border: '1.5px solid #f43f5e',
+              color: '#e11d48',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            - دەرکردنی پارە بۆ کڕینی کاڵا
+          </button>
+
           {/* Direct 1-Click Print Day Summary */}
           <button 
             type="button"
@@ -194,6 +279,7 @@ const CashDrawer = () => {
                 debt_sales: stats?.debt_sales || 0,
                 debt_repaid_cash: stats?.debt_repaid_cash || 0,
                 expenses_paid: stats?.expenses_paid || 0,
+                goods_purchased_cash: stats?.goods_purchased_cash || 0,
                 cash_refunds: stats?.cash_refunds || 0,
                 expected_cash: stats?.expected_cash || 0,
                 actual_cash: stats?.expected_cash || 0,
@@ -377,7 +463,16 @@ const CashDrawer = () => {
             <div style={{ fontSize: '0.72rem', color: '#b91c1c', marginTop: '2px' }}>پارەی دراو لە قاسە</div>
           </div>
 
-          {/* 6. Debt Sales (Record only) */}
+          {/* 6. Goods Purchased From Drawer (-) */}
+          <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', padding: '10px 14px' }}>
+            <div style={{ fontSize: '0.78rem', color: '#9f1239', fontWeight: 700, marginBottom: '4px' }}>دراو بە کاڵا لە قاسە (-)</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e11d48', fontFamily: 'monospace' }}>
+              -{Number(stats?.goods_purchased_cash || 0).toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>د.ع</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#be123c', marginTop: '2px' }}>{stats?.goods_purchased_count || 0} کڕینی کاڵا لەم شیفتەدا</div>
+          </div>
+
+          {/* 7. Debt Sales (Record only) */}
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px' }}>
             <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, marginBottom: '4px' }}>فرۆشتنی قەرز</div>
             <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#d97706', fontFamily: 'monospace' }}>
@@ -408,7 +503,8 @@ const CashDrawer = () => {
               <span> نەقد ({Number(stats?.cash_sales || 0).toLocaleString()})</span> + 
               <span> وەرگرتنەوەی قەرز ({Number(stats?.debt_repaid_cash || 0).toLocaleString()})</span> - 
               <span> گەڕاندنەوە ({Number(stats?.cash_refunds || 0).toLocaleString()})</span> - 
-              <span> خەرجی ({Number(stats?.expenses_paid || 0).toLocaleString()})</span> = 
+              <span> خەرجی ({Number(stats?.expenses_paid || 0).toLocaleString()})</span> - 
+              <span> دراو بە کاڵا ({Number(stats?.goods_purchased_cash || 0).toLocaleString()})</span> = 
               <strong style={{ color: '#0284c7' }}> {Number(stats?.expected_cash || 0).toLocaleString()} د.ع</strong>
             </div>
           </div>
@@ -417,6 +513,72 @@ const CashDrawer = () => {
             {Number(stats?.expected_cash || 0).toLocaleString()} <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>دینار</span>
           </div>
         </div>
+
+        {/* Active Shift Drawer Purchases Table */}
+        {stats?.goods_purchased_list && stats.goods_purchased_list.length > 0 && (
+          <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#e11d48', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShoppingBag size={16} />
+                لیستی ئەو کاڵایانەی لەم شیفتەدا پارەکەیان لە قاسە دراوە
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                کۆی گشتی: <strong style={{ color: '#e11d48', fontFamily: 'monospace' }}>{Number(stats?.goods_purchased_cash || 0).toLocaleString()} د.ع</strong>
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #fecdd3', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <thead>
+                  <tr style={{ height: '34px', background: '#fff1f2', borderBottom: '1px solid #fecdd3', fontSize: '0.80rem', color: '#9f1239', fontWeight: 700 }}>
+                    <th style={{ padding: '0 12px', textAlign: 'center', width: '36px' }}>#</th>
+                    <th style={{ padding: '0 12px', textAlign: 'right' }}>ناوی کاڵا / کڕین</th>
+                    <th style={{ padding: '0 12px', textAlign: 'center' }}>بڕی پارە</th>
+                    <th style={{ padding: '0 12px', textAlign: 'right' }}>تێبینی</th>
+                    <th style={{ padding: '0 12px', textAlign: 'center' }}>کات</th>
+                    <th style={{ padding: '0 12px', textAlign: 'center', width: '60px' }}>کردار</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.goods_purchased_list.map((dp, idx) => (
+                    <tr key={dp.id} style={{ height: '36px', borderBottom: '1px solid #fecdd3' }}>
+                      <td style={{ padding: '0 12px', textAlign: 'center', color: '#64748b', fontSize: '0.78rem' }}>{idx + 1}</td>
+                      <td style={{ padding: '0 12px', fontWeight: 700, color: '#0f172a', fontSize: '0.84rem' }}>{dp.item_name}</td>
+                      <td style={{ padding: '0 12px', textAlign: 'center', fontWeight: 800, color: '#e11d48', fontFamily: 'monospace', fontSize: '0.84rem' }}>
+                        -{Number(dp.amount || 0).toLocaleString()} د.ع
+                      </td>
+                      <td style={{ padding: '0 12px', color: '#64748b', fontSize: '0.80rem' }}>{dp.notes || '-'}</td>
+                      <td style={{ padding: '0 12px', textAlign: 'center', color: '#64748b', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+                        {formatDateTime(dp.created_at)}
+                      </td>
+                      <td style={{ padding: '0 12px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDrawerPurchase(dp.id)}
+                          style={{
+                            background: '#fff',
+                            border: '1px solid #fecaca',
+                            color: '#ef4444',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            padding: '3px 6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.74rem'
+                          }}
+                          title="سڕینەوە"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Shift History Section */}
@@ -628,6 +790,12 @@ const CashDrawer = () => {
                   <span>خەرجی و تێچووەکان:</span>
                   <span>-{Number(selectedReportForPrint.expenses_paid || 0).toLocaleString()} دینار</span>
                 </div>
+                {Number(selectedReportForPrint.goods_purchased_cash || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <span>دراو بە کاڵا (لە قاسە):</span>
+                    <span>-{Number(selectedReportForPrint.goods_purchased_cash).toLocaleString()} دینار</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', color: '#555' }}>
                   <span>فرۆشتنی قەرز (تۆمار):</span>
                   <span>{Number(selectedReportForPrint.debt_sales || 0).toLocaleString()} دینار</span>
@@ -776,6 +944,145 @@ const CashDrawer = () => {
                 <button
                   type="button"
                   onClick={() => setIsOpeningCashModalOpen(false)}
+                  style={{
+                    height: '38px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    background: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '0.84rem'
+                  }}
+                >
+                  داخستن
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Modal: Record Drawer Cash Payout For Goods (دەرکردنی پارە بۆ کڕینی کاڵا) */}
+      {isDrawerPurchaseModalOpen && (
+        <div className="pos-modal-overlay" onClick={() => setIsDrawerPurchaseModalOpen(false)}>
+          <div className="pos-modal-card pos-modal-sm" onClick={e => e.stopPropagation()} style={{ background: '#ffffff', borderRadius: '12px', padding: '20px', border: '1px solid #cbd5e1', maxWidth: '420px', width: '92%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+              <h2 style={{ fontSize: '1.05rem', margin: 0, color: '#0f172a', fontWeight: 800 }}>
+                دەرکردنی پارە بۆ کڕینی کاڵا
+              </h2>
+              <button 
+                type="button"
+                onClick={() => setIsDrawerPurchaseModalOpen(false)} 
+                style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#64748b', cursor: 'pointer', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDrawerPurchase} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
+                  ناوی کاڵا یان کڕین
+                </label>
+                <input 
+                  type="text"
+                  autoFocus
+                  required
+                  placeholder="نموونە: نان، ماست، عارەبانە..."
+                  value={drawerPurchaseItem}
+                  onChange={e => setDrawerPurchaseItem(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
+                  بڕی پارە (دینار)
+                </label>
+                <input 
+                  type="number"
+                  step="any"
+                  min="1"
+                  required
+                  placeholder="بڕی پارە بنووسە..."
+                  value={drawerPurchaseAmount}
+                  onChange={e => setDrawerPurchaseAmount(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #e11d48',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    fontFamily: 'monospace'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
+                  تێبینی (ئارەزوومەندانە)
+                </label>
+                <input 
+                  type="text"
+                  placeholder="هەر تێبینییەکی تر..."
+                  value={drawerPurchaseNotes}
+                  onChange={e => setDrawerPurchaseNotes(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDrawerPurchase}
+                  style={{
+                    flex: 1,
+                    height: '38px',
+                    borderRadius: '6px',
+                    background: '#e11d48',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: isSubmittingDrawerPurchase ? 'wait' : 'pointer',
+                    fontWeight: 700,
+                    fontSize: '0.88rem'
+                  }}
+                >
+                  {isSubmittingDrawerPurchase ? 'تۆمار دەکرێت...' : 'تۆمارکردن'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDrawerPurchaseModalOpen(false)}
                   style={{
                     height: '38px',
                     padding: '0 16px',
