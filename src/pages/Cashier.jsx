@@ -92,6 +92,19 @@ const Cashier = () => {
   const isDraggingCatRef = useRef(false);
   const touchStartPosRef = useRef({ x: 0, y: 0, catId: null, isMoved: false });
 
+  const [draggedProdId, setDraggedProdId] = useState(null);
+  const [dragOverProdId, setDragOverProdId] = useState(null);
+  const isDraggingProdRef = useRef(false);
+  const touchStartProdPosRef = useRef({ x: 0, y: 0, prodId: null, isMoved: false });
+  const [categoryProductOrderMap, setCategoryProductOrderMap] = useState(() => {
+    try {
+      const raw = localStorage.getItem('pos_cashier_category_products_orders');
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
   const sortCategoriesBySavedOrder = (cats) => {
     try {
       const raw = localStorage.getItem('pos_cashier_categories_order');
@@ -123,6 +136,42 @@ const Cashier = () => {
         localStorage.setItem('pos_cashier_categories_order', JSON.stringify(newCats.map(c => c.id)));
       } catch (_) {}
       return newCats;
+    });
+  };
+
+  const handleReorderCategoryProducts = (sourceId, targetId) => {
+    if (!sourceId || !targetId || String(sourceId) === String(targetId) || !selectedCategoryId) return;
+    setCategoryProductOrderMap(prevMap => {
+      const catKey = String(selectedCategoryId);
+      const currentCatProds = products.filter(p => 
+        selectedCategoryId === 'ALL' || String(p.category_id) === catKey
+      );
+      const existingOrder = prevMap[catKey] || [];
+      const orderMap = new Map();
+      existingOrder.forEach((id, idx) => orderMap.set(String(id), idx));
+
+      const sortedProds = [...currentCatProds].sort((a, b) => {
+        const orderA = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : 99999;
+        const orderB = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : 99999;
+        return orderA - orderB;
+      });
+
+      const sourceIdx = sortedProds.findIndex(p => String(p.id) === String(sourceId));
+      const targetIdx = sortedProds.findIndex(p => String(p.id) === String(targetId));
+      if (sourceIdx < 0 || targetIdx < 0) return prevMap;
+
+      const [movedItem] = sortedProds.splice(sourceIdx, 1);
+      sortedProds.splice(targetIdx, 0, movedItem);
+
+      const newOrderIds = sortedProds.map(p => p.id);
+      const updatedMap = {
+        ...prevMap,
+        [catKey]: newOrderIds
+      };
+      try {
+        localStorage.setItem('pos_cashier_category_products_orders', JSON.stringify(updatedMap));
+      } catch (_) {}
+      return updatedMap;
     });
   };
   const [activePromotions, setActivePromotions] = useState({});
@@ -2114,7 +2163,7 @@ const Cashier = () => {
 
   // Filtered Products for Quick Selection Grid
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
+    const list = products.filter(p => {
       const matchesSearch = kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch);
 
       const matchesCat = 
@@ -2124,7 +2173,23 @@ const Cashier = () => {
 
       return matchesSearch && matchesCat;
     });
-  }, [products, productSearch, selectedCategoryId]);
+
+    if (selectedCategoryId) {
+      const catKey = String(selectedCategoryId);
+      const savedOrder = categoryProductOrderMap[catKey];
+      if (Array.isArray(savedOrder) && savedOrder.length > 0) {
+        const orderMap = new Map();
+        savedOrder.forEach((id, idx) => orderMap.set(String(id), idx));
+        return [...list].sort((a, b) => {
+          const orderA = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : 99999;
+          const orderB = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : 99999;
+          return orderA - orderB;
+        });
+      }
+    }
+
+    return list;
+  }, [products, productSearch, selectedCategoryId, categoryProductOrderMap]);
 
   return (
     <div id="cashier-page-root" style={{ height: '100vh', overflow: 'hidden', padding: '6px 10px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }} dir="rtl">
@@ -2746,16 +2811,116 @@ const Cashier = () => {
                 ) : (
                   filteredProducts.map(p => {
                     const isOutOfStock = !p.is_weighted && Number(p.stock) <= 0;
+                    const isCurrentDragged = String(draggedProdId) === String(p.id);
+                    const isCurrentOver = String(dragOverProdId) === String(p.id) && !isCurrentDragged;
+
                     return (
                       <div
                         key={p.id}
-                        onClick={() => addToCart(p, 1, 'PIECE')}
+                        data-product-id={p.id}
+                        draggable={Boolean(selectedCategoryId)}
+                        onDragStart={(e) => {
+                          if (!selectedCategoryId) return;
+                          e.dataTransfer.setData('text/plain', String(p.id));
+                          e.dataTransfer.effectAllowed = 'move';
+                          setDraggedProdId(p.id);
+                          isDraggingProdRef.current = true;
+                        }}
+                        onDragOver={(e) => {
+                          if (!selectedCategoryId) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                          if (dragOverProdId !== p.id) {
+                            setDragOverProdId(p.id);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverProdId === p.id) {
+                            setDragOverProdId(null);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          if (!selectedCategoryId) return;
+                          e.preventDefault();
+                          const sourceId = e.dataTransfer.getData('text/plain') || draggedProdId;
+                          handleReorderCategoryProducts(sourceId, p.id);
+                          setDraggedProdId(null);
+                          setDragOverProdId(null);
+                          setTimeout(() => {
+                            isDraggingProdRef.current = false;
+                          }, 100);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedProdId(null);
+                          setDragOverProdId(null);
+                          setTimeout(() => {
+                            isDraggingProdRef.current = false;
+                          }, 100);
+                        }}
+                        onTouchStart={(e) => {
+                          if (!selectedCategoryId) return;
+                          const touch = e.touches[0];
+                          touchStartProdPosRef.current = {
+                            x: touch.clientX,
+                            y: touch.clientY,
+                            prodId: p.id,
+                            isMoved: false
+                          };
+                        }}
+                        onTouchMove={(e) => {
+                          if (!selectedCategoryId) return;
+                          const touch = e.touches[0];
+                          const start = touchStartProdPosRef.current;
+                          if (!start.prodId) return;
+                          const dx = Math.abs(touch.clientX - start.x);
+                          const dy = Math.abs(touch.clientY - start.y);
+                          if (dx > 8 || dy > 8) {
+                            start.isMoved = true;
+                            isDraggingProdRef.current = true;
+                            setDraggedProdId(start.prodId);
+                            const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+                            const prodElem = elem?.closest('[data-product-id]');
+                            const overId = prodElem?.getAttribute('data-product-id');
+                            if (overId && overId !== String(dragOverProdId)) {
+                              setDragOverProdId(overId);
+                            }
+                          }
+                        }}
+                        onTouchEnd={(e) => {
+                          if (!selectedCategoryId) return;
+                          const start = touchStartProdPosRef.current;
+                          if (start.isMoved && start.prodId) {
+                            const lastTouch = e.changedTouches[0];
+                            const elem = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY);
+                            const prodElem = elem?.closest('[data-product-id]');
+                            const targetId = prodElem?.getAttribute('data-product-id');
+                            if (targetId && targetId !== String(start.prodId)) {
+                              handleReorderCategoryProducts(start.prodId, targetId);
+                            }
+                          }
+                          touchStartProdPosRef.current = { x: 0, y: 0, prodId: null, isMoved: false };
+                          setDraggedProdId(null);
+                          setDragOverProdId(null);
+                          setTimeout(() => {
+                            isDraggingProdRef.current = false;
+                          }, 100);
+                        }}
+                        onClick={() => {
+                          if (isDraggingProdRef.current) return;
+                          addToCart(p, 1, 'PIECE');
+                        }}
                         style={{
                           padding: '6px 8px',
                           borderRadius: '10px',
-                          border: isOutOfStock ? '1px dashed #ef4444' : '1px solid var(--border-color)',
-                          background: isOutOfStock ? 'rgba(239, 68, 68, 0.05)' : 'var(--bg-secondary)',
-                          opacity: isOutOfStock ? 0.6 : 1,
+                          border: isCurrentOver 
+                            ? '2px dashed var(--accent-color, #2563eb)' 
+                            : (isCurrentDragged 
+                              ? '1px dashed var(--border-color)' 
+                              : (isOutOfStock ? '1px dashed #ef4444' : '1px solid var(--border-color)')),
+                          background: isCurrentOver 
+                            ? 'rgba(37, 99, 235, 0.08)' 
+                            : (isOutOfStock ? 'rgba(239, 68, 68, 0.05)' : 'var(--bg-secondary)'),
+                          opacity: isCurrentDragged ? 0.4 : (isOutOfStock ? 0.6 : 1),
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -2765,9 +2930,12 @@ const Cashier = () => {
                           minHeight: '60px',
                           maxHeight: '60px',
                           boxSizing: 'border-box',
-                          cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                          transition: 'all 0.15s ease'
+                          cursor: isOutOfStock ? 'not-allowed' : (isCurrentDragged ? 'grabbing' : (selectedCategoryId ? 'grab' : 'pointer')),
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          transform: isCurrentOver ? 'scale(1.03)' : (isCurrentDragged ? 'scale(0.97)' : 'none'),
+                          boxShadow: isCurrentOver ? '0 4px 12px rgba(37, 99, 235, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.04)',
+                          transition: 'transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease'
                         }}
                       >
                         <span style={{ 
@@ -2779,7 +2947,8 @@ const Cashier = () => {
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
-                          wordBreak: 'break-word'
+                          wordBreak: 'break-word',
+                          pointerEvents: 'none'
                         }}>
                           {p.name}
                         </span>
