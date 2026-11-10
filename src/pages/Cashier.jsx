@@ -1089,7 +1089,7 @@ const Cashier = () => {
       unit_type: 'PIECE',
       units_per_box: 1
     };
-    setCart(prev => [scaleItem, ...prev]);
+    setCart(prev => [...prev, scaleItem]);
     setScaleItemName('');
     setScalePricePerKg('');
     setScaleWeight('500');
@@ -1511,7 +1511,7 @@ const Cashier = () => {
           units_per_box: 1,
           is_weighted: true
         };
-        setCart(prev => [item, ...prev]);
+        setCart(prev => [...prev, item]);
         setBarcodeInput('');
         barcodeInputRef.current?.focus();
         return;
@@ -1618,7 +1618,7 @@ const Cashier = () => {
       unit: 'دانە',
       is_custom: true
     };
-    setCart(prev => [item, ...prev]);
+    setCart(prev => [...prev, item]);
 
     // Save to product catalog in background if requested
     if (saveToProductCatalog) {
@@ -1679,7 +1679,7 @@ const Cashier = () => {
         unit: 'دانە',
         is_custom: true
       };
-      return [newItem, ...prev];
+      return [...prev, newItem];
     });
   };
 
