@@ -256,12 +256,28 @@ exports.processReturn = async (req, res) => {
             if (!sale.customer_id) {
                 throw new Error('ناتوانرێت لە قەرز کەمبکرێتەوە چونکە ئەم پسووڵەیە کڕیاری دیاریکراوی نییە');
             }
-            const debtNote = `گەڕاندنەوەی کاڵا (${saleItem.product_name} x ${returnQty}) بۆ پسووڵەی #${sale_id} - داشکاندن لە قەرز`;
-            const [debtRes] = await connection.query(
-                'INSERT INTO Customer_Debts (customer_id, sale_id, amount, transaction_type, note) VALUES (?, ?, ?, ?, ?)',
-                [sale.customer_id, sale_id, refundedAmount, 'PAY', debtNote]
+
+            // Financial Debt Guard: Check customer's current total debt balance
+            const [custDebtRows] = await connection.query(
+                `SELECT COALESCE(SUM(CASE WHEN transaction_type = 'ADD' THEN amount ELSE -amount END), 0) AS total_debt
+                 FROM Customer_Debts WHERE customer_id = ?`,
+                [sale.customer_id]
             );
-            debtTransactionId = debtRes.insertId;
+            const currentCustomerDebt = Math.max(0, Number(custDebtRows[0]?.total_debt) || 0);
+
+            // Cap the debt deduction at the remaining customer debt so balance never becomes negative
+            const actualDebtDeduction = Math.min(refundedAmount, currentCustomerDebt);
+
+            if (actualDebtDeduction > 0) {
+                const debtNote = `گەڕاندنەوەی کاڵا (${saleItem.product_name} x ${returnQty}) بۆ پسووڵەی #${sale_id} - داشکاندن لە قەرز`;
+                const [debtRes] = await connection.query(
+                    'INSERT INTO Customer_Debts (customer_id, sale_id, amount, transaction_type, note) VALUES (?, ?, ?, ?, ?)',
+                    [sale.customer_id, sale_id, actualDebtDeduction, 'PAY', debtNote]
+                );
+                debtTransactionId = debtRes.insertId;
+            } else {
+                finalRefundMethod = 'CASH';
+            }
         }
 
         // 2. Insert into Returns
@@ -465,13 +481,26 @@ exports.processDirectReturn = async (req, res) => {
         // 2. If DEBT refund, record in Customer_Debts
         let debtTransactionId = null;
         if (finalRefundMethod === 'DEBT' && customer_id && totalRefundedAmount > 0) {
-            const itemsSummary = processedItems.map(p => `${p.product.name} x ${p.returnQty}`).join('، ');
-            const debtNote = `گەڕاندنەوەی کاڵا لە کاشێر (${itemsSummary}) - کەمکردنەوە لە قەرز`;
-            const [debtRes] = await connection.query(
-                'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',
-                [customer_id, totalRefundedAmount, 'PAY', debtNote]
+            // Financial Debt Guard: Check customer's current total debt balance
+            const [custDebtRows] = await connection.query(
+                `SELECT COALESCE(SUM(CASE WHEN transaction_type = 'ADD' THEN amount ELSE -amount END), 0) AS total_debt
+                 FROM Customer_Debts WHERE customer_id = ?`,
+                [customer_id]
             );
-            debtTransactionId = debtRes.insertId;
+            const currentCustomerDebt = Math.max(0, Number(custDebtRows[0]?.total_debt) || 0);
+            const actualDebtDeduction = Math.min(totalRefundedAmount, currentCustomerDebt);
+
+            if (actualDebtDeduction > 0) {
+                const itemsSummary = processedItems.map(p => `${p.product.name} x ${p.returnQty}`).join('، ');
+                const debtNote = `گەڕاندنەوەی کاڵا لە کاشێر (${itemsSummary}) - کەمکردنەوە لە قەرز`;
+                const [debtRes] = await connection.query(
+                    'INSERT INTO Customer_Debts (customer_id, amount, transaction_type, note) VALUES (?, ?, ?, ?)',
+                    [customer_id, actualDebtDeduction, 'PAY', debtNote]
+                );
+                debtTransactionId = debtRes.insertId;
+            } else {
+                finalRefundMethod = 'CASH';
+            }
         }
 
         // 3. Process each item: insert into Returns, update Products stock, and restore Product_Batches
