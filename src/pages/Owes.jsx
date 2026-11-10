@@ -599,7 +599,7 @@ const Owes = () => {
               setRepaymentsFilter('today');
               fetchRepayments('today');
             }}
-            title="کلیک بکە بۆ بینینی قەرزە هاتۆتەوەکانی ئەمڕۆ"
+            title="کلیک بکە بۆ بینینی بڕی واسڵکراوی قەرز"
             style={{ 
               height: '38px', 
               padding: '0 14px', 
@@ -616,7 +616,7 @@ const Owes = () => {
               transition: 'all 0.15s ease'
             }}
           >
-            قەرزی هاتۆتەوەی ئەمڕۆ: {todayRepaymentsTotal.toLocaleString('en-US')} د.ع
+            بڕی واسڵکراوی قەرز: {todayRepaymentsTotal.toLocaleString('en-US')} د.ع
           </div>
 
           <button 
@@ -682,7 +682,7 @@ const Owes = () => {
               transition: 'all 0.15s ease'
             }}
           >
-            قەرزە هاتۆتەوەکان ({repaymentsFilter === 'today' ? todayRepaymentsCount : repayments.length})
+            قەرزە واسڵکراوەکان ({repaymentsFilter === 'today' ? todayRepaymentsCount : repayments.length})
           </button>
         </div>
 
@@ -894,7 +894,7 @@ const Owes = () => {
             {repaymentsLoading ? (
               <tr><td colSpan="7" style={{ border: '1px solid #e2e8f0', padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>باردەکرێت...</td></tr>
             ) : filteredRepayments.length === 0 ? (
-              <tr><td colSpan="7" style={{ border: '1px solid #e2e8f0', padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>هیچ قەرزێک لەم ماوەیەدا نەهاتووەتەوە</td></tr>
+              <tr><td colSpan="7" style={{ border: '1px solid #e2e8f0', padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>هیچ قەرزێک لەم ماوەیەدا واسڵ نەکراوە</td></tr>
             ) : (
               filteredRepayments.map((r, index) => (
                 <tr 

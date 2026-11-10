@@ -425,7 +425,7 @@ const ThisMonth = () => {
                   <span style={{ fontWeight: 700 }}>{debtIssued.toLocaleString()} د.ع</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px dashed var(--border-color, #334155)' }}>
-                  <span style={{ color: '#10b981', fontWeight: 700 }}>قەرزی هاتۆتەوە:</span>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>بڕی واسڵکراوی قەرز:</span>
                   <span style={{ fontWeight: 800, color: '#10b981' }}>+{debtCollected.toLocaleString()} د.ع</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '2px' }}>
@@ -738,7 +738,7 @@ const ThisMonth = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
               <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                قەرزە هاتۆتەوەکان لەم ماوەیەدا
+                قەرزە واسڵکراوەکان لەم ماوەیەدا
               </h2>
               <span style={{ 
                 fontSize: '0.82rem', 
@@ -748,13 +748,13 @@ const ThisMonth = () => {
                 padding: '4px 10px', 
                 borderRadius: '6px' 
               }}>
-                کۆی هاتۆتەوە: {debtCollected.toLocaleString()} د.ع ({debtRepayments.length})
+                کۆی واسڵکراو: {debtCollected.toLocaleString()} د.ع ({debtRepayments.length})
               </span>
             </div>
 
             {debtRepayments.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                هیچ قەرزێک لەم ماوەیەدا نەهاتووەتەوە.
+                هیچ قەرزێک لەم ماوەیەدا واسڵ نەکراوە.
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -852,7 +852,7 @@ const ThisMonth = () => {
           <span>{debtIssued.toLocaleString()} دینار</span>
         </div>
         <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-          <span>قەرزی هاتۆتەوە (وەرگیراو):</span>
+          <span>بڕی واسڵکراوی قەرز:</span>
           <span>{debtCollected.toLocaleString()} دینار</span>
         </div>
         <div style={{ fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
