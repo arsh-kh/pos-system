@@ -116,11 +116,12 @@ async function testNegativeDebtPrevention() {
 
     console.log('✓ هەموو پشکنینەکان بە تەواوی و ١٠٠٪ سەرکەوتوو بوون!');
   } finally {
-    // Cleanup
+    // Cleanup everything thoroughly
     if (testCustId) {
       await db.query('DELETE FROM Returns WHERE customer_id = ?', [testCustId]).catch(() => {});
       await db.query('DELETE FROM Customer_Debts WHERE customer_id = ?', [testCustId]).catch(() => {});
-      await db.query('DELETE FROM Sale_Items WHERE sale_id IN (SELECT id FROM Sales WHERE customer_id = ?)', [testCustId]).catch(() => {});
+      if (testProdId) await db.query('DELETE FROM Sale_Items WHERE product_id = ?', [testProdId]).catch(() => {});
+      if (testProd2Id) await db.query('DELETE FROM Sale_Items WHERE product_id = ?', [testProd2Id]).catch(() => {});
       await db.query('DELETE FROM Sales WHERE customer_id = ?', [testCustId]).catch(() => {});
       await db.query('DELETE FROM Customers WHERE id = ?', [testCustId]).catch(() => {});
     }
