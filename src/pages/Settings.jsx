@@ -474,10 +474,23 @@ const Settings = () => {
   };
 
   const handleCopyBotLink = () => {
-    const link = `https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`;
+    const link = telegramSettings?.bot_link || `https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}${telegramSettings?.security_pin ? `?start=${telegramSettings.security_pin}` : ''}`;
     navigator.clipboard.writeText(link);
     setCopiedBotLink(true);
     setTimeout(() => setCopiedBotLink(false), 3000);
+  };
+
+  const handleRegeneratePin = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/backup/telegram/regenerate-pin', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'SUCCESS') {
+        setTelegramNotice({ type: 'success', message: 'کۆدی نهێنی (PIN) بە سەرکەوتوویی نوێکرایەوە' });
+        fetchBackupData();
+      }
+    } catch (err) {
+      setTelegramNotice({ type: 'error', message: err.message });
+    }
   };
 
   const handleStartEditRecipient = (r) => {
@@ -1312,8 +1325,63 @@ const Settings = () => {
               )}
             </div>
 
+            {/* Strict Pairing PIN Security Box */}
+            <div style={{
+              padding: '10px 14px',
+              background: 'rgba(34, 158, 217, 0.06)',
+              borderRadius: '12px',
+              border: '1px solid rgba(34, 158, 217, 0.25)',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={16} color="#0284c7" />
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  کۆدی نهێنی بەستنەوە (PIN):
+                </span>
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  letterSpacing: '2px',
+                  background: 'var(--bg-secondary)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  color: '#0284c7',
+                  fontWeight: 900
+                }}>
+                  {telegramSettings?.security_pin || '------'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRegeneratePin}
+                title="دروستکردنی کۆدێکی نوێ"
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <RefreshCw size={11} /> نوێکردنەوەی کۆد
+              </button>
+            </div>
+
             {/* Invite Buttons */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={handleCopyBotLink}
@@ -1338,7 +1406,7 @@ const Settings = () => {
               </button>
 
               <a
-                href={`https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}`}
+                href={telegramSettings?.bot_link || `https://t.me/${telegramSettings?.bot_username || 'cashier_system_bot'}${telegramSettings?.security_pin ? `?start=${telegramSettings.security_pin}` : ''}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{

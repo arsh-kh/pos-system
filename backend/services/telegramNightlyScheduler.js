@@ -390,11 +390,20 @@ const getDebtSummaryForTelegram = async () => {
 };
 
 /**
- * Handle Two-Way Interactive Bot Commands (/today, /backup, /status, /help)
+ * Rate Limiting Cache for PIN pairing attempts (Anti-Brute-Force)
+ * Map<chatId, { attempts: number, lastAttempt: number }>
  */
-const handleIncomingBotCommand = async (chatId, text, senderName = 'بەڕێز') => {
+const failedPinAttempts = new Map();
+
+/**
+ * Handle Two-Way Interactive Bot Commands (/today, /backup, /status, /help, /pair)
+ * With Strict Whitelist Verification & PIN Pairing Protection
+ */
+const handleIncomingBotCommand = async (chatId, rawText, senderName = 'بەڕێز') => {
     const token = await getActiveBotToken();
-    const command = (text || '').trim().toLowerCase();
+    const text = (rawText || '').trim();
+    const command = text.toLowerCase();
+    const cleanChatId = String(chatId);
 
     // Helper to send text message
     const sendReply = async (replyText) => {
@@ -403,7 +412,7 @@ const handleIncomingBotCommand = async (chatId, text, senderName = 'بەڕێز')
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chat_id: chatId,
+                    chat_id: cleanChatId,
                     text: replyText,
                     parse_mode: 'Markdown'
                 }),
@@ -412,6 +421,79 @@ const handleIncomingBotCommand = async (chatId, text, senderName = 'بەڕێز')
         } catch (_) {}
     };
 
+    // 1. Check if chat is already an authorized active recipient
+    const [authRows] = await db.query(
+        'SELECT id, recipient_name, is_active FROM Telegram_Recipients WHERE chat_id = ?',
+        [cleanChatId]
+    );
+    const recipient = authRows[0];
+    const isAuthorized = Boolean(recipient && recipient.is_active);
+
+    // 2. If NOT authorized, only allow PIN pairing attempt
+    if (!isAuthorized) {
+        // Anti-Brute-Force check: max 5 failed attempts per 15 minutes
+        const rateRecord = failedPinAttempts.get(cleanChatId);
+        const nowMs = Date.now();
+        if (rateRecord && rateRecord.attempts >= 5 && (nowMs - rateRecord.lastAttempt < 15 * 60 * 1000)) {
+            console.warn(`[Security Alert] Blocked brute-force attempt from unauthenticated Chat ID: ${cleanChatId}`);
+            return;
+        }
+
+        // Check if message contains a pairing PIN
+        // Formats: "/start <PIN>", "/pair <PIN>", or just "<PIN>" (6 digits)
+        let attemptedPin = null;
+        if (command.startsWith('/start ') || command.startsWith('/pair ')) {
+            attemptedPin = text.split(/\s+/)[1]?.trim();
+        } else if (/^\d{6}$/.test(text)) {
+            attemptedPin = text;
+        }
+
+        // Fetch settings for security_pin and allow_pin_pairing
+        const [settingsRows] = await db.query('SELECT security_pin, allow_pin_pairing FROM telegram_backup_settings WHERE id = 1');
+        const settings = settingsRows[0] || {};
+        const systemPin = String(settings.security_pin || '').trim();
+        const isPairingEnabled = settings.allow_pin_pairing !== 0;
+
+        if (attemptedPin) {
+            if (!isPairingEnabled) {
+                await sendReply('⛔ *بەستنەوە ڕاگیراوە!*\nپەیوەستبوون بە کۆدی نهێنی لەلایەن بەڕێوەبەرەوە داخراوە.');
+                return;
+            }
+
+            if (systemPin && attemptedPin === systemPin) {
+                // PIN is CORRECT! Clear failed attempts
+                failedPinAttempts.delete(cleanChatId);
+
+                if (recipient) {
+                    await db.query('UPDATE Telegram_Recipients SET is_active = TRUE, recipient_name = ? WHERE id = ?', [senderName, recipient.id]);
+                } else {
+                    await db.query('INSERT INTO Telegram_Recipients (chat_id, recipient_name, is_active) VALUES (?, ?, TRUE)', [cleanChatId, senderName]);
+                }
+
+                console.log(`✓ Telegram recipient securely paired with PIN: ${senderName} (Chat ID: ${cleanChatId})`);
+                await sendReply(`✅ *پیرۆزە! هەژمارەکەت بە سەرکەوتوویی پەسەندکرا.*\n\nسڵاو بەڕێز *${senderName}*،\nئەم چاتە وەک وەرگری فەرمی باکئەپ و ڕاپۆرتەکانی سیستەمی مارکێت زیادکرا.\n\nفەرمانە بەردەستەکان:\n📊 /today - کورتەی فرۆشی ئەمڕۆ\n💳 /debts - کورتەی قەرزەکان\n📦 /backup - داواکردنی باکئەپ\n🏪 /status - دۆخی سیستەم\nℹ️ /help - ڕێنمایی`);
+                return;
+            } else {
+                // PIN is INCORRECT!
+                const prevAttempts = rateRecord ? rateRecord.attempts : 0;
+                const newAttempts = prevAttempts + 1;
+                failedPinAttempts.set(cleanChatId, { attempts: newAttempts, lastAttempt: nowMs });
+
+                if (newAttempts >= 5) {
+                    await sendReply('⛔ *هەوڵی نادروست زۆر بوو!*\nئەم هەژمارە بۆ ماوەی ١٥ خولەک بلۆک کرا.');
+                } else {
+                    await sendReply(`❌ *کۆدی نهێنی (PIN) هەڵەیە!*\nدەستپێگەیشتن ڕەتکرایەوە. دەتوانیت ${5 - newAttempts} جاری تر هەوڵ بدەیت.`);
+                }
+                return;
+            }
+        }
+
+        // Unknown unauthenticated user who did not provide a PIN:
+        await sendReply(`🔒 *سیستەمی پارێزراوی مارکێت*\n\nئەم بۆتە تایبەتە و دەستپێگەیشتنی گشتی قەدەغەیە.\nبۆ بەستنەوەی ئەم هەژمارە، تکایە کۆدی نهێنی (PIN) لە بەشی (ڕێکخستنەکان ⬅️ باکئەپ و پاراستن) لەسەر کۆمپیوتەر وەربگرە و بەم شێوازە بینێرە:\n\n\`/pair <کۆدی_نهێنی>\``);
+        return;
+    }
+
+    // 3. User is 100% AUTHORIZED: Handle legitimate commands
     if (command === '/today' || command === '/sales' || command === 'فرۆش' || command === 'ئەمڕۆ') {
         const summary = await getDailyFinancialSummary();
         await sendReply(`📊 *کورتەی زیندووی فرۆشی ئەمڕۆ:*\n\n${summary.formattedMessage}`);
@@ -427,7 +509,7 @@ const handleIncomingBotCommand = async (chatId, text, senderName = 'بەڕێز')
         
         try {
             const formData = new FormData();
-            formData.append('chat_id', chatId);
+            formData.append('chat_id', cleanChatId);
             formData.append('caption', `📦 *باکئەپی تەواوی داتابەیس بە سەرکەوتوویی دروستکرا*\n\n📁 ناوی پەڕگە: \`${filename}\`\n📊 خشتەکان: ${totalTables}\n💾 دێڕەکان: ${totalRows}\n📅 کات: ${new Date().toLocaleTimeString('en-GB')}`);
             formData.append('parse_mode', 'Markdown');
             const fileBlob = new Blob([Buffer.from(jsonString, 'utf8')], { type: 'application/json' });

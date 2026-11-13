@@ -174,53 +174,11 @@ const pollTelegramUpdates = async () => {
                 const username = msg.chat.username ? `@${msg.chat.username}` : '';
                 const fullName = `${senderName} ${username}`.trim();
 
-                // Check if already in recipients
-                const [existing] = await db.query('SELECT id FROM Telegram_Recipients WHERE chat_id = ?', [chatId]);
-
-                if (existing.length === 0) {
-                    await db.query(`
-                        INSERT INTO Telegram_Recipients (chat_id, recipient_name, is_active)
-                        VALUES (?, ?, TRUE)
-                    `, [chatId, fullName]);
-
-                    console.log(`✓ New Telegram recipient auto-registered: ${fullName} (ID: ${chatId})`);
-
-                    // Send welcome confirmation to the new user's chat
-                    const welcomeMsg = `🎉 *پیرۆزە! بە سەرکەوتوویی وەک وەرگری باکئەپ زیادکرایت*
-
-سڵاو بەڕێز *${senderName}*،
-ئەم چاتە بە شێوەیەکی ئۆتۆماتیکی وەک وەرگری باکئەپی سیستەمی POS زیادکرا.
-
-🤖 *بۆتی فەرمی:* @${DEFAULT_BOT_USERNAME}
-📱 *ناسنامەی تۆ:* \`${chatId}\`
-🔄 *دۆخ:* چالاکە بۆ وەرگرتنی باکئەپ
-
-لەمەودوا لە کاتی ناردنی باکئەپی فرۆشتن و داتابەیس، کۆپییەک دەگاتە ئەم چاتە.`;
-
-                    try {
-                        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                text: welcomeMsg,
-                                parse_mode: 'Markdown'
-                            })
-                        });
-                    } catch (_) {}
-
-                    // Immediately dispatch an initial backup document upon registration!
-                    try {
-                        await handleIncomingBotCommand(chatId, '/backup', senderName);
-                    } catch (bErr) {
-                        console.warn('Initial backup dispatch on start error:', bErr.message);
-                    }
-                }
-
-                // Handle interactive two-way bot commands (/today, /backup, /status, /help)
+                // STRICT SECURITY: Do NOT auto-register unknown chats.
+                // Pass directly to handleIncomingBotCommand which strictly validates authorization & PIN pairing
                 if (msg.text && typeof msg.text === 'string') {
                     try {
-                        await handleIncomingBotCommand(chatId, msg.text, senderName);
+                        await handleIncomingBotCommand(chatId, msg.text, fullName);
                     } catch (cmdErr) {
                         console.warn('Bot command processing error:', cmdErr.message);
                     }
@@ -254,7 +212,9 @@ exports.getTelegramSettings = async (req, res) => {
             status: 'SUCCESS',
             data: {
                 bot_username: DEFAULT_BOT_USERNAME,
-                bot_link: `https://t.me/${DEFAULT_BOT_USERNAME}`,
+                bot_link: `https://t.me/${DEFAULT_BOT_USERNAME}${settings.security_pin ? `?start=${settings.security_pin}` : ''}`,
+                security_pin: settings.security_pin || '',
+                allow_pin_pairing: settings.allow_pin_pairing !== 0,
                 auto_backup_enabled: Boolean(settings.auto_backup_enabled),
                 last_sent_at: settings.last_sent_at,
                 last_status: settings.last_status,
@@ -756,3 +716,43 @@ exports.getDailySummary = async (req, res) => {
 };
 
 module.exports = exports;
+
+/**
+ * Regenerate Security Pairing PIN
+ * POST /api/backup/telegram/regenerate-pin
+ */
+exports.regeneratePin = async (req, res) => {
+    try {
+        const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+        await db.query('UPDATE Telegram_Backup_Settings SET security_pin = ? WHERE id = 1', [newPin]);
+        res.json({
+            status: 'SUCCESS',
+            message: 'کۆدی نهێنی بە سەرکەوتوویی نوێکرایەوە',
+            data: { security_pin: newPin }
+        });
+    } catch (error) {
+        console.error('Error regenerating PIN:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
+
+/**
+ * Toggle PIN Pairing on/off
+ * POST /api/backup/telegram/toggle-pairing
+ */
+exports.togglePinPairing = async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT allow_pin_pairing FROM Telegram_Backup_Settings WHERE id = 1');
+        const current = rows[0]?.allow_pin_pairing !== 0;
+        const newStatus = !current;
+        await db.query('UPDATE Telegram_Backup_Settings SET allow_pin_pairing = ? WHERE id = 1', [newStatus ? 1 : 0]);
+        res.json({
+            status: 'SUCCESS',
+            message: newStatus ? 'پەیوەستبوون بە کۆدی نهێنی کارا کرا' : 'پەیوەستبوون بە کۆدی نهێنی ناچالاک کرا',
+            data: { allow_pin_pairing: newStatus }
+        });
+    } catch (error) {
+        console.error('Error toggling PIN pairing:', error);
+        res.status(500).json({ status: 'ERROR', message: error.message });
+    }
+};
