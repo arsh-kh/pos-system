@@ -274,6 +274,31 @@ const ProductModal = ({
     setFormData(prev => ({ ...prev, box_barcode: randomBox }));
   };
 
+  const cleanNumericInput = (val) => {
+    if (val === '' || val === undefined || val === null) return '';
+    const str = String(val);
+    const sanitized = str.replace(/[^0-9.]/g, '');
+    const parts = sanitized.split('.');
+    return parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : sanitized;
+  };
+
+  const placeCursorAtEnd = (e) => {
+    const el = e.target;
+    if (!el) return;
+    const setEnd = () => {
+      try {
+        const len = el.value ? el.value.length : 0;
+        if (typeof el.setSelectionRange === 'function') {
+          el.setSelectionRange(len, len);
+        }
+      } catch (_) {}
+    };
+    setEnd();
+    requestAnimationFrame(setEnd);
+    setTimeout(setEnd, 0);
+    setTimeout(setEnd, 20);
+  };
+
   // Auto-calculate unit cost price based on carton cost price / units per box
   const handleBoxCostChange = (val) => {
     const boxCost = parseFloat(val);
@@ -802,13 +827,17 @@ const ProductModal = ({
                 {formData.is_weighted ? 'نرخی کڕینی گونیە' : 'نرخی کڕینی کارتۆن'}
               </label>
               <input 
-                type="number" 
-                step="any"
-                min="0"
+                type="text" 
+                inputMode="decimal"
                 placeholder="0"
                 value={formData.box_cost_price} 
-                onChange={e => handleBoxCostChange(e.target.value)} 
-                onFocus={e => e.target.select()}
+                onChange={e => handleBoxCostChange(cleanNumericInput(e.target.value))} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#f8fafc', border: '1.5px solid #93c5fd', color: '#1e3a8a', fontWeight: 700, boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
@@ -818,13 +847,17 @@ const ProductModal = ({
                 {formData.is_weighted ? 'نرخی فرۆشتنی گونیە' : 'نرخی فرۆشتنی کارتۆن'}
               </label>
               <input 
-                type="number" 
-                step="any"
-                min="0"
+                type="text" 
+                inputMode="decimal"
                 placeholder="0"
                 value={formData.wholesale_price} 
-                onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
-                onFocus={e => e.target.select()}
+                onChange={e => setFormData({ ...formData, wholesale_price: cleanNumericInput(e.target.value) })} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
@@ -834,13 +867,17 @@ const ProductModal = ({
                 {formData.is_weighted ? 'کێش لە گونیەدا (کگم)' : 'دانە لە کارتۆندا'}
               </label>
               <input 
-                type="number" 
-                min={formData.is_weighted ? '0.1' : '1'}
-                step="any"
+                type="text" 
+                inputMode="decimal"
                 placeholder={formData.is_weighted ? '25' : '24'}
                 value={formData.units_per_box} 
-                onChange={e => handleUnitsPerBoxChange(e.target.value)} 
-                onFocus={e => e.target.select()}
+                onChange={e => handleUnitsPerBoxChange(cleanNumericInput(e.target.value))} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
@@ -909,13 +946,17 @@ const ProductModal = ({
                 {formData.is_weighted ? 'نرخی کڕینی ١ کیلۆ' : 'نرخی کڕینی تاک'}
               </label>
               <input 
-                type="number" 
-                step="any"
-                min="0"
+                type="text" 
+                inputMode="decimal"
                 placeholder="0"
                 value={formData.cost_price} 
-                onChange={e => setFormData({ ...formData, cost_price: e.target.value })} 
-                onFocus={e => e.target.select()}
+                onChange={e => setFormData({ ...formData, cost_price: cleanNumericInput(e.target.value) })} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
@@ -925,14 +966,18 @@ const ProductModal = ({
                 {formData.is_weighted ? 'نرخی فرۆشتنی ١ کیلۆ' : 'نرخی فرۆشتنی تاک'} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <input 
-                type="number" 
-                step="any"
-                min="0"
+                type="text" 
+                inputMode="decimal"
                 required 
                 placeholder="0"
                 value={formData.selling_price} 
-                onChange={e => setFormData({ ...formData, selling_price: e.target.value })} 
-                onFocus={e => e.target.select()}
+                onChange={e => setFormData({ ...formData, selling_price: cleanNumericInput(e.target.value) })} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
@@ -943,13 +988,17 @@ const ProductModal = ({
                 {formData.is_weighted ? (isPurchaseMode ? 'کێش (کگم)' : 'کێش لە کۆگا (کگم)') : (isPurchaseMode ? 'بڕ (دانە)' : 'دانە لە کۆگا')}
               </label>
               <input 
-                type="number" 
-                step={formData.is_weighted ? '0.001' : '1'}
-                min="0"
+                type="text" 
+                inputMode="decimal"
                 placeholder="0"
                 value={formData.stock} 
-                onChange={e => setFormData({ ...formData, stock: e.target.value })} 
-                onFocus={e => e.target.select()}
+                onChange={e => setFormData({ ...formData, stock: cleanNumericInput(e.target.value) })} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ 
                   width: '100%', 
                   height: '38px', 
@@ -971,13 +1020,17 @@ const ProductModal = ({
                 {formData.is_weighted ? 'ئاگاداری کەمبوونەوە (کگم)' : 'ئاگاداری کەمبوونەوە (دانە)'}
               </label>
               <input 
-                type="number" 
-                step={formData.is_weighted ? '0.001' : '1'}
-                min="0"
+                type="text" 
+                inputMode="decimal"
                 placeholder="5"
                 value={formData.low_stock_threshold} 
-                onChange={e => setFormData({ ...formData, low_stock_threshold: e.target.value })} 
-                onFocus={e => e.target.select()}
+                onChange={e => setFormData({ ...formData, low_stock_threshold: cleanNumericInput(e.target.value) })} 
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>

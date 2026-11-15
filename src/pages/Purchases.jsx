@@ -99,6 +99,31 @@ const Purchases = () => {
     return products.filter(p => kurdishSearchMatch([p.name, p.barcode, p.box_barcode], giftProductSearch)).slice(0, 10);
   }, [products, giftProductSearch, selectedGiftProduct]);
 
+  const cleanNumericInput = (val) => {
+    if (val === '' || val === undefined || val === null) return '';
+    const str = String(val);
+    const sanitized = str.replace(/[^0-9.]/g, '');
+    const parts = sanitized.split('.');
+    return parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : sanitized;
+  };
+
+  const placeCursorAtEnd = (e) => {
+    const el = e.target;
+    if (!el) return;
+    const setEnd = () => {
+      try {
+        const len = el.value ? el.value.length : 0;
+        if (typeof el.setSelectionRange === 'function') {
+          el.setSelectionRange(len, len);
+        }
+      } catch (_) {}
+    };
+    setEnd();
+    requestAnimationFrame(setEnd);
+    setTimeout(setEnd, 0);
+    setTimeout(setEnd, 20);
+  };
+
   const getAuthConfig = () => {
     const token = localStorage.getItem('token');
     return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
@@ -1322,13 +1347,16 @@ const Purchases = () => {
         {paymentMethod === 'PARTIAL' && (
           <div style={{ width: '120px' }}>
             <input 
-              type="number" 
-              step="any"
-              min="0"
-              max={totalInvoiceCost}
+              type="text" 
+              inputMode="decimal"
               value={paidAmount} 
-              onChange={(e) => handlePaidAmountChange(e.target.value)} 
-              onFocus={(e) => e.target.select()}
+              onChange={(e) => handlePaidAmountChange(cleanNumericInput(e.target.value))} 
+              onFocus={placeCursorAtEnd}
+              onClick={(e) => {
+                if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                  placeCursorAtEnd(e);
+                }
+              }}
               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
               placeholder="پارەی دراو"
               style={{
@@ -1353,19 +1381,16 @@ const Purchases = () => {
         {/* Additional Cost Field */}
         <div style={{ width: '150px' }}>
           <input 
-            type="number" 
-            step="any"
-            min="0"
+            type="text" 
+            inputMode="decimal"
             value={additionalCost} 
-            onChange={(e) => {
-              if (e.target.value === '') {
-                setAdditionalCost('');
-              } else {
-                const v = Math.max(0, parseFloat(e.target.value) || 0);
-                setAdditionalCost(String(v));
+            onChange={(e) => setAdditionalCost(cleanNumericInput(e.target.value))}
+            onFocus={placeCursorAtEnd}
+            onClick={(e) => {
+              if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                placeCursorAtEnd(e);
               }
             }}
-            onFocus={(e) => e.target.select()}
             onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
             placeholder="تێچووی زیادە (بار)"
             style={{
@@ -1706,12 +1731,16 @@ const Purchases = () => {
                     {/* Quantity Input - Clean Single Centered Input */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
                       <input 
-                        type="number" 
-                        step="any"
-                        min="0.001" 
+                        type="text" 
+                        inputMode="decimal"
                         value={isBox ? item.box_quantity : item.quantity} 
-                        onChange={(e) => updateItem(index, isBox ? 'box_quantity' : 'quantity', e.target.value)} 
-                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => updateItem(index, isBox ? 'box_quantity' : 'quantity', cleanNumericInput(e.target.value))} 
+                        onFocus={placeCursorAtEnd}
+                        onClick={(e) => {
+                          if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                            placeCursorAtEnd(e);
+                          }
+                        }}
                         onBlur={(e) => {
                           const formatted = formatCleanQty(e.target.value);
                           if (formatted !== e.target.value) {
@@ -1738,13 +1767,17 @@ const Purchases = () => {
                     {/* Units per Box/Sack Input ("دانە لە کارتۆندا" / "کێش لە گونیەدا") */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
                       <input 
-                        type="number" 
-                        step="any"
-                        min={item.is_weighted ? '0.1' : '1'} 
+                        type="text" 
+                        inputMode="decimal"
                         disabled={!isBox}
                         value={isBox ? (formatCleanQty(item.units_per_box) ?? '') : (item.is_weighted ? (formatCleanQty(item.last_box_multiplier || item.units_per_box) || '1') : '1')} 
-                        onChange={(e) => updateItem(index, 'units_per_box', e.target.value)} 
-                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => updateItem(index, 'units_per_box', cleanNumericInput(e.target.value))} 
+                        onFocus={placeCursorAtEnd}
+                        onClick={(e) => {
+                          if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                            placeCursorAtEnd(e);
+                          }
+                        }}
                         onBlur={(e) => {
                           const formatted = formatCleanQty(e.target.value);
                           if (formatted !== e.target.value) {
@@ -1772,12 +1805,16 @@ const Purchases = () => {
                     {/* Cost Price Input - Clean Single Centered Input */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
                       <input 
-                        type="number" 
-                        step="any"
-                        min="0"
+                        type="text" 
+                        inputMode="decimal"
                         value={isBox ? item.box_cost_price : item.cost_price} 
-                        onChange={(e) => updateItem(index, isBox ? 'box_cost_price' : 'cost_price', e.target.value)} 
-                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => updateItem(index, isBox ? 'box_cost_price' : 'cost_price', cleanNumericInput(e.target.value))} 
+                        onFocus={placeCursorAtEnd}
+                        onClick={(e) => {
+                          if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                            placeCursorAtEnd(e);
+                          }
+                        }}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
                           width: '90px',
@@ -1809,12 +1846,16 @@ const Purchases = () => {
                     {/* Selling Price (Per Piece) - Clean Gray Border */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
                       <input 
-                        type="number" 
-                        step="any"
-                        min="0"
+                        type="text" 
+                        inputMode="decimal"
                         value={item.selling_price} 
-                        onChange={(e) => updateItem(index, 'selling_price', e.target.value)} 
-                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => updateItem(index, 'selling_price', cleanNumericInput(e.target.value))} 
+                        onFocus={placeCursorAtEnd}
+                        onClick={(e) => {
+                          if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                            placeCursorAtEnd(e);
+                          }
+                        }}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
                           width: '85px',
@@ -2441,12 +2482,16 @@ const Purchases = () => {
                   بڕی دیاری
                 </label>
                 <input
-                  type="number"
-                  step="any"
-                  min="0.001"
+                  type="text"
+                  inputMode="decimal"
                   value={giftQuantity}
-                  onChange={(e) => handleGiftQuantityChange(e.target.value)}
-                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => handleGiftQuantityChange(cleanNumericInput(e.target.value))}
+                  onFocus={placeCursorAtEnd}
+                  onClick={(e) => {
+                    if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                      placeCursorAtEnd(e);
+                    }
+                  }}
                   style={{
                     width: '100%',
                     height: '38px',
@@ -2470,12 +2515,16 @@ const Purchases = () => {
                 بەهای دیاری (دینار)
               </label>
               <input
-                type="number"
-                step="any"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={giftValue}
-                onChange={(e) => setGiftValue(e.target.value)}
-                onFocus={(e) => e.target.select()}
+                onChange={(e) => setGiftValue(cleanNumericInput(e.target.value))}
+                onFocus={placeCursorAtEnd}
+                onClick={(e) => {
+                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                    placeCursorAtEnd(e);
+                  }
+                }}
                 style={{
                   width: '100%',
                   height: '38px',
