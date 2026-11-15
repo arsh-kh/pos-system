@@ -17,6 +17,7 @@ const ensureInvoicesSchema = async () => {
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN landed_cost_price BIGINT DEFAULT NULL"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
         try { await db.query("ALTER TABLE Product_Batches ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN bonus_quantity DECIMAL(10,3) NOT NULL DEFAULT 0.000"); } catch (_) {}
     } catch (err) {
         console.error('Invoice schema ensure error:', err.message);
     }
@@ -175,13 +176,18 @@ exports.createPurchaseInvoice = async (req, res) => {
             const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
 
             const itemUnitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+            const isBox = item.unit_type === 'BOX';
+            const bonusInputQty = Math.max(0, parseFloat(item.bonus_quantity) || 0);
+            const bonusPieces = isBox ? (bonusInputQty * itemUnitsPerBox) : bonusInputQty;
+            const totalStockPieces = itemQtyNum + bonusPieces;
+
             const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
                 ? safeBigInt(item.selling_price ?? item.sell_price).toString()
                 : null;
 
-            // Record raw supplier invoice cost, landed unit cost, packaging details and exact line total
+            // Record raw supplier invoice cost, landed unit cost, packaging details, bonus and exact line total
             await connection.query(
-                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     invoice_id, 
                     finalProductId, 
@@ -193,7 +199,8 @@ exports.createPurchaseInvoice = async (req, res) => {
                     item.unit_type || 'PIECE',
                     item.box_quantity ? item.box_quantity : null,
                     item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
-                    itemSubtotal.toString()
+                    itemSubtotal.toString(),
+                    bonusInputQty
                 ]
             );
 
@@ -226,12 +233,43 @@ exports.createPurchaseInvoice = async (req, res) => {
                 dateVal
             ]);
 
+            // If bonus pieces exist, insert separate BONUS FIFO batch with cost_price = 0 (100% pure profit when sold!)
+            if (bonusPieces > 0) {
+                const bonusBatchNum = `BATCH-${invoice_id}-${finalProductId}-BONUS`;
+                const bonusDateVal = new Date(dateVal.getTime() + 1000);
+                await connection.query(`
+                    INSERT INTO Product_Batches (
+                        product_id,
+                        purchase_invoice_id,
+                        batch_number,
+                        initial_quantity,
+                        remaining_quantity,
+                        cost_price,
+                        selling_price,
+                        units_per_box,
+                        expiry_date,
+                        status,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?)
+                `, [
+                    finalProductId,
+                    invoice_id,
+                    bonusBatchNum,
+                    bonusPieces,
+                    bonusPieces,
+                    sellingPriceVal,
+                    itemUnitsPerBox,
+                    item.expiry_date || null,
+                    bonusDateVal
+                ]);
+            }
+
             // HISTORICAL PRICE & STOCK INTEGRITY (CORE ACCOUNTING):
             // DO NOT overwrite global Product flat prices/packaging (cost_price, box_cost_price, selling_price, units_per_box).
-            // ONLY increment inventory stock!
+            // ONLY increment inventory stock with total pieces (paid + bonus)!
             await connection.query(
                 'UPDATE Products SET stock = stock + ? WHERE id = ?',
-                [itemQtyNum, finalProductId]
+                [totalStockPieces, finalProductId]
             );
         }
 
@@ -449,6 +487,11 @@ exports.updatePurchaseInvoice = async (req, res) => {
             const additionalPerUnit = itemQtyNum > 0 ? Math.round(Number(allocatedCostForItem) / itemQtyNum) : 0;
             const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
             const itemUnitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+            const isBox = item.unit_type === 'BOX';
+            const bonusInputQty = Math.max(0, parseFloat(item.bonus_quantity) || 0);
+            const bonusPieces = isBox ? (bonusInputQty * itemUnitsPerBox) : bonusInputQty;
+            const newTotalPieces = itemQtyNum + bonusPieces;
+
             const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
                 ? safeBigInt(item.selling_price ?? item.sell_price).toString()
                 : null;
@@ -456,12 +499,20 @@ exports.updatePurchaseInvoice = async (req, res) => {
             if (oldItemMap.has(pId)) {
                 // Existing item: Update item and only adjust inventory by DELTA
                 const existingItem = oldItemMap.get(pId);
-                const oldQty = parseFloat(existingItem.quantity) || 0;
-                const qtyDelta = itemQtyNum - oldQty;
+                const oldPaidQty = parseFloat(existingItem.quantity) || 0;
+                const oldIsBox = existingItem.unit_type === 'BOX';
+                const oldUnits = parseFloat(existingItem.units_per_box) || 1;
+                const oldBonusInput = parseFloat(existingItem.bonus_quantity) || 0;
+                const oldBonusPieces = oldIsBox ? (oldBonusInput * oldUnits) : oldBonusInput;
+                const oldTotalPieces = oldPaidQty + oldBonusPieces;
+
+                const totalStockDelta = newTotalPieces - oldTotalPieces;
+                const paidDelta = itemQtyNum - oldPaidQty;
+                const bonusDelta = bonusPieces - oldBonusPieces;
 
                 await connection.query(`
                     UPDATE Purchase_Invoice_Items 
-                    SET quantity = ?, cost_price = ?, landed_cost_price = ?, selling_price = ?, units_per_box = ?, unit_type = ?, box_quantity = ?, box_cost_price = ?, line_total = ?
+                    SET quantity = ?, cost_price = ?, landed_cost_price = ?, selling_price = ?, units_per_box = ?, unit_type = ?, box_quantity = ?, box_cost_price = ?, line_total = ?, bonus_quantity = ?
                     WHERE id = ?
                 `, [
                     itemQtyNum,
@@ -473,17 +524,18 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     item.box_quantity ? item.box_quantity : null,
                     item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
                     itemSubtotal.toString(),
+                    bonusInputQty,
                     existingItem.id
                 ]);
 
-                // Update product stock with delta only (if delta == 0, stock is completely unchanged!)
-                if (qtyDelta !== 0) {
-                    await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [qtyDelta, pId]);
+                // Update product stock with total delta (paid + bonus)
+                if (totalStockDelta !== 0) {
+                    await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [totalStockDelta, pId]);
                 }
 
-                // Update Batch
-                if (oldBatchMap.has(pId)) {
-                    const batch = oldBatchMap.get(pId);
+                // Update Regular Batch
+                const regularBatch = oldBatches.find(b => Number(b.product_id) === pId && !String(b.batch_number).endsWith('-BONUS'));
+                if (regularBatch) {
                     await connection.query(`
                         UPDATE Product_Batches 
                         SET initial_quantity = initial_quantity + ?,
@@ -493,20 +545,62 @@ exports.updatePurchaseInvoice = async (req, res) => {
                             units_per_box = ?
                         WHERE id = ?
                     `, [
-                        qtyDelta,
-                        qtyDelta,
+                        paidDelta,
+                        paidDelta,
                         landedUnitCost.toString(),
                         sellingPriceVal,
                         itemUnitsPerBox,
-                        batch.id
+                        regularBatch.id
+                    ]);
+                }
+
+                // Update or Insert Bonus Batch
+                const bonusBatch = oldBatches.find(b => Number(b.product_id) === pId && String(b.batch_number).endsWith('-BONUS'));
+                if (bonusBatch) {
+                    if (bonusPieces > 0) {
+                        await connection.query(`
+                            UPDATE Product_Batches 
+                            SET initial_quantity = initial_quantity + ?,
+                                remaining_quantity = remaining_quantity + ?,
+                                cost_price = 0,
+                                selling_price = ?,
+                                units_per_box = ?
+                            WHERE id = ?
+                        `, [
+                            bonusDelta,
+                            bonusDelta,
+                            sellingPriceVal,
+                            itemUnitsPerBox,
+                            bonusBatch.id
+                        ]);
+                    } else {
+                        await connection.query('DELETE FROM Product_Batches WHERE id = ?', [bonusBatch.id]);
+                    }
+                } else if (bonusPieces > 0) {
+                    const bonusBatchNum = `BATCH-${id}-${pId}-BONUS`;
+                    const bonusDateVal = new Date(dateVal.getTime() + 1000);
+                    await connection.query(`
+                        INSERT INTO Product_Batches (
+                            product_id, purchase_invoice_id, batch_number, initial_quantity, remaining_quantity, cost_price, selling_price, units_per_box, expiry_date, status, created_at
+                        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?)
+                    `, [
+                        pId,
+                        id,
+                        bonusBatchNum,
+                        bonusPieces,
+                        bonusPieces,
+                        sellingPriceVal,
+                        itemUnitsPerBox,
+                        item.expiry_date || null,
+                        bonusDateVal
                     ]);
                 }
             } else {
                 // NEW ITEM added to invoice: Insert item, create batch, add full quantity to stock
                 await connection.query(`
                     INSERT INTO Purchase_Invoice_Items (
-                        invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     id,
                     pId,
@@ -518,7 +612,8 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     item.unit_type || 'PIECE',
                     item.box_quantity ? item.box_quantity : null,
                     item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
-                    itemSubtotal.toString()
+                    itemSubtotal.toString(),
+                    bonusInputQty
                 ]);
 
                 const batchNum = item.batch_number || `BATCH-${id}-${pId}`;
@@ -539,19 +634,42 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     dateVal
                 ]);
 
-                await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [itemQtyNum, pId]);
+                if (bonusPieces > 0) {
+                    const bonusBatchNum = `BATCH-${id}-${pId}-BONUS`;
+                    const bonusDateVal = new Date(dateVal.getTime() + 1000);
+                    await connection.query(`
+                        INSERT INTO Product_Batches (
+                            product_id, purchase_invoice_id, batch_number, initial_quantity, remaining_quantity, cost_price, selling_price, units_per_box, expiry_date, status, created_at
+                        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?)
+                    `, [
+                        pId,
+                        id,
+                        bonusBatchNum,
+                        bonusPieces,
+                        bonusPieces,
+                        sellingPriceVal,
+                        itemUnitsPerBox,
+                        item.expiry_date || null,
+                        bonusDateVal
+                    ]);
+                }
+
+                await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [newTotalPieces, pId]);
             }
         }
 
         // Handle removed items
         for (const [oldPId, oldItem] of oldItemMap.entries()) {
             if (!processedProductIds.has(oldPId)) {
-                const oldQty = parseFloat(oldItem.quantity) || 0;
-                await connection.query('UPDATE Products SET stock = stock - ? WHERE id = ?', [oldQty, oldPId]);
-                if (oldBatchMap.has(oldPId)) {
-                    const b = oldBatchMap.get(oldPId);
-                    await connection.query('DELETE FROM Product_Batches WHERE id = ?', [b.id]);
-                }
+                const oldPaidQty = parseFloat(oldItem.quantity) || 0;
+                const oldIsBox = oldItem.unit_type === 'BOX';
+                const oldUnits = parseFloat(oldItem.units_per_box) || 1;
+                const oldBonusInput = parseFloat(oldItem.bonus_quantity) || 0;
+                const oldBonusPieces = oldIsBox ? (oldBonusInput * oldUnits) : oldBonusInput;
+                const oldTotalPieces = oldPaidQty + oldBonusPieces;
+
+                await connection.query('UPDATE Products SET stock = stock - ? WHERE id = ?', [oldTotalPieces, oldPId]);
+                await connection.query('DELETE FROM Product_Batches WHERE purchase_invoice_id = ? AND product_id = ?', [id, oldPId]);
                 await connection.query('DELETE FROM Purchase_Invoice_Items WHERE id = ?', [oldItem.id]);
             }
         }

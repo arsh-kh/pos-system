@@ -808,7 +808,8 @@ const ProductModal = ({
                 placeholder="0"
                 value={formData.box_cost_price} 
                 onChange={e => handleBoxCostChange(e.target.value)} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#f8fafc', border: '1.5px solid #93c5fd', color: '#1e3a8a', fontWeight: 700, boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onFocus={e => e.target.select()}
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#f8fafc', border: '1.5px solid #93c5fd', color: '#1e3a8a', fontWeight: 700, boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
 
@@ -823,7 +824,8 @@ const ProductModal = ({
                 placeholder="0"
                 value={formData.wholesale_price} 
                 onChange={e => setFormData({ ...formData, wholesale_price: e.target.value })} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onFocus={e => e.target.select()}
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
 
@@ -838,7 +840,8 @@ const ProductModal = ({
                 placeholder={formData.is_weighted ? '25' : '24'}
                 value={formData.units_per_box} 
                 onChange={e => handleUnitsPerBoxChange(e.target.value)} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onFocus={e => e.target.select()}
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
 
@@ -912,7 +915,8 @@ const ProductModal = ({
                 placeholder="0"
                 value={formData.cost_price} 
                 onChange={e => setFormData({ ...formData, cost_price: e.target.value })} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onFocus={e => e.target.select()}
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
 
@@ -928,7 +932,8 @@ const ProductModal = ({
                 placeholder="0"
                 value={formData.selling_price} 
                 onChange={e => setFormData({ ...formData, selling_price: e.target.value })} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onFocus={e => e.target.select()}
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
 
@@ -944,6 +949,7 @@ const ProductModal = ({
                 placeholder="0"
                 value={formData.stock} 
                 onChange={e => setFormData({ ...formData, stock: e.target.value })} 
+                onFocus={e => e.target.select()}
                 style={{ 
                   width: '100%', 
                   height: '38px', 
@@ -954,7 +960,8 @@ const ProductModal = ({
                   color: '#1e293b', 
                   boxSizing: 'border-box', 
                   fontSize: '0.88rem', 
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  direction: 'ltr'
                 }} 
               />
             </div>
@@ -970,7 +977,8 @@ const ProductModal = ({
                 placeholder="5"
                 value={formData.low_stock_threshold} 
                 onChange={e => setFormData({ ...formData, low_stock_threshold: e.target.value })} 
-                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center' }} 
+                onFocus={e => e.target.select()}
+                style={{ width: '100%', height: '38px', padding: '0 10px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#1e293b', boxSizing: 'border-box', fontSize: '0.88rem', textAlign: 'center', direction: 'ltr' }} 
               />
             </div>
 

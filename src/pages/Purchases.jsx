@@ -169,6 +169,9 @@ const Purchases = () => {
               const cleanBoxQty = formatCleanQty(rawBoxQty);
 
               const cleanQty = formatCleanQty(it.quantity || 0);
+              const cleanBonusQty = it.bonus_quantity !== undefined && it.bonus_quantity !== null && Number(it.bonus_quantity) > 0
+                ? formatCleanQty(it.bonus_quantity)
+                : '';
 
               return {
                 product_id: it.product_id,
@@ -180,6 +183,7 @@ const Purchases = () => {
                 box_quantity: cleanBoxQty,
                 box_cost_price: String(boxCostPrice),
                 quantity: cleanQty,
+                bonus_quantity: cleanBonusQty,
                 cost_price: String(costPrice),
                 selling_price: it.selling_price || 0,
                 stock_before: it.current_stock || 0,
@@ -288,6 +292,7 @@ const Purchases = () => {
               box_quantity: '1',
               box_cost_price: String(boxCost),
               quantity: initialUnitType === 'BOX' ? String(unitsPerBox) : '1',
+              bonus_quantity: '',
               cost_price: String(effectivePieceCost),
               selling_price: existing.selling_price || 0,
               stock_before: existing.stock || 0,
@@ -359,6 +364,7 @@ const Purchases = () => {
           box_quantity: '1',
           box_cost_price: String(boxCost || (pieceCost * unitsPerBox)),
           quantity: initialQty,
+          bonus_quantity: '',
           cost_price: String(effectivePieceCost),
           selling_price: newProd.selling_price || 0,
           stock_before: 0,
@@ -399,6 +405,11 @@ const Purchases = () => {
           it.box_quantity = String(bQty);
           it.quantity = String(Math.round(bQty * currentMult));
 
+          if (it.bonus_quantity !== '' && it.bonus_quantity !== undefined && it.bonus_quantity !== null) {
+            const bNum = parseFloat(it.bonus_quantity) || 0;
+            it.bonus_quantity = bNum > 0 ? String(parseFloat((bNum / currentMult).toFixed(2)) || 0) : '';
+          }
+
           // Carton purchase price = piece purchase price * multiplier
           const pieceCost = (it.exact_cost_price !== undefined && it.exact_cost_price !== null && Number(it.exact_cost_price) > 0)
             ? Number(it.exact_cost_price)
@@ -417,6 +428,11 @@ const Purchases = () => {
           const totalPieces = Math.max(1, parseFloat(it.quantity) || (bQty * currentMult) || 1);
           it.quantity = String(Math.round(totalPieces));
           it.box_quantity = String(parseFloat((totalPieces / currentMult).toFixed(2)) || 1);
+
+          if (it.bonus_quantity !== '' && it.bonus_quantity !== undefined && it.bonus_quantity !== null) {
+            const bNum = parseFloat(it.bonus_quantity) || 0;
+            it.bonus_quantity = bNum > 0 ? String(Math.round(bNum * currentMult)) : '';
+          }
 
           // CRITICAL: Calculate single piece purchase price: pieceCost = carton_cost / multiplier
           let pieceCost = 0;
@@ -497,6 +513,17 @@ const Purchases = () => {
             it.box_quantity = mult > 0 ? String(parseFloat((safeVal / mult).toFixed(2)) || 0) : String(safeVal);
           }
         }
+      } else if (field === 'bonus_quantity') {
+        if (value === '') {
+          it.bonus_quantity = '';
+        } else {
+          const parsed = parseFloat(value);
+          if (parsed < 0 || isNaN(parsed)) {
+            it.bonus_quantity = '0';
+          } else {
+            it.bonus_quantity = value;
+          }
+        }
       } else if (field === 'cost_price') {
         const mult = Math.max(1, parseFloat(it.units_per_box) || 1);
         if (value === '') {
@@ -569,12 +596,18 @@ const Purchases = () => {
 
     items.forEach(item => {
       const q = Math.max(0, parseFloat(item.quantity) || 0);
+      const isBox = item.unit_type === 'BOX';
+      const unitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+      const bonusQty = Math.max(0, parseFloat(item.bonus_quantity) || 0);
+      const bonusPieces = isBox ? (bonusQty * unitsPerBox) : bonusQty;
+      const totalPieces = q + bonusPieces;
+
       const sp = Math.max(0, Number(item.selling_price) || 0);
       const lineCost = getItemLineTotal(item);
 
       cost += lineCost;
-      sales += sp * q;
-      qtySum += q;
+      sales += sp * totalPieces;
+      qtySum += totalPieces;
     });
 
     const addCost = Math.max(0, Math.round(Number(additionalCost) || 0));
@@ -729,6 +762,7 @@ const Purchases = () => {
           const totalPieces = isBox 
             ? Math.max(0.001, (parseFloat(i.box_quantity) || 0) * unitsPerBox)
             : Math.max(0.001, parseFloat(i.quantity) || 1);
+          const bonusQty = Math.max(0, parseFloat(i.bonus_quantity) || 0);
           const lineTotal = getItemLineTotal(i);
           const pieceCost = isBox
             ? Math.max(0, (Number(i.box_cost_price) || 0) / unitsPerBox)
@@ -758,6 +792,7 @@ const Purchases = () => {
             unit: i.unit || 'دانە',
             is_weighted: Boolean(i.is_weighted),
             quantity: Math.round(totalPieces * 1000) / 1000,
+            bonus_quantity: bonusQty,
             cost_price: Math.round(pieceCost),
             purchase_price: Math.round(pieceCost),
             selling_price: Math.max(0, Number(i.selling_price) || 0),
@@ -792,7 +827,11 @@ const Purchases = () => {
         totalInvoiceCost,
         items: itemsWithLandedCost.map(i => {
           const lineTotal = getItemLineTotal(i);
-          const unitDesc = i.unit_type === 'BOX' ? `${i.box_quantity} کارتۆن` : `${i.quantity} دانە`;
+          const bonusQty = Math.max(0, parseFloat(i.bonus_quantity) || 0);
+          const bonusDesc = bonusQty > 0
+            ? ` (+${bonusQty} ${i.unit_type === 'BOX' ? (i.is_weighted ? 'گونیە دیاری' : 'کارتۆن دیاری') : (i.is_weighted ? 'کگم دیاری' : 'دانە دیاری')})`
+            : '';
+          const unitDesc = (i.unit_type === 'BOX' ? `${i.box_quantity} ${i.is_weighted ? 'گونیە' : 'کارتۆن'}` : `${i.quantity} ${i.is_weighted ? 'کگم' : 'دانە'}`) + bonusDesc;
 
           return {
             name: i.name,
@@ -1026,6 +1065,7 @@ const Purchases = () => {
               max={totalInvoiceCost}
               value={paidAmount} 
               onChange={(e) => handlePaidAmountChange(e.target.value)} 
+              onFocus={(e) => e.target.select()}
               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
               placeholder="پارەی دراو"
               style={{
@@ -1039,6 +1079,7 @@ const Purchases = () => {
                 fontWeight: 700,
                 fontSize: '0.88rem',
                 textAlign: 'center',
+                direction: 'ltr',
                 boxSizing: 'border-box',
                 outline: 'none'
               }} 
@@ -1061,6 +1102,7 @@ const Purchases = () => {
                 setAdditionalCost(String(v));
               }
             }}
+            onFocus={(e) => e.target.select()}
             onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
             placeholder="تێچووی زیادە (بار)"
             style={{
@@ -1074,6 +1116,7 @@ const Purchases = () => {
               fontWeight: 700,
               fontSize: '0.86rem',
               textAlign: 'center',
+              direction: 'ltr',
               boxSizing: 'border-box',
               outline: 'none'
             }} 
@@ -1242,12 +1285,13 @@ const Purchases = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'right', whiteSpace: 'nowrap' }}>
           <colgroup>
             <col style={{ width: '3%' }} />
-            <col style={{ width: '18%' }} />
-            <col style={{ width: '10%' }} />
-            <col style={{ width: '8%' }} />
+            <col style={{ width: '16%' }} />
             <col style={{ width: '9%' }} />
+            <col style={{ width: '7%' }} />
             <col style={{ width: '8%' }} />
-            <col style={{ width: '9%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '8%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
@@ -1267,6 +1311,7 @@ const Purchases = () => {
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>هەبوو</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>شێوازی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بڕ</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center', color: '#16a34a' }}>دیاری / بۆنس</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>دانە / کێش لە بەستەدا</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی فرۆشتن (تاک)</th>
@@ -1277,7 +1322,7 @@ const Purchases = () => {
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan="11" style={{ border: '1px solid #e2e8f0', padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+                <td colSpan="12" style={{ border: '1px solid #e2e8f0', padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
                   هیچ کاڵایەک لە پسووڵەکەدا نییە. بارکۆد لێبدە یان بە ناوی کاڵا بگەڕێ.
                 </td>
               </tr>
@@ -1376,6 +1421,7 @@ const Purchases = () => {
                         min="0.001" 
                         value={isBox ? item.box_quantity : item.quantity} 
                         onChange={(e) => updateItem(index, isBox ? 'box_quantity' : 'quantity', e.target.value)} 
+                        onFocus={(e) => e.target.select()}
                         onBlur={(e) => {
                           const formatted = formatCleanQty(e.target.value);
                           if (formatted !== e.target.value) {
@@ -1384,13 +1430,47 @@ const Purchases = () => {
                         }}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
-                          width: '75px',
+                          width: '65px',
                           height: '28px',
                           borderRadius: '4px',
                           background: '#ffffff',
                           border: '1px solid #cbd5e1',
                           color: '#1e293b',
                           textAlign: 'center',
+                          direction: 'ltr',
+                          fontWeight: 700,
+                          fontSize: '0.86rem',
+                          outline: 'none'
+                        }} 
+                      />
+                    </td>
+
+                    {/* Bonus / Gift Quantity (دیاری / بۆنس) */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
+                      <input 
+                        type="number" 
+                        step="any"
+                        min="0" 
+                        value={item.bonus_quantity ?? ''} 
+                        onChange={(e) => updateItem(index, 'bonus_quantity', e.target.value)} 
+                        onFocus={(e) => e.target.select()}
+                        onBlur={(e) => {
+                          const formatted = formatCleanQty(e.target.value);
+                          if (formatted !== e.target.value) {
+                            updateItem(index, 'bonus_quantity', formatted);
+                          }
+                        }}
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+                        placeholder="0"
+                        style={{
+                          width: '65px',
+                          height: '28px',
+                          borderRadius: '4px',
+                          background: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '#f0fdf4' : '#ffffff',
+                          border: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '1px solid #86efac' : '1px solid #cbd5e1',
+                          color: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '#15803d' : '#1e293b',
+                          textAlign: 'center',
+                          direction: 'ltr',
                           fontWeight: 700,
                           fontSize: '0.86rem',
                           outline: 'none'
@@ -1407,6 +1487,7 @@ const Purchases = () => {
                         disabled={!isBox}
                         value={isBox ? (formatCleanQty(item.units_per_box) ?? '') : (item.is_weighted ? (formatCleanQty(item.last_box_multiplier || item.units_per_box) || '1') : '1')} 
                         onChange={(e) => updateItem(index, 'units_per_box', e.target.value)} 
+                        onFocus={(e) => e.target.select()}
                         onBlur={(e) => {
                           const formatted = formatCleanQty(e.target.value);
                           if (formatted !== e.target.value) {
@@ -1415,13 +1496,14 @@ const Purchases = () => {
                         }}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
-                          width: '75px',
+                          width: '65px',
                           height: '28px',
                           borderRadius: '4px',
                           background: !isBox ? '#f1f5f9' : '#ffffff',
                           border: '1px solid #cbd5e1',
                           color: !isBox ? '#94a3b8' : '#1e293b',
                           textAlign: 'center',
+                          direction: 'ltr',
                           fontWeight: 700,
                           fontSize: '0.86rem',
                           outline: 'none',
@@ -1438,9 +1520,10 @@ const Purchases = () => {
                         min="0"
                         value={isBox ? item.box_cost_price : item.cost_price} 
                         onChange={(e) => updateItem(index, isBox ? 'box_cost_price' : 'cost_price', e.target.value)} 
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
-                          width: '95px',
+                          width: '90px',
                           height: '28px',
                           borderRadius: '4px',
                           background: '#ffffff',
@@ -1449,6 +1532,7 @@ const Purchases = () => {
                           fontWeight: 700,
                           fontSize: '0.86rem',
                           textAlign: 'center',
+                          direction: 'ltr',
                           outline: 'none'
                         }} 
                       />
@@ -1462,6 +1546,7 @@ const Purchases = () => {
                         min="0"
                         value={item.selling_price} 
                         onChange={(e) => updateItem(index, 'selling_price', e.target.value)} 
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         style={{
                           width: '85px',
@@ -1473,6 +1558,7 @@ const Purchases = () => {
                           fontWeight: 700,
                           fontSize: '0.86rem',
                           textAlign: 'center',
+                          direction: 'ltr',
                           outline: 'none'
                         }} 
                       />
