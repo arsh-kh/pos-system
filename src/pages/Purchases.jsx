@@ -1287,11 +1287,11 @@ const Purchases = () => {
             <col style={{ width: '3%' }} />
             <col style={{ width: '16%' }} />
             <col style={{ width: '9%' }} />
-            <col style={{ width: '7%' }} />
+            <col style={{ width: '6%' }} />
             <col style={{ width: '8%' }} />
-            <col style={{ width: '7%' }} />
-            <col style={{ width: '7%' }} />
-            <col style={{ width: '8%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '11%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
@@ -1308,11 +1308,11 @@ const Purchases = () => {
               <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>#</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 10px', textAlign: 'right' }}>ناوی کاڵا</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بارکۆد</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>هەبوو</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>شێوازی کڕین</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>بڕ</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center', color: '#16a34a' }}>دیاری / بۆنس</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>دانە / کێش لە بەستەدا</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>هەبوو</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>شێوازی کڕین</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>بڕ</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center', color: '#16a34a' }}>دیاری</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center', fontSize: '0.80rem' }}>دانە/کێش لە کارتۆن</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی فرۆشتن (تاک)</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center' }}>کۆی کڕین</th>
@@ -1445,8 +1445,8 @@ const Purchases = () => {
                       />
                     </td>
 
-                    {/* Bonus / Gift Quantity (دیاری / بۆنس) */}
-                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
+                    {/* Bonus / Gift Quantity (دیاری) */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
                       <input 
                         type="number" 
                         step="any"
@@ -1463,7 +1463,7 @@ const Purchases = () => {
                         onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                         placeholder="0"
                         style={{
-                          width: '65px',
+                          width: '55px',
                           height: '28px',
                           borderRadius: '4px',
                           background: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '#f0fdf4' : '#ffffff',
@@ -1479,7 +1479,7 @@ const Purchases = () => {
                     </td>
 
                     {/* Units per Box/Sack Input ("دانە لە کارتۆندا" / "کێش لە گونیەدا") */}
-                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
                       <input 
                         type="number" 
                         step="any"

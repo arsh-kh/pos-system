@@ -172,20 +172,27 @@ exports.createPurchaseInvoice = async (req, res) => {
                 }
             }
 
-            const additionalPerUnit = itemQtyNum > 0 ? Math.round(Number(allocatedCostForItem) / itemQtyNum) : 0;
-            const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
-
             const itemUnitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
             const isBox = item.unit_type === 'BOX';
             const bonusInputQty = Math.max(0, parseFloat(item.bonus_quantity) || 0);
             const bonusPieces = isBox ? (bonusInputQty * itemUnitsPerBox) : bonusInputQty;
             const totalStockPieces = itemQtyNum + bonusPieces;
 
+            // WEIGHTED AVERAGE LANDED COST:
+            // Total financial outlay for this line item = itemSubtotal + allocatedCostForItem
+            // Total inventory units received into warehouse = totalStockPieces (paid + bonus)
+            // Landed unit cost is averaged down across ALL received units!
+            const totalCostOutlay = Number(itemSubtotal + allocatedCostForItem);
+            const landedUnitCost = totalStockPieces > 0
+                ? safeBigInt(Math.round(totalCostOutlay / totalStockPieces))
+                : safeBigInt(rawCostNum);
+
             const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
                 ? safeBigInt(item.selling_price ?? item.sell_price).toString()
                 : null;
 
             // Record raw supplier invoice cost, landed unit cost, packaging details, bonus and exact line total
+            // cost_price keeps the real vendor contractual invoice price, while landed_cost_price reflects the bonus-discounted cost
             await connection.query(
                 'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
@@ -204,7 +211,7 @@ exports.createPurchaseInvoice = async (req, res) => {
                 ]
             );
 
-            // Insert new FIFO batch with landedUnitCost and specific units_per_box
+            // Insert single unified FIFO batch with landedUnitCost across ALL received units (paid + bonus)
             const batchNum = item.batch_number || `BATCH-${invoice_id}-${finalProductId}`;
             await connection.query(`
                 INSERT INTO Product_Batches (
@@ -224,8 +231,8 @@ exports.createPurchaseInvoice = async (req, res) => {
                 finalProductId,
                 invoice_id,
                 batchNum,
-                itemQtyNum,
-                itemQtyNum,
+                totalStockPieces,
+                totalStockPieces,
                 landedUnitCost.toString(),
                 sellingPriceVal,
                 itemUnitsPerBox,
@@ -233,40 +240,7 @@ exports.createPurchaseInvoice = async (req, res) => {
                 dateVal
             ]);
 
-            // If bonus pieces exist, insert separate BONUS FIFO batch with cost_price = 0 (100% pure profit when sold!)
-            if (bonusPieces > 0) {
-                const bonusBatchNum = `BATCH-${invoice_id}-${finalProductId}-BONUS`;
-                const bonusDateVal = new Date(dateVal.getTime() + 1000);
-                await connection.query(`
-                    INSERT INTO Product_Batches (
-                        product_id,
-                        purchase_invoice_id,
-                        batch_number,
-                        initial_quantity,
-                        remaining_quantity,
-                        cost_price,
-                        selling_price,
-                        units_per_box,
-                        expiry_date,
-                        status,
-                        created_at
-                    ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?)
-                `, [
-                    finalProductId,
-                    invoice_id,
-                    bonusBatchNum,
-                    bonusPieces,
-                    bonusPieces,
-                    sellingPriceVal,
-                    itemUnitsPerBox,
-                    item.expiry_date || null,
-                    bonusDateVal
-                ]);
-            }
-
-            // HISTORICAL PRICE & STOCK INTEGRITY (CORE ACCOUNTING):
-            // DO NOT overwrite global Product flat prices/packaging (cost_price, box_cost_price, selling_price, units_per_box).
-            // ONLY increment inventory stock with total pieces (paid + bonus)!
+            // ONLY increment inventory stock with totalStockPieces (paid + bonus)!
             await connection.query(
                 'UPDATE Products SET stock = stock + ? WHERE id = ?',
                 [totalStockPieces, finalProductId]
@@ -484,13 +458,17 @@ exports.updatePurchaseInvoice = async (req, res) => {
                 }
             }
 
-            const additionalPerUnit = itemQtyNum > 0 ? Math.round(Number(allocatedCostForItem) / itemQtyNum) : 0;
-            const landedUnitCost = safeBigInt(rawCostNum + additionalPerUnit);
             const itemUnitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
             const isBox = item.unit_type === 'BOX';
             const bonusInputQty = Math.max(0, parseFloat(item.bonus_quantity) || 0);
             const bonusPieces = isBox ? (bonusInputQty * itemUnitsPerBox) : bonusInputQty;
             const newTotalPieces = itemQtyNum + bonusPieces;
+
+            // WEIGHTED AVERAGE LANDED COST:
+            const totalCostOutlay = Number(itemSubtotal + allocatedCostForItem);
+            const landedUnitCost = newTotalPieces > 0
+                ? safeBigInt(Math.round(totalCostOutlay / newTotalPieces))
+                : safeBigInt(rawCostNum);
 
             const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
                 ? safeBigInt(item.selling_price ?? item.sell_price).toString()
@@ -507,8 +485,6 @@ exports.updatePurchaseInvoice = async (req, res) => {
                 const oldTotalPieces = oldPaidQty + oldBonusPieces;
 
                 const totalStockDelta = newTotalPieces - oldTotalPieces;
-                const paidDelta = itemQtyNum - oldPaidQty;
-                const bonusDelta = bonusPieces - oldBonusPieces;
 
                 await connection.query(`
                     UPDATE Purchase_Invoice_Items 
@@ -533,9 +509,10 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [totalStockDelta, pId]);
                 }
 
-                // Update Regular Batch
-                const regularBatch = oldBatches.find(b => Number(b.product_id) === pId && !String(b.batch_number).endsWith('-BONUS'));
-                if (regularBatch) {
+                // Update FIFO Batch
+                const primaryBatch = oldBatches.find(b => Number(b.product_id) === pId && !String(b.batch_number).endsWith('-BONUS'))
+                    || oldBatches.find(b => Number(b.product_id) === pId);
+                if (primaryBatch) {
                     await connection.query(`
                         UPDATE Product_Batches 
                         SET initial_quantity = initial_quantity + ?,
@@ -545,56 +522,19 @@ exports.updatePurchaseInvoice = async (req, res) => {
                             units_per_box = ?
                         WHERE id = ?
                     `, [
-                        paidDelta,
-                        paidDelta,
+                        totalStockDelta,
+                        totalStockDelta,
                         landedUnitCost.toString(),
                         sellingPriceVal,
                         itemUnitsPerBox,
-                        regularBatch.id
+                        primaryBatch.id
                     ]);
                 }
-
-                // Update or Insert Bonus Batch
-                const bonusBatch = oldBatches.find(b => Number(b.product_id) === pId && String(b.batch_number).endsWith('-BONUS'));
-                if (bonusBatch) {
-                    if (bonusPieces > 0) {
-                        await connection.query(`
-                            UPDATE Product_Batches 
-                            SET initial_quantity = initial_quantity + ?,
-                                remaining_quantity = remaining_quantity + ?,
-                                cost_price = 0,
-                                selling_price = ?,
-                                units_per_box = ?
-                            WHERE id = ?
-                        `, [
-                            bonusDelta,
-                            bonusDelta,
-                            sellingPriceVal,
-                            itemUnitsPerBox,
-                            bonusBatch.id
-                        ]);
-                    } else {
-                        await connection.query('DELETE FROM Product_Batches WHERE id = ?', [bonusBatch.id]);
-                    }
-                } else if (bonusPieces > 0) {
-                    const bonusBatchNum = `BATCH-${id}-${pId}-BONUS`;
-                    const bonusDateVal = new Date(dateVal.getTime() + 1000);
-                    await connection.query(`
-                        INSERT INTO Product_Batches (
-                            product_id, purchase_invoice_id, batch_number, initial_quantity, remaining_quantity, cost_price, selling_price, units_per_box, expiry_date, status, created_at
-                        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?)
-                    `, [
-                        pId,
-                        id,
-                        bonusBatchNum,
-                        bonusPieces,
-                        bonusPieces,
-                        sellingPriceVal,
-                        itemUnitsPerBox,
-                        item.expiry_date || null,
-                        bonusDateVal
-                    ]);
-                }
+                // Clean up any legacy -BONUS batch
+                await connection.query(
+                    'DELETE FROM Product_Batches WHERE purchase_invoice_id = ? AND product_id = ? AND batch_number LIKE "%-BONUS"',
+                    [id, pId]
+                );
             } else {
                 // NEW ITEM added to invoice: Insert item, create batch, add full quantity to stock
                 await connection.query(`
@@ -625,34 +565,14 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     pId,
                     id,
                     batchNum,
-                    itemQtyNum,
-                    itemQtyNum,
+                    newTotalPieces,
+                    newTotalPieces,
                     landedUnitCost.toString(),
                     sellingPriceVal,
                     itemUnitsPerBox,
                     item.expiry_date || null,
                     dateVal
                 ]);
-
-                if (bonusPieces > 0) {
-                    const bonusBatchNum = `BATCH-${id}-${pId}-BONUS`;
-                    const bonusDateVal = new Date(dateVal.getTime() + 1000);
-                    await connection.query(`
-                        INSERT INTO Product_Batches (
-                            product_id, purchase_invoice_id, batch_number, initial_quantity, remaining_quantity, cost_price, selling_price, units_per_box, expiry_date, status, created_at
-                        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', ?)
-                    `, [
-                        pId,
-                        id,
-                        bonusBatchNum,
-                        bonusPieces,
-                        bonusPieces,
-                        sellingPriceVal,
-                        itemUnitsPerBox,
-                        item.expiry_date || null,
-                        bonusDateVal
-                    ]);
-                }
 
                 await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [newTotalPieces, pId]);
             }
