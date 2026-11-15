@@ -18,6 +18,8 @@ const ensureInvoicesSchema = async () => {
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
         try { await db.query("ALTER TABLE Product_Batches ADD COLUMN units_per_box DECIMAL(10,3) NOT NULL DEFAULT 1.000"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN bonus_quantity DECIMAL(10,3) NOT NULL DEFAULT 0.000"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN is_gift TINYINT(1) NOT NULL DEFAULT 0"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN discount_amount BIGINT NOT NULL DEFAULT 0"); } catch (_) {}
     } catch (err) {
         console.error('Invoice schema ensure error:', err.message);
     }
@@ -179,22 +181,23 @@ exports.createPurchaseInvoice = async (req, res) => {
             const totalStockPieces = itemQtyNum + bonusPieces;
 
             // WEIGHTED AVERAGE LANDED COST:
-            // Total financial outlay for this line item = itemSubtotal + allocatedCostForItem
+            // Total financial outlay for this line item = itemSubtotal - discountAmount + allocatedCostForItem
             // Total inventory units received into warehouse = totalStockPieces (paid + bonus)
             // Landed unit cost is averaged down across ALL received units!
-            const totalCostOutlay = Number(itemSubtotal + allocatedCostForItem);
+            const discountAmount = Math.max(0, Number(item.discount_amount) || 0);
+            const totalCostOutlay = Number(itemSubtotal - safeBigInt(discountAmount) + allocatedCostForItem);
             const landedUnitCost = totalStockPieces > 0
-                ? safeBigInt(Math.round(totalCostOutlay / totalStockPieces))
+                ? safeBigInt(Math.max(0, Math.round(totalCostOutlay / totalStockPieces)))
                 : safeBigInt(rawCostNum);
 
             const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
                 ? safeBigInt(item.selling_price ?? item.sell_price).toString()
                 : null;
 
-            // Record raw supplier invoice cost, landed unit cost, packaging details, bonus and exact line total
-            // cost_price keeps the real vendor contractual invoice price, while landed_cost_price reflects the bonus-discounted cost
+            // Record raw supplier invoice cost, landed unit cost, packaging details, bonus, gift discount and exact line total
+            // cost_price keeps the real vendor contractual invoice price, while landed_cost_price reflects the bonus/gift-discounted cost
             await connection.query(
-                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity, is_gift, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
                 [
                     invoice_id, 
                     finalProductId, 
@@ -207,7 +210,8 @@ exports.createPurchaseInvoice = async (req, res) => {
                     item.box_quantity ? item.box_quantity : null,
                     item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
                     itemSubtotal.toString(),
-                    bonusInputQty
+                    bonusInputQty,
+                    safeBigInt(discountAmount).toString()
                 ]
             );
 
@@ -245,6 +249,83 @@ exports.createPurchaseInvoice = async (req, res) => {
                 'UPDATE Products SET stock = stock + ? WHERE id = ?',
                 [totalStockPieces, finalProductId]
             );
+        }
+
+        // 4. Handle Dedicated Gift Item (دیاری) if provided
+        if (req.body.gift_item && (parseFloat(req.body.gift_item.quantity) > 0 || parseFloat(req.body.gift_item.box_quantity) > 0)) {
+            const gift = req.body.gift_item;
+            let giftProductId = gift.product_id;
+
+            const isGiftDraft = gift.is_draft || !giftProductId || String(giftProductId).startsWith('draft_');
+            if (isGiftDraft) {
+                const giftBarcode = gift.barcode ? String(gift.barcode).trim() : null;
+                const giftBoxBarcode = gift.box_barcode ? String(gift.box_barcode).trim() : null;
+                if (giftBarcode || giftBoxBarcode) {
+                    const [exG] = await connection.query(
+                        'SELECT * FROM Products WHERE (barcode = ? AND barcode != "") OR (box_barcode = ? AND box_barcode != "") LIMIT 1',
+                        [giftBarcode || giftBoxBarcode, giftBoxBarcode || giftBarcode]
+                    );
+                    if (exG.length > 0) giftProductId = exG[0].id;
+                }
+            }
+
+            if (giftProductId) {
+                const giftUnitsPerBox = Math.max(1, parseFloat(gift.units_per_box) || 1);
+                const isGiftBox = gift.unit_type === 'BOX';
+                const giftInputQty = Math.max(0.001, parseFloat(isGiftBox ? (gift.box_quantity || gift.quantity) : gift.quantity) || 1);
+                const giftTotalPieces = isGiftBox ? (giftInputQty * giftUnitsPerBox) : giftInputQty;
+
+                const giftCostPiece = gift.cost_price ? Math.max(0, Number(gift.cost_price)) : 0;
+                const giftBoxCost = gift.box_cost_price ? Math.round(Number(gift.box_cost_price)) : Math.round(giftCostPiece * giftUnitsPerBox);
+                const giftPieceCost = isGiftBox ? Math.round(giftBoxCost / giftUnitsPerBox) : giftCostPiece;
+                const giftSelling = gift.selling_price ? safeBigInt(gift.selling_price).toString() : null;
+
+                await connection.query(
+                    'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity, is_gift, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, 0)',
+                    [
+                        invoice_id,
+                        giftProductId,
+                        giftTotalPieces,
+                        safeBigInt(giftPieceCost).toString(),
+                        safeBigInt(giftPieceCost).toString(),
+                        giftSelling,
+                        giftUnitsPerBox,
+                        gift.unit_type || 'BOX',
+                        isGiftBox ? giftInputQty : null,
+                        giftBoxCost ? safeBigInt(giftBoxCost).toString() : null
+                    ]
+                );
+
+                const giftBatchNum = `BATCH-GIFT-${invoice_id}-${giftProductId}`;
+                await connection.query(`
+                    INSERT INTO Product_Batches (
+                        product_id,
+                        purchase_invoice_id,
+                        batch_number,
+                        initial_quantity,
+                        remaining_quantity,
+                        cost_price,
+                        selling_price,
+                        units_per_box,
+                        expiry_date,
+                        status,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+                `, [
+                    giftProductId,
+                    invoice_id,
+                    giftBatchNum,
+                    giftTotalPieces,
+                    giftTotalPieces,
+                    safeBigInt(giftPieceCost).toString(),
+                    giftSelling,
+                    giftUnitsPerBox,
+                    gift.expiry_date || null,
+                    dateVal
+                ]);
+
+                await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [giftTotalPieces, giftProductId]);
+            }
         }
 
         await connection.commit();
@@ -365,8 +446,20 @@ exports.updatePurchaseInvoice = async (req, res) => {
 
         // 6. Proportional Landed Cost Allocation per Item
         let remainingAdditional = additionalCostBigInt;
+
+        // Clean up old dedicated gift items if any
+        const oldGiftItems = oldItems.filter(i => i.is_gift === 1 || i.is_gift === true);
+        for (const oldGift of oldGiftItems) {
+            const oldGQty = parseFloat(oldGift.quantity) || 0;
+            if (oldGQty > 0) {
+                await connection.query('UPDATE Products SET stock = stock - ? WHERE id = ?', [oldGQty, oldGift.product_id]);
+                await connection.query('DELETE FROM Product_Batches WHERE purchase_invoice_id = ? AND product_id = ? AND batch_number LIKE "BATCH-GIFT-%"', [id, oldGift.product_id]);
+            }
+            await connection.query('DELETE FROM Purchase_Invoice_Items WHERE id = ?', [oldGift.id]);
+        }
+
         const oldItemMap = new Map();
-        oldItems.forEach(oi => oldItemMap.set(Number(oi.product_id), oi));
+        oldItems.filter(i => !i.is_gift).forEach(oi => oldItemMap.set(Number(oi.product_id), oi));
 
         const oldBatchMap = new Map();
         oldBatches.forEach(ob => oldBatchMap.set(Number(ob.product_id), ob));
@@ -465,9 +558,10 @@ exports.updatePurchaseInvoice = async (req, res) => {
             const newTotalPieces = itemQtyNum + bonusPieces;
 
             // WEIGHTED AVERAGE LANDED COST:
-            const totalCostOutlay = Number(itemSubtotal + allocatedCostForItem);
+            const discountAmount = Math.max(0, Number(item.discount_amount) || 0);
+            const totalCostOutlay = Number(itemSubtotal - safeBigInt(discountAmount) + allocatedCostForItem);
             const landedUnitCost = newTotalPieces > 0
-                ? safeBigInt(Math.round(totalCostOutlay / newTotalPieces))
+                ? safeBigInt(Math.max(0, Math.round(totalCostOutlay / newTotalPieces)))
                 : safeBigInt(rawCostNum);
 
             const sellingPriceVal = (item.selling_price !== undefined && item.selling_price !== null && item.selling_price !== '')
@@ -488,7 +582,7 @@ exports.updatePurchaseInvoice = async (req, res) => {
 
                 await connection.query(`
                     UPDATE Purchase_Invoice_Items 
-                    SET quantity = ?, cost_price = ?, landed_cost_price = ?, selling_price = ?, units_per_box = ?, unit_type = ?, box_quantity = ?, box_cost_price = ?, line_total = ?, bonus_quantity = ?
+                    SET quantity = ?, cost_price = ?, landed_cost_price = ?, selling_price = ?, units_per_box = ?, unit_type = ?, box_quantity = ?, box_cost_price = ?, line_total = ?, bonus_quantity = ?, discount_amount = ?
                     WHERE id = ?
                 `, [
                     itemQtyNum,
@@ -501,6 +595,7 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
                     itemSubtotal.toString(),
                     bonusInputQty,
+                    safeBigInt(discountAmount).toString(),
                     existingItem.id
                 ]);
 
@@ -539,8 +634,8 @@ exports.updatePurchaseInvoice = async (req, res) => {
                 // NEW ITEM added to invoice: Insert item, create batch, add full quantity to stock
                 await connection.query(`
                     INSERT INTO Purchase_Invoice_Items (
-                        invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity, is_gift, discount_amount
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                 `, [
                     id,
                     pId,
@@ -553,7 +648,8 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     item.box_quantity ? item.box_quantity : null,
                     item.box_cost_price ? safeBigInt(item.box_cost_price).toString() : null,
                     itemSubtotal.toString(),
-                    bonusInputQty
+                    bonusInputQty,
+                    safeBigInt(discountAmount).toString()
                 ]);
 
                 const batchNum = item.batch_number || `BATCH-${id}-${pId}`;
@@ -575,6 +671,83 @@ exports.updatePurchaseInvoice = async (req, res) => {
                 ]);
 
                 await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [newTotalPieces, pId]);
+            }
+        }
+
+        // Handle Dedicated Gift Item (دیاری) for Updated Invoice
+        if (req.body.gift_item && (parseFloat(req.body.gift_item.quantity) > 0 || parseFloat(req.body.gift_item.box_quantity) > 0)) {
+            const gift = req.body.gift_item;
+            let giftProductId = gift.product_id;
+
+            const isGiftDraft = gift.is_draft || !giftProductId || String(giftProductId).startsWith('draft_');
+            if (isGiftDraft) {
+                const giftBarcode = gift.barcode ? String(gift.barcode).trim() : null;
+                const giftBoxBarcode = gift.box_barcode ? String(gift.box_barcode).trim() : null;
+                if (giftBarcode || giftBoxBarcode) {
+                    const [exG] = await connection.query(
+                        'SELECT * FROM Products WHERE (barcode = ? AND barcode != "") OR (box_barcode = ? AND box_barcode != "") LIMIT 1',
+                        [giftBarcode || giftBoxBarcode, giftBoxBarcode || giftBarcode]
+                    );
+                    if (exG.length > 0) giftProductId = exG[0].id;
+                }
+            }
+
+            if (giftProductId) {
+                const giftUnitsPerBox = Math.max(1, parseFloat(gift.units_per_box) || 1);
+                const isGiftBox = gift.unit_type === 'BOX';
+                const giftInputQty = Math.max(0.001, parseFloat(isGiftBox ? (gift.box_quantity || gift.quantity) : gift.quantity) || 1);
+                const giftTotalPieces = isGiftBox ? (giftInputQty * giftUnitsPerBox) : giftInputQty;
+
+                const giftCostPiece = gift.cost_price ? Math.max(0, Number(gift.cost_price)) : 0;
+                const giftBoxCost = gift.box_cost_price ? Math.round(Number(gift.box_cost_price)) : Math.round(giftCostPiece * giftUnitsPerBox);
+                const giftPieceCost = isGiftBox ? Math.round(giftBoxCost / giftUnitsPerBox) : giftCostPiece;
+                const giftSelling = gift.selling_price ? safeBigInt(gift.selling_price).toString() : null;
+
+                await connection.query(
+                    'INSERT INTO Purchase_Invoice_Items (invoice_id, product_id, quantity, cost_price, landed_cost_price, selling_price, units_per_box, unit_type, box_quantity, box_cost_price, line_total, bonus_quantity, is_gift, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, 0)',
+                    [
+                        id,
+                        giftProductId,
+                        giftTotalPieces,
+                        safeBigInt(giftPieceCost).toString(),
+                        safeBigInt(giftPieceCost).toString(),
+                        giftSelling,
+                        giftUnitsPerBox,
+                        gift.unit_type || 'BOX',
+                        isGiftBox ? giftInputQty : null,
+                        giftBoxCost ? safeBigInt(giftBoxCost).toString() : null
+                    ]
+                );
+
+                const giftBatchNum = `BATCH-GIFT-${id}-${giftProductId}`;
+                await connection.query(`
+                    INSERT INTO Product_Batches (
+                        product_id,
+                        purchase_invoice_id,
+                        batch_number,
+                        initial_quantity,
+                        remaining_quantity,
+                        cost_price,
+                        selling_price,
+                        units_per_box,
+                        expiry_date,
+                        status,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+                `, [
+                    giftProductId,
+                    id,
+                    giftBatchNum,
+                    giftTotalPieces,
+                    giftTotalPieces,
+                    safeBigInt(giftPieceCost).toString(),
+                    giftSelling,
+                    giftUnitsPerBox,
+                    gift.expiry_date || null,
+                    dateVal
+                ]);
+
+                await connection.query('UPDATE Products SET stock = stock + ? WHERE id = ?', [giftTotalPieces, giftProductId]);
             }
         }
 

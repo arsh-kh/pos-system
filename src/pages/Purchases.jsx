@@ -58,6 +58,17 @@ const Purchases = () => {
   const [paidAmount, setPaidAmount] = useState(() => initialDraft.paidAmount || '');
   const [additionalCost, setAdditionalCost] = useState(() => initialDraft.additionalCost || '');
 
+  // Dedicated Gift (دیاری) State
+  const [giftData, setGiftData] = useState(() => initialDraft.giftData || null);
+  const [giftModalOpen, setGiftModalOpen] = useState(false);
+  const [giftProductSearch, setGiftProductSearch] = useState('');
+  const [selectedGiftProduct, setSelectedGiftProduct] = useState(null);
+  const [giftUnitType, setGiftUnitType] = useState('BOX');
+  const [giftQuantity, setGiftQuantity] = useState('1');
+  const [giftValue, setGiftValue] = useState('');
+  const [giftAllocationMode, setGiftAllocationMode] = useState('ALL');
+  const [giftTargetKeys, setGiftTargetKeys] = useState([]);
+
   // Invoice Items State
   const [items, setItems] = useState(() => Array.isArray(initialDraft.items) ? initialDraft.items : []);
 
@@ -82,6 +93,11 @@ const Purchases = () => {
     if (!productSearch.trim()) return [];
     return products.filter(p => kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch)).slice(0, 10);
   }, [products, productSearch]);
+
+  const giftFilteredProducts = useMemo(() => {
+    if (!giftProductSearch.trim() || selectedGiftProduct) return [];
+    return products.filter(p => kurdishSearchMatch([p.name, p.barcode, p.box_barcode], giftProductSearch)).slice(0, 10);
+  }, [products, giftProductSearch, selectedGiftProduct]);
 
   const getAuthConfig = () => {
     const token = localStorage.getItem('token');
@@ -125,6 +141,7 @@ const Purchases = () => {
           setPaymentMethod('CASH');
           setPaidAmount('');
           setAdditionalCost('');
+          setGiftData(null);
         }
       }
     } catch (_) {}
@@ -157,7 +174,39 @@ const Purchases = () => {
           setAdditionalCost(String(inv.additional_cost || '0'));
 
           if (Array.isArray(inv.items)) {
-            const loadedItems = inv.items.map(it => {
+            const giftIt = inv.items.find(it => it.is_gift === 1 || it.is_gift === true);
+            if (giftIt) {
+              const isGiftBox = giftIt.unit_type === 'BOX';
+              const gUnits = Math.max(1, parseFloat(giftIt.units_per_box) || 1);
+              const gBoxCost = giftIt.box_cost_price ? Number(giftIt.box_cost_price) : Math.round(Number(giftIt.cost_price || 0) * gUnits);
+              const gQty = isGiftBox && giftIt.box_quantity ? giftIt.box_quantity : (isGiftBox ? (Number(giftIt.quantity) / gUnits) : giftIt.quantity);
+              const gVal = isGiftBox ? (Number(gQty) * gBoxCost) : (Number(gQty) * Number(giftIt.cost_price || 0));
+
+              const targetBarcodes = inv.items
+                .filter(i => !i.is_gift && Number(i.discount_amount) > 0)
+                .map(i => i.barcode || i.product_name);
+
+              setGiftData({
+                product_id: giftIt.product_id,
+                name: giftIt.product_name,
+                barcode: giftIt.barcode,
+                box_barcode: giftIt.box_barcode || '',
+                unit_type: giftIt.unit_type || 'BOX',
+                quantity: String(gQty || '1'),
+                units_per_box: gUnits,
+                cost_price: Number(giftIt.cost_price) || 0,
+                box_cost_price: gBoxCost,
+                selling_price: giftIt.selling_price || 0,
+                gift_value: String(gVal || gBoxCost),
+                allocation_mode: targetBarcodes.length > 0 && targetBarcodes.length < (inv.items.length - 1) ? 'SELECTED' : 'ALL',
+                target_keys: targetBarcodes
+              });
+            } else {
+              setGiftData(null);
+            }
+
+            const regularItems = inv.items.filter(it => !it.is_gift);
+            const loadedItems = regularItems.map(it => {
               const unitsPerBox = Math.max(1, parseFloat(it.units_per_box) || 1);
               const isBox = it.unit_type === 'BOX';
               const costPrice = Number(it.cost_price) || 0;
@@ -213,6 +262,7 @@ const Purchases = () => {
     setPaymentMethod('CASH');
     setPaidAmount('');
     setAdditionalCost('');
+    setGiftData(null);
     setIsEditMode(false);
     navigate('/financials');
   };
@@ -230,7 +280,8 @@ const Purchases = () => {
           paymentMethod,
           paidAmount,
           additionalCost,
-          items
+          items,
+          giftData
         }));
       } catch (err) {
         console.error('Failed to save purchase draft:', err);
@@ -238,7 +289,7 @@ const Purchases = () => {
     } else {
       localStorage.removeItem('pos_purchase_draft');
     }
-  }, [supplierId, invoiceNumber, invoiceDate, paymentMethod, paidAmount, additionalCost, items]);
+  }, [supplierId, invoiceNumber, invoiceDate, paymentMethod, paidAmount, additionalCost, items, giftData]);
 
   const openQuickAddModal = (presetBarcode = '') => {
     setQuickAddBarcode(presetBarcode || '');
@@ -565,6 +616,133 @@ const Purchases = () => {
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Dedicated Gift (دیاری) Modal Handlers
+  const openGiftModal = () => {
+    if (giftData) {
+      setSelectedGiftProduct({
+        id: giftData.product_id,
+        name: giftData.name,
+        barcode: giftData.barcode,
+        box_barcode: giftData.box_barcode,
+        units_per_box: giftData.units_per_box,
+        cost_price: giftData.cost_price,
+        box_cost_price: giftData.box_cost_price,
+        selling_price: giftData.selling_price
+      });
+      setGiftProductSearch(giftData.name || '');
+      setGiftUnitType(giftData.unit_type || 'BOX');
+      setGiftQuantity(String(giftData.quantity || '1'));
+      setGiftValue(String(giftData.gift_value || ''));
+      setGiftAllocationMode(giftData.allocation_mode || 'ALL');
+      setGiftTargetKeys(Array.isArray(giftData.target_keys) ? giftData.target_keys : []);
+    } else {
+      setSelectedGiftProduct(null);
+      setGiftProductSearch('');
+      setGiftUnitType('BOX');
+      setGiftQuantity('1');
+      setGiftValue('');
+      setGiftAllocationMode('ALL');
+      setGiftTargetKeys(items.map((it, idx) => it.barcode || it.name || String(idx)));
+    }
+    setGiftModalOpen(true);
+  };
+
+  const handleSelectGiftProduct = (prod) => {
+    setSelectedGiftProduct(prod);
+    setGiftProductSearch(prod.name);
+    const units = Math.max(1, parseFloat(prod.units_per_box) || 1);
+    const isBox = units > 1 || Boolean(prod.box_barcode) || Boolean(prod.box_cost_price);
+    const unitType = isBox ? 'BOX' : 'PIECE';
+    setGiftUnitType(unitType);
+
+    const bCost = prod.box_cost_price ? Number(prod.box_cost_price) : Math.round(Number(prod.cost_price || 0) * units);
+    const pCost = Number(prod.cost_price || 0);
+    const q = Math.max(0.001, parseFloat(giftQuantity) || 1);
+    const val = unitType === 'BOX' ? Math.round(q * bCost) : Math.round(q * pCost);
+    setGiftValue(String(val || bCost || pCost || '0'));
+  };
+
+  const handleGiftUnitTypeChange = (type) => {
+    setGiftUnitType(type);
+    if (selectedGiftProduct) {
+      const units = Math.max(1, parseFloat(selectedGiftProduct.units_per_box) || 1);
+      const bCost = selectedGiftProduct.box_cost_price 
+        ? Number(selectedGiftProduct.box_cost_price) 
+        : Math.round(Number(selectedGiftProduct.cost_price || 0) * units);
+      const pCost = Number(selectedGiftProduct.cost_price || 0);
+      const q = Math.max(0.001, parseFloat(giftQuantity) || 1);
+      const val = type === 'BOX' ? Math.round(q * bCost) : Math.round(q * pCost);
+      setGiftValue(String(val || '0'));
+    }
+  };
+
+  const handleGiftQuantityChange = (newQty) => {
+    setGiftQuantity(newQty);
+    const q = Math.max(0, parseFloat(newQty) || 0);
+    if (selectedGiftProduct && q > 0) {
+      const units = Math.max(1, parseFloat(selectedGiftProduct.units_per_box) || 1);
+      const bCost = selectedGiftProduct.box_cost_price 
+        ? Number(selectedGiftProduct.box_cost_price) 
+        : Math.round(Number(selectedGiftProduct.cost_price || 0) * units);
+      const pCost = Number(selectedGiftProduct.cost_price || 0);
+      const val = giftUnitType === 'BOX' ? Math.round(q * bCost) : Math.round(q * pCost);
+      setGiftValue(String(val || '0'));
+    }
+  };
+
+  const handleSaveGiftModal = () => {
+    if (!selectedGiftProduct) {
+      toast.error('تکایە کاڵای دیاری دیاری بکە');
+      return;
+    }
+    const q = parseFloat(giftQuantity);
+    if (!q || q <= 0) {
+      toast.error('تکایە بڕی دیاری دیاری بکە');
+      return;
+    }
+    const val = parseFloat(giftValue);
+    if (val === undefined || isNaN(val) || val < 0) {
+      toast.error('تکایە بەهای دیاری دیاری بکە');
+      return;
+    }
+
+    if (giftAllocationMode === 'SELECTED' && (!giftTargetKeys || giftTargetKeys.length === 0)) {
+      toast.error('تکایە لانیکەم یەک کاڵا دیاری بکە بۆ داشکاندنەکە');
+      return;
+    }
+
+    const units = Math.max(1, parseFloat(selectedGiftProduct.units_per_box) || 1);
+    const bCost = selectedGiftProduct.box_cost_price 
+      ? Number(selectedGiftProduct.box_cost_price) 
+      : Math.round(Number(selectedGiftProduct.cost_price || 0) * units);
+    const pCost = Number(selectedGiftProduct.cost_price || 0);
+
+    setGiftData({
+      product_id: selectedGiftProduct.id,
+      name: selectedGiftProduct.name,
+      barcode: selectedGiftProduct.barcode,
+      box_barcode: selectedGiftProduct.box_barcode || '',
+      unit_type: giftUnitType,
+      quantity: String(q),
+      units_per_box: units,
+      cost_price: pCost,
+      box_cost_price: bCost,
+      selling_price: selectedGiftProduct.selling_price || 0,
+      gift_value: String(val),
+      allocation_mode: giftAllocationMode,
+      target_keys: giftAllocationMode === 'SELECTED' ? giftTargetKeys : []
+    });
+
+    setGiftModalOpen(false);
+    toast.success('دیاری بە سەرکەوتوویی زیادکرا');
+  };
+
+  const handleRemoveGift = () => {
+    setGiftData(null);
+    setGiftModalOpen(false);
+    toast.success('دیاری سڕایەوە');
+  };
+
   // Mathematical Line Item Total Helper (Always: Quantity × Purchase Price, locking exact floating-point precision)
   const getItemLineTotal = (item) => {
     if (item.unit_type === 'BOX') {
@@ -580,7 +758,7 @@ const Purchases = () => {
     }
   };
 
-  // Calculations: Subtotal, Shipping, Grand Total, Landed Cost Allocation
+  // Calculations: Subtotal, Shipping, Grand Total, Landed Cost Allocation & Gift Discount Allocation
   const { 
     itemsSubtotal, 
     effectiveAdditionalCost, 
@@ -610,30 +788,95 @@ const Purchases = () => {
       qtySum += totalPieces;
     });
 
+    // 2. Gift Discount Allocation across target items
+    const giftVal = giftData ? Math.max(0, Number(giftData.gift_value) || 0) : 0;
+    const isGiftActive = Boolean(giftData && giftVal > 0);
+    const isAll = !giftData || giftData.allocation_mode !== 'SELECTED' || !Array.isArray(giftData.target_keys) || giftData.target_keys.length === 0;
+
+    let targetItemsCost = 0;
+    items.forEach((item, idx) => {
+      const lineCost = getItemLineTotal(item);
+      const itemKey = item.barcode || item.name || String(idx);
+      const isTarget = isAll || (giftData && giftData.target_keys && giftData.target_keys.includes(itemKey));
+      if (isTarget && lineCost > 0) {
+        targetItemsCost += lineCost;
+      }
+    });
+
+    const effectiveGiftDiscount = targetItemsCost > 0 ? Math.min(giftVal, targetItemsCost) : 0;
+    let remainingGiftDiscount = effectiveGiftDiscount;
+
+    const itemsWithDiscount = items.map((item, idx) => {
+      const lineCost = getItemLineTotal(item);
+      const itemKey = item.barcode || item.name || String(idx);
+      const isTarget = isAll || (giftData && giftData.target_keys && giftData.target_keys.includes(itemKey));
+
+      let allocatedDiscount = 0;
+      if (isGiftActive && isTarget && targetItemsCost > 0 && lineCost > 0) {
+        const isLastTarget = items.slice(idx + 1).every(remItem => {
+          const remKey = remItem.barcode || remItem.name;
+          const remIsTarget = isAll || (giftData && giftData.target_keys && giftData.target_keys.includes(remKey));
+          return !(remIsTarget && getItemLineTotal(remItem) > 0);
+        });
+
+        if (isLastTarget) {
+          allocatedDiscount = remainingGiftDiscount;
+        } else {
+          allocatedDiscount = Math.round((lineCost / targetItemsCost) * effectiveGiftDiscount);
+          remainingGiftDiscount -= allocatedDiscount;
+        }
+      }
+
+      const netLineCost = Math.max(0, lineCost - allocatedDiscount);
+      const isBox = item.unit_type === 'BOX';
+      const unitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+      const boxQty = Math.max(0.001, parseFloat(item.box_quantity) || 1);
+      const pieceQty = Math.max(0.001, parseFloat(item.quantity) || 1);
+
+      const discountedBoxCost = Math.round(netLineCost / boxQty);
+      const discountedPieceCost = isBox 
+        ? Math.round(discountedBoxCost / unitsPerBox) 
+        : Math.round(netLineCost / pieceQty);
+
+      return {
+        ...item,
+        allocatedDiscount,
+        netLineCost,
+        discountedBoxCost,
+        discountedPieceCost,
+        itemKey
+      };
+    });
+
+    // 3. Additional Cost (Freight) Allocation
     const addCost = Math.max(0, Math.round(Number(additionalCost) || 0));
     const grandTotal = cost + addCost;
 
     let remainingAdd = addCost;
-    const itemsWithLanded = items.map((item, idx) => {
-      const q = Math.max(0.001, parseFloat(item.quantity) || 1);
+    const itemsWithLanded = itemsWithDiscount.map((item, idx) => {
+      const isBox = item.unit_type === 'BOX';
+      const unitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
+      const totalPieces = isBox
+        ? Math.max(0.001, (parseFloat(item.box_quantity) || 0) * unitsPerBox)
+        : Math.max(0.001, parseFloat(item.quantity) || 1);
       const lineCost = getItemLineTotal(item);
 
-      let allocated = 0;
+      let allocatedAdd = 0;
       if (addCost > 0 && cost > 0) {
-        if (idx === items.length - 1) {
-          allocated = remainingAdd;
+        if (idx === itemsWithDiscount.length - 1) {
+          allocatedAdd = remainingAdd;
         } else {
-          allocated = Math.round((addCost * lineCost) / cost);
-          remainingAdd -= allocated;
+          allocatedAdd = Math.round((addCost * lineCost) / cost);
+          remainingAdd -= allocatedAdd;
         }
       }
-      const perUnitAdd = Math.round(allocated / q);
-      const landedUnitCost = Math.round(Number(item.cost_price) || 0) + perUnitAdd;
+
+      const totalLineOutlay = item.netLineCost + allocatedAdd;
+      const landedUnitCost = Math.max(0, Math.round(totalLineOutlay / totalPieces));
 
       return {
         ...item,
-        allocatedCost: allocated,
-        perUnitAdd,
+        allocatedCost: allocatedAdd,
         landedUnitCost
       };
     });
@@ -647,7 +890,7 @@ const Purchases = () => {
       totalQty: qtySum,
       itemsWithLandedCost: itemsWithLanded
     };
-  }, [items, additionalCost]);
+  }, [items, additionalCost, giftData]);
 
   // Synchronize Payment Method State with Absolute Accounting Rigor
   useEffect(() => {
@@ -756,13 +999,12 @@ const Purchases = () => {
         total_amount: totalInvoiceCost,
         paid_amount: effectivePaid,
         remaining_amount: totalRemaining,
-        items: items.map(i => {
+        items: itemsWithLandedCost.map(i => {
           const isBox = i.unit_type === 'BOX';
           const unitsPerBox = Math.max(1, parseFloat(i.units_per_box) || 1);
           const totalPieces = isBox 
             ? Math.max(0.001, (parseFloat(i.box_quantity) || 0) * unitsPerBox)
             : Math.max(0.001, parseFloat(i.quantity) || 1);
-          const bonusQty = Math.max(0, parseFloat(i.bonus_quantity) || 0);
           const lineTotal = getItemLineTotal(i);
           const pieceCost = isBox
             ? Math.max(0, (Number(i.box_cost_price) || 0) / unitsPerBox)
@@ -792,9 +1034,11 @@ const Purchases = () => {
             unit: i.unit || 'دانە',
             is_weighted: Boolean(i.is_weighted),
             quantity: Math.round(totalPieces * 1000) / 1000,
-            bonus_quantity: bonusQty,
+            bonus_quantity: 0,
+            discount_amount: i.allocatedDiscount || 0,
             cost_price: Math.round(pieceCost),
             purchase_price: Math.round(pieceCost),
+            landed_cost_price: i.landedUnitCost || Math.round(pieceCost),
             selling_price: Math.max(0, Number(i.selling_price) || 0),
             sell_price: Math.max(0, Number(i.selling_price) || 0),
             units_per_box: unitsPerBox,
@@ -803,7 +1047,23 @@ const Purchases = () => {
             box_cost_price: isBox ? (Number(i.box_cost_price) || 0) : null,
             line_total: lineTotal
           };
-        })
+        }),
+        gift_item: giftData ? {
+          product_id: giftData.product_id,
+          name: giftData.name,
+          barcode: giftData.barcode,
+          box_barcode: giftData.box_barcode,
+          unit_type: giftData.unit_type,
+          box_quantity: giftData.unit_type === 'BOX' ? parseFloat(giftData.quantity) : null,
+          units_per_box: giftData.units_per_box,
+          quantity: giftData.unit_type === 'BOX' ? (parseFloat(giftData.quantity) * giftData.units_per_box) : parseFloat(giftData.quantity),
+          cost_price: giftData.cost_price,
+          box_cost_price: giftData.box_cost_price,
+          selling_price: giftData.selling_price,
+          gift_value: giftData.gift_value,
+          allocation_mode: giftData.allocation_mode,
+          target_keys: giftData.target_keys
+        } : null
       };
 
       if (isEditMode) {
@@ -825,19 +1085,21 @@ const Purchases = () => {
         itemsSubtotal,
         additionalCost: effectiveAdditionalCost,
         totalInvoiceCost,
+        giftItem: giftData ? {
+          name: giftData.name,
+          quantity: `${giftData.quantity} ${giftData.unit_type === 'BOX' ? 'کارتۆن' : 'دانە'}`,
+          value: Number(giftData.gift_value)
+        } : null,
         items: itemsWithLandedCost.map(i => {
           const lineTotal = getItemLineTotal(i);
-          const bonusQty = Math.max(0, parseFloat(i.bonus_quantity) || 0);
-          const bonusDesc = bonusQty > 0
-            ? ` (+${bonusQty} ${i.unit_type === 'BOX' ? (i.is_weighted ? 'گونیە دیاری' : 'کارتۆن دیاری') : (i.is_weighted ? 'کگم دیاری' : 'دانە دیاری')})`
-            : '';
-          const unitDesc = (i.unit_type === 'BOX' ? `${i.box_quantity} ${i.is_weighted ? 'گونیە' : 'کارتۆن'}` : `${i.quantity} ${i.is_weighted ? 'کگم' : 'دانە'}`) + bonusDesc;
+          const unitDesc = (i.unit_type === 'BOX' ? `${i.box_quantity} ${i.is_weighted ? 'گونیە' : 'کارتۆن'}` : `${i.quantity} ${i.is_weighted ? 'کگم' : 'دانە'}`);
 
           return {
             name: i.name,
             barcode: i.barcode || '',
             quantity: unitDesc,
             cost_price: i.unit_type === 'BOX' ? Number(i.box_cost_price) : Number(i.cost_price),
+            discountedCost: (i.allocatedDiscount > 0) ? (i.unit_type === 'BOX' ? i.discountedBoxCost : i.discountedPieceCost) : null,
             landedUnitCost: i.landedUnitCost || Number(i.cost_price) || 0,
             total: lineTotal
           };
@@ -859,6 +1121,7 @@ const Purchases = () => {
       setPaymentMethod('CASH');
       setPaidAmount('');
       setAdditionalCost('');
+      setGiftData(null);
       setProductSearch('');
 
       if (isEditMode && !exportPdf) {
@@ -1122,6 +1385,33 @@ const Purchases = () => {
             }} 
           />
         </div>
+
+        {/* Gift (دیاری) Button */}
+        <div>
+          <button
+            type="button"
+            onClick={openGiftModal}
+            style={{
+              height: '38px',
+              padding: '0 14px',
+              borderRadius: '6px',
+              background: giftData ? '#f0fdf4' : '#ffffff',
+              border: giftData ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+              color: giftData ? '#15803d' : '#475569',
+              fontWeight: 800,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              boxSizing: 'border-box',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>{giftData ? `دیاری: ${giftData.name || 'کاڵا'}` : 'دیاری'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Consolidate Search Row: Barcode, Name Search, Add, and + New Product on tightly unified line */}
@@ -1285,14 +1575,14 @@ const Purchases = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', textAlign: 'right', whiteSpace: 'nowrap' }}>
           <colgroup>
             <col style={{ width: '3%' }} />
-            <col style={{ width: '16%' }} />
-            <col style={{ width: '9%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '8%' }} />
             <col style={{ width: '6%' }} />
             <col style={{ width: '8%' }} />
             <col style={{ width: '6%' }} />
-            <col style={{ width: '6%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '9%' }} />
             <col style={{ width: '11%' }} />
-            <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '10%' }} />
             <col style={{ width: '5%' }} />
@@ -1311,23 +1601,23 @@ const Purchases = () => {
               <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>هەبوو</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>شێوازی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>بڕ</th>
-              <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center', color: '#16a34a' }}>دیاری</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center', fontSize: '0.80rem' }}>دانە/کێش لە کارتۆن</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی کڕین</th>
+              <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center', color: '#16a34a' }}>نرخی دوای داشکاندن</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>نرخی فرۆشتن (تاک)</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 8px', textAlign: 'center' }}>کۆی کڕین</th>
               <th style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>کردار</th>
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {itemsWithLandedCost.length === 0 ? (
               <tr>
                 <td colSpan="12" style={{ border: '1px solid #e2e8f0', padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
                   هیچ کاڵایەک لە پسووڵەکەدا نییە. بارکۆد لێبدە یان بە ناوی کاڵا بگەڕێ.
                 </td>
               </tr>
             ) : (
-              items.map((item, index) => {
+              itemsWithLandedCost.map((item, index) => {
                 const isBox = item.unit_type === 'BOX';
                 const unitsPerBox = Math.max(1, parseFloat(item.units_per_box) || 1);
                 const lineTotalCost = getItemLineTotal(item);
@@ -1445,39 +1735,6 @@ const Purchases = () => {
                       />
                     </td>
 
-                    {/* Bonus / Gift Quantity (دیاری) */}
-                    <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
-                      <input 
-                        type="number" 
-                        step="any"
-                        min="0" 
-                        value={item.bonus_quantity ?? ''} 
-                        onChange={(e) => updateItem(index, 'bonus_quantity', e.target.value)} 
-                        onFocus={(e) => e.target.select()}
-                        onBlur={(e) => {
-                          const formatted = formatCleanQty(e.target.value);
-                          if (formatted !== e.target.value) {
-                            updateItem(index, 'bonus_quantity', formatted);
-                          }
-                        }}
-                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
-                        placeholder="0"
-                        style={{
-                          width: '55px',
-                          height: '28px',
-                          borderRadius: '4px',
-                          background: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '#f0fdf4' : '#ffffff',
-                          border: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '1px solid #86efac' : '1px solid #cbd5e1',
-                          color: item.bonus_quantity && parseFloat(item.bonus_quantity) > 0 ? '#15803d' : '#1e293b',
-                          textAlign: 'center',
-                          direction: 'ltr',
-                          fontWeight: 700,
-                          fontSize: '0.86rem',
-                          outline: 'none'
-                        }} 
-                      />
-                    </td>
-
                     {/* Units per Box/Sack Input ("دانە لە کارتۆندا" / "کێش لە گونیەدا") */}
                     <td style={{ border: '1px solid #e2e8f0', padding: '0 4px', textAlign: 'center' }}>
                       <input 
@@ -1536,6 +1793,17 @@ const Purchases = () => {
                           outline: 'none'
                         }} 
                       />
+                    </td>
+
+                    {/* Price After Discount (نرخی دوای داشکاندن) */}
+                    <td style={{ border: '1px solid #e2e8f0', padding: '0 6px', textAlign: 'center' }}>
+                      {item.allocatedDiscount > 0 ? (
+                        <span style={{ color: '#16a34a', fontWeight: 800, fontSize: '0.86rem' }}>
+                          {(isBox ? item.discountedBoxCost : item.discountedPieceCost).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '0.86rem' }}>-</span>
+                      )}
                     </td>
 
                     {/* Selling Price (Per Piece) - Clean Gray Border */}
@@ -1645,6 +1913,12 @@ const Purchases = () => {
           <div>
             ماوە (قەرز): <strong style={{ color: '#1e293b', fontWeight: 800 }}>{totalRemaining.toLocaleString()} د.ع</strong>
           </div>
+
+          {giftData && Number(giftData.gift_value) > 0 && (
+            <div style={{ color: '#15803d' }}>
+              دیاری: <strong style={{ fontWeight: 800 }}>{giftData.name} ({giftData.quantity} {giftData.unit_type === 'BOX' ? 'کارتۆن' : 'دانە'})</strong>
+            </div>
+          )}
         </div>
 
         {/* Action Save & Print Buttons */}
@@ -1988,6 +2262,378 @@ const Purchases = () => {
             >
               باشە
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Gift (دیاری) Minimalist Modal */}
+      {giftModalOpen && (
+        <div 
+          onClick={() => setGiftModalOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            direction: 'rtl'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              padding: '20px 24px',
+              width: '460px',
+              maxWidth: '92vw',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.16)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
+                دیاری
+              </h3>
+              <button
+                type="button"
+                onClick={() => setGiftModalOpen(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.2rem',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '2px 6px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Gift Product Selection */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                کاڵای دیاری
+              </label>
+              <input
+                type="text"
+                value={giftProductSearch}
+                onChange={(e) => {
+                  setGiftProductSearch(e.target.value);
+                  if (selectedGiftProduct && selectedGiftProduct.name !== e.target.value) {
+                    setSelectedGiftProduct(null);
+                  }
+                }}
+                placeholder="گەڕان بە ناوی کاڵا یان بارکۆد..."
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.86rem',
+                  color: '#1e293b',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+              {/* Product search dropdown */}
+              {giftFilteredProducts.length > 0 && !selectedGiftProduct && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '4px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+                  zIndex: 100,
+                  maxHeight: '180px',
+                  overflowY: 'auto'
+                }}>
+                  {giftFilteredProducts.map(p => (
+                    <div
+                      key={p.id}
+                      onClick={() => handleSelectGiftProduct(p)}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.84rem' }}>{p.name}</span>
+                      <span style={{ color: '#64748b', fontSize: '0.80rem' }}>
+                        {Math.round(Number(p.box_cost_price || p.cost_price || 0)).toLocaleString()} د.ع
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Packaging / Unit Type & Quantity */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                  شێوازی دیاری
+                </label>
+                <div style={{
+                  display: 'flex',
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  border: '1px solid #cbd5e1',
+                  height: '38px',
+                  boxSizing: 'border-box'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => handleGiftUnitTypeChange('BOX')}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: giftUnitType === 'BOX' ? 800 : 600,
+                      background: giftUnitType === 'BOX' ? '#2563eb' : '#f8fafc',
+                      color: giftUnitType === 'BOX' ? '#ffffff' : '#64748b',
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    کارتۆن
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGiftUnitTypeChange('PIECE')}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: giftUnitType === 'PIECE' ? 800 : 600,
+                      background: giftUnitType === 'PIECE' ? '#2563eb' : '#f8fafc',
+                      color: giftUnitType === 'PIECE' ? '#ffffff' : '#64748b',
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    دانە
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ width: '120px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                  بڕی دیاری
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.001"
+                  value={giftQuantity}
+                  onChange={(e) => handleGiftQuantityChange(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    direction: 'ltr',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Gift Value (Total Monetary Discount to be absorbed) */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                بەهای دیاری (دینار)
+              </label>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={giftValue}
+                onChange={(e) => setGiftValue(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  direction: 'ltr',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Discount Target Options */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                داشکاندن بەسەر
+              </label>
+              <div style={{ display: 'flex', gap: '14px', marginBottom: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+                  <input
+                    type="radio"
+                    name="giftAllocation"
+                    checked={giftAllocationMode === 'ALL'}
+                    onChange={() => setGiftAllocationMode('ALL')}
+                  />
+                  <span>گشت کاڵاکان</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+                  <input
+                    type="radio"
+                    name="giftAllocation"
+                    checked={giftAllocationMode === 'SELECTED'}
+                    onChange={() => setGiftAllocationMode('SELECTED')}
+                  />
+                  <span>کاڵای دیاریکراو</span>
+                </label>
+              </div>
+
+              {/* Items Checklist (when SELECTED mode is active) */}
+              {giftAllocationMode === 'SELECTED' && (
+                <div style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  maxHeight: '140px',
+                  overflowY: 'auto',
+                  padding: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  background: '#f8fafc'
+                }}>
+                  {items.map((it, idx) => {
+                    const itemKey = it.barcode || it.name || String(idx);
+                    const isChecked = giftTargetKeys.includes(itemKey);
+                    const lineCost = getItemLineTotal(it);
+                    return (
+                      <label 
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          background: isChecked ? '#f0fdf4' : '#ffffff',
+                          border: isChecked ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          fontSize: '0.82rem'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setGiftTargetKeys([...giftTargetKeys, itemKey]);
+                            } else {
+                              setGiftTargetKeys(giftTargetKeys.filter(k => k !== itemKey));
+                            }
+                          }}
+                        />
+                        <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.name}</span>
+                        <span style={{ marginRight: 'auto', color: '#64748b', fontSize: '0.78rem' }}>
+                          {lineCost.toLocaleString()} د.ع
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+              <div>
+                {giftData && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveGift}
+                    style={{
+                      height: '36px',
+                      padding: '0 14px',
+                      borderRadius: '6px',
+                      background: '#fee2e2',
+                      border: '1px solid #fca5a5',
+                      color: '#b91c1c',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    سڕینەوەی دیاری
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setGiftModalOpen(false)}
+                  style={{
+                    height: '36px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#475569',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  پاشگەزبوونەوە
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveGiftModal}
+                  style={{
+                    height: '36px',
+                    padding: '0 20px',
+                    borderRadius: '6px',
+                    background: '#16a34a',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  تۆمارکردن
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
