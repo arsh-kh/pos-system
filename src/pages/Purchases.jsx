@@ -2418,458 +2418,456 @@ const Purchases = () => {
               background: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #cbd5e1',
-              padding: '20px 24px',
-              width: '520px',
-              maxWidth: '94vw',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.16)',
+              padding: '22px 26px',
+              width: '860px',
+              maxWidth: '95vw',
+              boxShadow: '0 20px 45px rgba(0, 0, 0, 0.18)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '14px'
+              gap: '16px'
             }}
           >
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>🎁</span>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
-                  دیارییەکان ({giftsList.length})
-                </h3>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>
+                دیارییەکان
+              </h3>
               <button
                 type="button"
                 onClick={() => setGiftModalOpen(false)}
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  fontSize: '1.2rem',
+                  fontSize: '1.25rem',
                   color: '#64748b',
                   cursor: 'pointer',
-                  padding: '2px 6px'
+                  padding: '2px 6px',
+                  lineHeight: 1
                 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* Gift Product Selection */}
-            <div style={{ position: 'relative' }}>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                کاڵای دیاری
-              </label>
-              <input
-                type="text"
-                value={giftProductSearch}
-                onChange={(e) => {
-                  setGiftProductSearch(e.target.value);
-                  if (selectedGiftProduct && selectedGiftProduct.name !== e.target.value) {
-                    setSelectedGiftProduct(null);
-                  }
-                }}
-                placeholder="گەڕان بە ناوی کاڵا یان بارکۆد..."
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  padding: '0 10px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.86rem',
-                  color: '#1e293b',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-              {/* Product search dropdown */}
-              {giftFilteredProducts.length > 0 && !selectedGiftProduct && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '4px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '8px',
-                  boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
-                  zIndex: 100,
-                  maxHeight: '180px',
-                  overflowY: 'auto'
-                }}>
-                  {giftFilteredProducts.map(p => (
-                    <div
-                      key={p.id}
-                      onClick={() => handleSelectGiftProduct(p)}
-                      style={{
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        borderBottom: '1px solid #f1f5f9'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.84rem' }}>{p.name}</span>
-                      <span style={{ color: '#64748b', fontSize: '0.80rem' }}>
-                        {Math.round(Number(p.box_cost_price || p.cost_price || 0)).toLocaleString()} د.ع
-                      </span>
+            {/* Two-Column Layout (Side-by-Side) */}
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+
+              {/* Right Column: Form to Add Gift */}
+              <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Gift Product Selection */}
+                <div style={{ position: 'relative' }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                    کاڵای دیاری
+                  </label>
+                  <input
+                    type="text"
+                    value={giftProductSearch}
+                    onChange={(e) => {
+                      setGiftProductSearch(e.target.value);
+                      if (selectedGiftProduct && selectedGiftProduct.name !== e.target.value) {
+                        setSelectedGiftProduct(null);
+                      }
+                    }}
+                    placeholder="گەڕان بە ناوی کاڵا یان بارکۆد..."
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.86rem',
+                      color: '#1e293b',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  {/* Product search dropdown */}
+                  {giftFilteredProducts.length > 0 && !selectedGiftProduct && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '4px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+                      zIndex: 100,
+                      maxHeight: '180px',
+                      overflowY: 'auto'
+                    }}>
+                      {giftFilteredProducts.map(p => (
+                        <div
+                          key={p.id}
+                          onClick={() => handleSelectGiftProduct(p)}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderBottom: '1px solid #f1f5f9'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.84rem' }}>{p.name}</span>
+                          <span style={{ color: '#64748b', fontSize: '0.80rem' }}>
+                            {Math.round(Number(p.box_cost_price || p.cost_price || 0)).toLocaleString()} د.ع
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Packaging / Unit Type & Quantity */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                  شێوازی دیاری
-                </label>
-                <div style={{
-                  display: 'flex',
-                  borderRadius: '6px',
-                  overflow: 'hidden',
-                  border: '1px solid #cbd5e1',
-                  height: '38px',
-                  boxSizing: 'border-box'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => handleGiftUnitTypeChange('BOX')}
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: giftUnitType === 'BOX' ? 800 : 600,
-                      background: giftUnitType === 'BOX' ? '#2563eb' : '#f8fafc',
-                      color: giftUnitType === 'BOX' ? '#ffffff' : '#64748b',
-                      fontSize: '0.82rem'
-                    }}
-                  >
-                    کارتۆن
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleGiftUnitTypeChange('PIECE')}
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: giftUnitType === 'PIECE' ? 800 : 600,
-                      background: giftUnitType === 'PIECE' ? '#2563eb' : '#f8fafc',
-                      color: giftUnitType === 'PIECE' ? '#ffffff' : '#64748b',
-                      fontSize: '0.82rem'
-                    }}
-                  >
-                    دانە
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ width: '120px' }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                  بڕی دیاری
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={giftQuantity}
-                  onChange={(e) => handleGiftQuantityChange(cleanNumericInput(e.target.value))}
-                  onFocus={placeCursorAtEnd}
-                  onClick={(e) => {
-                    if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
-                      placeCursorAtEnd(e);
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '38px',
-                    padding: '0 8px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
-                    textAlign: 'center',
-                    direction: 'ltr',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Gift Value (Total Monetary Discount to be absorbed) */}
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                بەهای دیاری (دینار)
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={giftValue}
-                onChange={(e) => setGiftValue(cleanNumericInput(e.target.value))}
-                onFocus={placeCursorAtEnd}
-                onClick={(e) => {
-                  if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
-                    placeCursorAtEnd(e);
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  padding: '0 10px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  direction: 'ltr',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            {/* Discount Target Options */}
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
-                داشکاندن بەسەر
-              </label>
-              <div style={{ display: 'flex', gap: '14px', marginBottom: '8px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
-                  <input
-                    type="radio"
-                    name="giftAllocation"
-                    checked={giftAllocationMode === 'ALL'}
-                    onChange={() => setGiftAllocationMode('ALL')}
-                  />
-                  <span>گشت کاڵاکان</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
-                  <input
-                    type="radio"
-                    name="giftAllocation"
-                    checked={giftAllocationMode === 'SELECTED'}
-                    onChange={() => setGiftAllocationMode('SELECTED')}
-                  />
-                  <span>کاڵای دیاریکراو</span>
-                </label>
-              </div>
-
-              {/* Items Checklist (when SELECTED mode is active) */}
-              {giftAllocationMode === 'SELECTED' && (
-                <div style={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  maxHeight: '130px',
-                  overflowY: 'auto',
-                  padding: '6px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  background: '#f8fafc'
-                }}>
-                  {items.map((it, idx) => {
-                    const itemKey = it.barcode || it.name || String(idx);
-                    const isChecked = giftTargetKeys.includes(itemKey);
-                    const lineCost = getItemLineTotal(it);
-                    return (
-                      <label 
-                        key={idx}
+                {/* Packaging / Unit Type & Quantity */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      شێوازی دیاری
+                    </label>
+                    <div style={{
+                      display: 'flex',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      border: '1px solid #cbd5e1',
+                      height: '38px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleGiftUnitTypeChange('BOX')}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '6px 8px',
-                          borderRadius: '4px',
-                          background: isChecked ? '#f0fdf4' : '#ffffff',
-                          border: isChecked ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          flex: 1,
+                          border: 'none',
                           cursor: 'pointer',
+                          fontWeight: giftUnitType === 'BOX' ? 800 : 600,
+                          background: giftUnitType === 'BOX' ? '#2563eb' : '#f8fafc',
+                          color: giftUnitType === 'BOX' ? '#ffffff' : '#64748b',
                           fontSize: '0.82rem'
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setGiftTargetKeys([...giftTargetKeys, itemKey]);
-                            } else {
-                              setGiftTargetKeys(giftTargetKeys.filter(k => k !== itemKey));
-                            }
-                          }}
-                        />
-                        <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.name}</span>
-                        <span style={{ marginRight: 'auto', color: '#64748b', fontSize: '0.78rem' }}>
-                          {lineCost.toLocaleString()} د.ع
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                        کارتۆن
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleGiftUnitTypeChange('PIECE')}
+                        style={{
+                          flex: 1,
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: giftUnitType === 'PIECE' ? 800 : 600,
+                          background: giftUnitType === 'PIECE' ? '#2563eb' : '#f8fafc',
+                          color: giftUnitType === 'PIECE' ? '#ffffff' : '#64748b',
+                          fontSize: '0.82rem'
+                        }}
+                      >
+                        دانە
+                      </button>
+                    </div>
+                  </div>
 
-            {/* Add Gift to List Button */}
-            <button
-              type="button"
-              onClick={handleAddGiftToList}
-              style={{
-                height: '38px',
-                borderRadius: '6px',
-                background: '#2563eb',
-                border: 'none',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <span>+</span>
-              <span>زیادکردنی ئەم دیارییە</span>
-            </button>
-
-            {/* Added Gifts List */}
-            {giftsList.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                <span style={{ fontSize: '0.80rem', fontWeight: 700, color: '#475569' }}>
-                  دیارییە زیادکراوەکان ({giftsList.length})
-                </span>
-                <div style={{
-                  maxHeight: '140px',
-                  overflowY: 'auto',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  background: '#f8fafc',
-                  padding: '6px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px'
-                }}>
-                  {giftsList.map((g) => (
-                    <div
-                      key={g.id}
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        padding: '8px 10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '8px'
+                  <div style={{ width: '120px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                      بڕی دیاری
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={giftQuantity}
+                      onChange={(e) => handleGiftQuantityChange(cleanNumericInput(e.target.value))}
+                      onFocus={placeCursorAtEnd}
+                      onClick={(e) => {
+                        if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                          placeCursorAtEnd(e);
+                        }
                       }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0f172a' }}>
-                            {g.name}
-                          </span>
-                          <span style={{
-                            background: '#dbeafe',
-                            color: '#1d4ed8',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: '4px'
-                          }}>
-                            {g.quantity} {g.unit_type === 'BOX' ? 'کارتۆن' : 'دانە'}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        direction: 'ltr',
+                        boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Gift Value (Total Monetary Discount to be absorbed) */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                    بەهای دیاری (دینار)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={giftValue}
+                    onChange={(e) => setGiftValue(cleanNumericInput(e.target.value))}
+                    onFocus={placeCursorAtEnd}
+                    onClick={(e) => {
+                      if (e.target && e.target.selectionStart === 0 && e.target.value && e.target.value.length > 0) {
+                        placeCursorAtEnd(e);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      direction: 'ltr',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Discount Target Options */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+                    داشکاندن بەسەر
+                  </label>
+                  <div style={{ display: 'flex', gap: '14px', marginBottom: '6px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+                      <input
+                        type="radio"
+                        name="giftAllocation"
+                        checked={giftAllocationMode === 'ALL'}
+                        onChange={() => setGiftAllocationMode('ALL')}
+                      />
+                      <span>گشت کاڵاکان</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+                      <input
+                        type="radio"
+                        name="giftAllocation"
+                        checked={giftAllocationMode === 'SELECTED'}
+                        onChange={() => setGiftAllocationMode('SELECTED')}
+                      />
+                      <span>کاڵای دیاریکراو</span>
+                    </label>
+                  </div>
+
+                  {/* Items Checklist (when SELECTED mode is active) */}
+                  {giftAllocationMode === 'SELECTED' && (
+                    <div style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      maxHeight: '120px',
+                      overflowY: 'auto',
+                      padding: '6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      background: '#f8fafc'
+                    }}>
+                      {items.map((it, idx) => {
+                        const itemKey = it.barcode || it.name || String(idx);
+                        const isChecked = giftTargetKeys.includes(itemKey);
+                        const lineCost = getItemLineTotal(it);
+                        return (
+                          <label 
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '5px 8px',
+                              borderRadius: '4px',
+                              background: isChecked ? '#f0fdf4' : '#ffffff',
+                              border: isChecked ? '1px solid #86efac' : '1px solid #e2e8f0',
+                              cursor: 'pointer',
+                              fontSize: '0.80rem'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setGiftTargetKeys([...giftTargetKeys, itemKey]);
+                                } else {
+                                  setGiftTargetKeys(giftTargetKeys.filter(k => k !== itemKey));
+                                }
+                              }}
+                            />
+                            <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.name}</span>
+                            <span style={{ marginRight: 'auto', color: '#64748b', fontSize: '0.78rem' }}>
+                              {lineCost.toLocaleString()} د.ع
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Gift to List Button */}
+                <button
+                  type="button"
+                  onClick={handleAddGiftToList}
+                  style={{
+                    height: '38px',
+                    borderRadius: '6px',
+                    background: '#2563eb',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    marginTop: '2px'
+                  }}
+                >
+                  <span>+</span>
+                  <span>زیادکردنی ئەم دیارییە</span>
+                </button>
+              </div>
+
+              {/* Left Column: Added Gifts List & Summary */}
+              <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#334155' }}>
+                  دیارییە زیادکراوەکان
+                </div>
+
+                {giftsList.length === 0 ? (
+                  <div style={{
+                    minHeight: '220px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px dashed #cbd5e1',
+                    color: '#94a3b8',
+                    fontSize: '0.84rem'
+                  }}>
+                    هیچ دیارییەک زیاد نەکراوە
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    minHeight: '160px'
+                  }}>
+                    {giftsList.map((g) => (
+                      <div
+                        key={g.id}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '8px 10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0f172a' }}>
+                              {g.name}
+                            </span>
+                            <span style={{
+                              background: '#dbeafe',
+                              color: '#1d4ed8',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '1px 6px',
+                              borderRadius: '4px'
+                            }}>
+                              {g.quantity} {g.unit_type === 'BOX' ? 'کارتۆن' : 'دانە'}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                            بۆ: {getGiftTargetSummary(g)}
                           </span>
                         </div>
-                        <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                          بۆ: {getGiftTargetSummary(g)}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#16a34a', direction: 'ltr' }}>
+                            {Number(g.gift_value || 0).toLocaleString()} د.ع
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveGiftFromList(g.id)}
+                            style={{
+                              background: '#fee2e2',
+                              border: '1px solid #fca5a5',
+                              color: '#b91c1c',
+                              borderRadius: '4px',
+                              padding: '3px 8px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            سڕینەوە
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.86rem', color: '#16a34a', direction: 'ltr' }}>
-                          {Number(g.gift_value || 0).toLocaleString()} د.ع
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveGiftFromList(g.id)}
-                          style={{
-                            background: '#fee2e2',
-                            border: '1px solid #fca5a5',
-                            color: '#b91c1c',
-                            borderRadius: '4px',
-                            padding: '3px 8px',
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          سڕینەوە
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+
+                {/* Total Gifts Summary */}
+                {giftsList.length > 0 && (
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.84rem'
+                  }}>
+                    <span style={{ fontWeight: 700, color: '#166534' }}>
+                      کۆی گشتی داشکاندنی دیارییەکان:
+                    </span>
+                    <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.92rem', direction: 'ltr' }}>
+                      {totalGiftsValue.toLocaleString()} د.ع
+                    </span>
+                  </div>
+                )}
+
+                {/* Save Button (NO CLOSE BUTTON) */}
+                <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveGiftModal}
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      borderRadius: '6px',
+                      background: '#16a34a',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontSize: '0.86rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    پاشەکەوتکردن
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Total Gifts Summary */}
-            {giftsList.length > 0 && (
-              <div style={{
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '6px',
-                padding: '8px 12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.84rem'
-              }}>
-                <span style={{ fontWeight: 700, color: '#166534' }}>
-                  کۆی گشتی داشکاندنی دیارییەکان:
-                </span>
-                <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.92rem', direction: 'ltr' }}>
-                  {totalGiftsValue.toLocaleString()} د.ع
-                </span>
-              </div>
-            )}
-
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-              <button
-                type="button"
-                onClick={() => setGiftModalOpen(false)}
-                style={{
-                  height: '36px',
-                  padding: '0 16px',
-                  borderRadius: '6px',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: '#475569',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                داخستن
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveGiftModal}
-                style={{
-                  height: '36px',
-                  padding: '0 20px',
-                  borderRadius: '6px',
-                  background: '#16a34a',
-                  border: 'none',
-                  color: '#ffffff',
-                  fontSize: '0.84rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                پاشەکەوتکردن
-              </button>
             </div>
 
           </div>
