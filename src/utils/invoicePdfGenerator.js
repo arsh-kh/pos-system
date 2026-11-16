@@ -258,6 +258,11 @@ export const generateA4InvoiceHTML = (invoiceData, storeName, storePhone) => {
       <span class="sum-lbl">کۆی کاڵاکان:</span>
       <span class="sum-val">${(invoiceData.items || []).length}</span>
     </div>
+    ${(invoiceData.gifts && invoiceData.gifts.length > 0) ? `
+    <div class="sum-part">
+      <span class="sum-lbl">داشکاندنی دیاری (${invoiceData.gifts.length} جۆر):</span>
+      <span class="sum-val" style="color: #16a34a;">- ${fmt(invoiceData.gifts.reduce((s, g) => s + (Number(g.value) || 0), 0))} د.ع</span>
+    </div>` : ''}
     ${hasAddCost ? `
     <div class="sum-part">
       <span class="sum-lbl">خەرجی زیادە:</span>

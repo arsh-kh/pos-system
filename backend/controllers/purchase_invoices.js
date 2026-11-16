@@ -20,6 +20,7 @@ const ensureInvoicesSchema = async () => {
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN bonus_quantity DECIMAL(10,3) NOT NULL DEFAULT 0.000"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN is_gift TINYINT(1) NOT NULL DEFAULT 0"); } catch (_) {}
         try { await db.query("ALTER TABLE Purchase_Invoice_Items ADD COLUMN discount_amount BIGINT NOT NULL DEFAULT 0"); } catch (_) {}
+        try { await db.query("ALTER TABLE Purchase_Invoices ADD COLUMN gift_data LONGTEXT NULL"); } catch (_) {}
     } catch (err) {
         console.error('Invoice schema ensure error:', err.message);
     }
@@ -63,10 +64,15 @@ exports.createPurchaseInvoice = async (req, res) => {
             total_amount = safeBigInt(Math.round(Number(req.body.total_amount)));
         }
 
+        const giftsList = Array.isArray(req.body.gift_items)
+            ? req.body.gift_items
+            : (req.body.gift_item ? [req.body.gift_item] : []);
+        const gift_data_json = giftsList.length > 0 ? JSON.stringify(giftsList) : null;
+
         // 1. Create Invoice
         const dateVal = invoice_date ? new Date(invoice_date) : new Date();
         const [invoiceResult] = await connection.query(
-            'INSERT INTO Purchase_Invoices (supplier_id, total_amount, paid_amount, remaining_amount, invoice_number, payment_method, additional_cost, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO Purchase_Invoices (supplier_id, total_amount, paid_amount, remaining_amount, invoice_number, payment_method, additional_cost, created_at, gift_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 supplier_id ? supplier_id : null, 
                 total_amount.toString(), 
@@ -75,7 +81,8 @@ exports.createPurchaseInvoice = async (req, res) => {
                 invoice_number || null,
                 payment_method || 'CASH',
                 additionalCostBigInt.toString(),
-                dateVal
+                dateVal,
+                gift_data_json
             ]
         );
         const invoice_id = invoiceResult.insertId;
@@ -251,11 +258,12 @@ exports.createPurchaseInvoice = async (req, res) => {
             );
         }
 
-        // 4. Handle Dedicated Gift Item (دیاری) if provided
-        if (req.body.gift_item && (parseFloat(req.body.gift_item.quantity) > 0 || parseFloat(req.body.gift_item.box_quantity) > 0)) {
-            const gift = req.body.gift_item;
-            let giftProductId = gift.product_id;
+        // 4. Handle Dedicated Gift Items (دیاری) if provided
+        for (let gIdx = 0; gIdx < giftsList.length; gIdx++) {
+            const gift = giftsList[gIdx];
+            if (!gift || (parseFloat(gift.quantity) <= 0 && parseFloat(gift.box_quantity) <= 0)) continue;
 
+            let giftProductId = gift.product_id;
             const isGiftDraft = gift.is_draft || !giftProductId || String(giftProductId).startsWith('draft_');
             if (isGiftDraft) {
                 const giftBarcode = gift.barcode ? String(gift.barcode).trim() : null;
@@ -296,7 +304,7 @@ exports.createPurchaseInvoice = async (req, res) => {
                     ]
                 );
 
-                const giftBatchNum = `BATCH-GIFT-${invoice_id}-${giftProductId}`;
+                const giftBatchNum = `BATCH-GIFT-${invoice_id}-${giftProductId}-${gIdx + 1}`;
                 await connection.query(`
                     INSERT INTO Product_Batches (
                         product_id,
@@ -674,11 +682,17 @@ exports.updatePurchaseInvoice = async (req, res) => {
             }
         }
 
-        // Handle Dedicated Gift Item (دیاری) for Updated Invoice
-        if (req.body.gift_item && (parseFloat(req.body.gift_item.quantity) > 0 || parseFloat(req.body.gift_item.box_quantity) > 0)) {
-            const gift = req.body.gift_item;
-            let giftProductId = gift.product_id;
+        // Handle Dedicated Gift Items (دیاری) for Updated Invoice
+        const giftsList = Array.isArray(req.body.gift_items)
+            ? req.body.gift_items
+            : (req.body.gift_item ? [req.body.gift_item] : []);
+        const gift_data_json = giftsList.length > 0 ? JSON.stringify(giftsList) : null;
 
+        for (let gIdx = 0; gIdx < giftsList.length; gIdx++) {
+            const gift = giftsList[gIdx];
+            if (!gift || (parseFloat(gift.quantity) <= 0 && parseFloat(gift.box_quantity) <= 0)) continue;
+
+            let giftProductId = gift.product_id;
             const isGiftDraft = gift.is_draft || !giftProductId || String(giftProductId).startsWith('draft_');
             if (isGiftDraft) {
                 const giftBarcode = gift.barcode ? String(gift.barcode).trim() : null;
@@ -719,7 +733,7 @@ exports.updatePurchaseInvoice = async (req, res) => {
                     ]
                 );
 
-                const giftBatchNum = `BATCH-GIFT-${id}-${giftProductId}`;
+                const giftBatchNum = `BATCH-GIFT-${id}-${giftProductId}-${gIdx + 1}`;
                 await connection.query(`
                     INSERT INTO Product_Batches (
                         product_id,
@@ -770,7 +784,7 @@ exports.updatePurchaseInvoice = async (req, res) => {
         // 7. Update Invoice Record
         await connection.query(`
             UPDATE Purchase_Invoices 
-            SET supplier_id = ?, total_amount = ?, paid_amount = ?, remaining_amount = ?, invoice_number = ?, payment_method = ?, additional_cost = ?, created_at = ?
+            SET supplier_id = ?, total_amount = ?, paid_amount = ?, remaining_amount = ?, invoice_number = ?, payment_method = ?, additional_cost = ?, created_at = ?, gift_data = ?
             WHERE id = ?
         `, [
             supplier_id,
@@ -781,6 +795,7 @@ exports.updatePurchaseInvoice = async (req, res) => {
             payment_method || oldInv.payment_method,
             additionalCostBigInt.toString(),
             dateVal,
+            gift_data_json,
             id
         ]);
 
