@@ -230,7 +230,19 @@ exports.processCheckout = async (req, res) => {
 
                     const batchAvailable = Number(batch.remaining_quantity);
                     const deductQty = Math.min(remainingToDeduct, batchAvailable);
-                    const batchUnitCost = Number(batch.cost_price || 0);
+                    let batchUnitCost = Number(batch.cost_price || 0);
+
+                    // Safety guard: Prevent legacy batches with whole-carton cost from corrupting piece sales profit
+                    const prodSell = Number(product.selling_price || 0);
+                    const prodCost = Number(product.cost_price || 0);
+                    if (batchUnitCost > prodSell && prodCost > 0 && prodCost <= prodSell) {
+                        const batchUnits = Number(batch.units_per_box || product.units_per_box || 1);
+                        if (batchUnits > 1 && Math.round(batchUnitCost / batchUnits) <= prodSell) {
+                            batchUnitCost = Math.round(batchUnitCost / batchUnits);
+                        } else {
+                            batchUnitCost = prodCost;
+                        }
+                    }
 
                     itemCostTotal += Math.round(deductQty * batchUnitCost);
                     remainingToDeduct -= deductQty;
