@@ -93,6 +93,39 @@ const Purchases = () => {
   const storeName = localStorage.getItem('pos_store_name') || 'مارکێتی شارەکەم';
   const storePhone = localStorage.getItem('pos_store_phone') || '';
 
+  // Searchable Supplier State
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
+  const supplierDropdownRef = useRef(null);
+
+  const filteredSuppliers = useMemo(() => {
+    if (!supplierSearch.trim()) return suppliers.slice(0, 30);
+    return suppliers.filter(s => kurdishSearchMatch([s.name, s.phone], supplierSearch));
+  }, [suppliers, supplierSearch]);
+
+  // Sync supplierSearch text with current supplierId
+  useEffect(() => {
+    if (supplierId) {
+      const match = suppliers.find(s => String(s.id) === String(supplierId));
+      if (match) {
+        setSupplierSearch(match.name);
+      }
+    } else {
+      setSupplierSearch('');
+    }
+  }, [supplierId, suppliers]);
+
+  // Close supplier dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target)) {
+        setIsSupplierDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return [];
     return products.filter(p => kurdishSearchMatch([p.name, p.barcode, p.box_barcode], productSearch)).slice(0, 10);
@@ -1299,31 +1332,135 @@ const Purchases = () => {
         flexWrap: 'nowrap',
         flexShrink: 0
       }}>
-        {/* Supplier Select */}
-        <div style={{ flex: '1.4', minWidth: '180px' }}>
-          <select 
-            value={supplierId} 
-            onChange={(e) => {
-              setSupplierId(e.target.value);
-              if (!e.target.value) setPaymentMethod('CASH');
-            }} 
-            style={{
-              width: '100%',
-              height: '38px',
-              padding: '0 10px',
-              borderRadius: '6px',
+        {/* Searchable Supplier Combobox */}
+        <div ref={supplierDropdownRef} style={{ flex: '1.4', minWidth: '200px', position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input 
+              type="text"
+              value={supplierSearch}
+              onFocus={() => setIsSupplierDropdownOpen(true)}
+              onChange={(e) => {
+                setSupplierSearch(e.target.value);
+                setIsSupplierDropdownOpen(true);
+                if (!e.target.value) {
+                  setSupplierId('');
+                  setPaymentMethod('CASH');
+                }
+              }}
+              placeholder="کۆمپانیا دیاریبکە..."
+              style={{
+                width: '100%',
+                height: '38px',
+                padding: '0 10px 0 32px',
+                borderRadius: '6px',
+                background: '#ffffff',
+                border: supplierId ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                color: '#1e293b',
+                fontSize: '0.86rem',
+                outline: 'none',
+                fontWeight: 700,
+                boxSizing: 'border-box'
+              }}
+            />
+            {supplierId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSupplierId('');
+                  setSupplierSearch('');
+                  setPaymentMethod('CASH');
+                  setIsSupplierDropdownOpen(false);
+                }}
+                style={{
+                  position: 'absolute',
+                  left: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                title="پاککردنەوە"
+              >
+                ✕
+              </button>
+            ) : (
+              <span
+                onClick={() => setIsSupplierDropdownOpen(prev => !prev)}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  color: '#94a3b8',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                ▼
+              </span>
+            )}
+          </div>
+
+          {/* Autocomplete Dropdown List */}
+          {isSupplierDropdownOpen && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: '4px',
               background: '#ffffff',
               border: '1px solid #cbd5e1',
-              color: '#1e293b',
-              fontSize: '0.86rem',
-              outline: 'none',
-              fontWeight: 700,
-              boxSizing: 'border-box'
-            }}
-          >
-            <option value="">کۆمپانیا دیاریبکە...</option>
-            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+              borderRadius: '8px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              maxHeight: '220px',
+              overflowY: 'auto'
+            }}>
+              {filteredSuppliers.length === 0 ? (
+                <div style={{ padding: '10px 12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                  هیچ کۆمپانیایەک نەدۆزرایەوە
+                </div>
+              ) : (
+                filteredSuppliers.map(s => {
+                  const isSelected = String(s.id) === String(supplierId);
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        setSupplierId(String(s.id));
+                        setSupplierSearch(s.name);
+                        setIsSupplierDropdownOpen(false);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        fontSize: '0.86rem',
+                        fontWeight: isSelected ? 800 : 600,
+                        color: isSelected ? '#2563eb' : '#1e293b',
+                        background: isSelected ? '#eff6ff' : 'transparent',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}
+                      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
+                      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span>{s.name}</span>
+                      {s.phone && (
+                        <span style={{ color: '#94a3b8', fontSize: '0.78rem', direction: 'ltr' }}>
+                          {s.phone}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* Invoice Number */}
