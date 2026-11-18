@@ -25,12 +25,52 @@ const Cashier = () => {
   const allowSplitPayment = canCashier ? canCashier('allow_split_payment') : true;
   const allowViewCostPrice = canCashier ? canCashier('allow_view_cost_price') : false;
 
+  const getInitialCarts = () => {
+    try {
+      const raw = localStorage.getItem('pos_cashier_active_carts');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return [
+      { id: 1, label: 'سەلە ١', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' },
+      { id: 2, label: 'سەلە ٢', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' }
+    ];
+  };
+
+  const getInitialActiveCartIndex = () => {
+    try {
+      const raw = localStorage.getItem('pos_cashier_active_cart_index');
+      if (raw !== null && !isNaN(Number(raw))) {
+        const idx = Number(raw);
+        return idx >= 0 ? idx : 0;
+      }
+    } catch (_) {}
+    return 0;
+  };
+
   // Multi-Cart State (Cart 1: Main, Cart 2: Quick-Sell)
-  const [activeCartIndex, setActiveCartIndex] = useState(0);
-  const [carts, setCarts] = useState([
-    { id: 1, label: 'سەلە ١', shortcut: 'F6', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' },
-    { id: 2, label: 'سەلە ٢', shortcut: 'F7', items: [], customerId: '', discountType: 'AMOUNT', discountValue: '', paymentMode: 'CASH', splitCashAmount: '' }
-  ]);
+  const [activeCartIndex, setActiveCartIndex] = useState(() => getInitialActiveCartIndex());
+  const [carts, setCarts] = useState(() => getInitialCarts());
+
+  // Auto-sync active carts to localStorage (Persistence across page navigation)
+  useEffect(() => {
+    const hasAnyContent = carts.some(c => (Array.isArray(c.items) && c.items.length > 0) || c.customerId || (c.discountValue && Number(c.discountValue) > 0));
+    if (hasAnyContent) {
+      try {
+        localStorage.setItem('pos_cashier_active_carts', JSON.stringify(carts));
+        localStorage.setItem('pos_cashier_active_cart_index', String(activeCartIndex));
+      } catch (err) {
+        console.error('Failed to save cashier draft:', err);
+      }
+    } else {
+      localStorage.removeItem('pos_cashier_active_carts');
+      localStorage.removeItem('pos_cashier_active_cart_index');
+    }
+  }, [carts, activeCartIndex]);
 
   // Active Cart Proxies
   const currentCartData = carts[activeCartIndex] || carts[0];
